@@ -1,0 +1,77 @@
+using RepagroSuite.Domain.Enums;
+
+namespace RepagroSuite.Application.Features.Reservations.DTOs;
+
+public class ReservationDto
+{
+    public Guid Id { get; set; }
+    public Guid RoomId { get; set; }
+    public string RoomName { get; set; } = string.Empty;
+    public string RoomCode { get; set; } = string.Empty;
+    public string? RoomColor { get; set; }
+    public Guid UserId { get; set; }
+    public string UserFullName { get; set; } = string.Empty;
+    public string UserEmail { get; set; } = string.Empty;
+    public DateTime StartDateTime { get; set; }
+    public DateTime EndDateTime { get; set; }
+    public int PeopleCount { get; set; }
+    public string Purpose { get; set; } = string.Empty;
+    public string? Notes { get; set; }
+    public ReservationStatus Status { get; set; }
+    public string StatusName { get; set; } = string.Empty;
+    public string? AdminComment { get; set; }
+    public Guid? ApprovedByUserId { get; set; }
+    public DateTime? ApprovedAt { get; set; }
+    public string? CancellationReason { get; set; }
+    public DateTime? CancelledAt { get; set; }
+    public bool IsDirectAdminReservation { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+
+public class CreateReservationDto
+{
+    public Guid RoomId { get; set; }
+    public DateTime StartDateTime { get; set; }
+    public DateTime EndDateTime { get; set; }
+    public int PeopleCount { get; set; }
+    public string Purpose { get; set; } = string.Empty;
+    public string? Notes { get; set; }
+}
+
+public class AdminDirectReservationDto
+{
+    public Guid RoomId { get; set; }
+    public Guid? UserId { get; set; }
+    public DateTime StartDateTime { get; set; }
+    public DateTime EndDateTime { get; set; }
+    public int PeopleCount { get; set; }
+    public string Purpose { get; set; } = string.Empty;
+    public string? Notes { get; set; }
+}
+
+public class ApproveReservationDto
+{
+    public string? AdminComment { get; set; }
+}
+
+public class RejectReservationDto
+{
+    public string AdminComment { get; set; } = string.Empty;
+}
+
+public class CancelReservationDto
+{
+    public string Reason { get; set; } = string.Empty;
+}
+
+public class CalendarEventDto
+{
+    public Guid Id { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public DateTime Start { get; set; }
+    public DateTime End { get; set; }
+    public string? Color { get; set; }
+    public string RoomName { get; set; } = string.Empty;
+    public string UserName { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+}

@@ -1,0 +1,25 @@
+# ── Backend ─────────────────────────────────────────────────────────
+Backend/**/bin/
+Backend/**/obj/
+Backend/**/logs/
+src/
+
+# ── Frontend ─────────────────────────────────────────────────────────
+Frontend/node_modules/
+Frontend/dist/
+Frontend/dist-ssr/
+Frontend/*.local
+
+# ── IDE / OS ─────────────────────────────────────────────────────────
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# ── Claude Code memory (local only) ──────────────────────────────────
+.claude/
+
+# ── Secrets / env ────────────────────────────────────────────────────
+*.env
+.env.*
