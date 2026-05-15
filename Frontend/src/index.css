@@ -1,0 +1,97 @@
+@import "tailwindcss";
+@import "@fontsource/geist/400.css";
+@import "@fontsource/geist/500.css";
+@import "@fontsource/geist/600.css";
+@import "@fontsource/geist/700.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+@import "@fontsource/jetbrains-mono/600.css";
+
+@theme {
+  /* Brand palette */
+  --color-brand-50:  #F0F7F4;
+  --color-brand-100: #E6F3EF;
+  --color-brand-200: #CCE3DB;
+  --color-brand-300: #9FCABB;
+  --color-brand-400: #4D9D85;
+  --color-brand-500: #006F55;
+  --color-brand-600: #006F55;
+  --color-brand-700: #005947;
+  --color-brand-800: #003E2D;
+  --color-brand-900: #002A1F;
+
+  /* Gold accent */
+  --color-gold:      #F5C518;
+  --color-gold-light: #FFD84D;
+  --color-gold-pale: #FFEFA8;
+  --color-gold-deep: #D9A800;
+
+  /* Neutral tones */
+  --color-ink:  #1F2933;
+  --color-ink2: #5F6B7A;
+  --color-line: #D9DEE5;
+  --color-bg:   #F5F7FA;
+  --color-paper: #FFFFFF;
+
+  /* Status */
+  --color-ok:     #10B981;
+  --color-warn:   #F59E0B;
+  --color-danger: #B42318;
+
+  /* Shadows */
+  --shadow-sh1: 0 1px 2px rgba(15,23,42,.06);
+  --shadow-sh2: 0 4px 14px rgba(15,23,42,.06);
+  --shadow-sh3: 0 16px 40px rgba(15,23,42,.10);
+
+  /* Fonts */
+  --font-sans: 'Geist', 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #F5F7FA;
+  color: #1F2933;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+:focus-visible {
+  outline: 2px solid #006F55;
+  outline-offset: 2px;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #D9DEE5; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #9FCABB; }
+
+/* Login form field — use aria-invalid for error state */
+.form-input {
+  height: 44px;
+  width: 100%;
+  border: 1px solid #D9DEE5;
+  border-radius: 6px;
+  padding: 0 14px;
+  font-size: 14px;
+  color: #1F2933;
+  background: #fff;
+  transition: border-color 150ms, box-shadow 150ms;
+  outline: none;
+}
+.form-input::placeholder { color: rgba(95, 107, 122, .45); }
+.form-input:focus {
+  border-color: #006F55;
+  box-shadow: 0 0 0 3px rgba(0, 111, 85, .18);
+}
+.form-input[aria-invalid="true"] { border-color: #B42318; }
+.form-input[aria-invalid="true"]:focus { border-color: #B42318; box-shadow: none; }
