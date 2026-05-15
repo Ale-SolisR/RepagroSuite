@@ -13,7 +13,7 @@ import toast from 'react-hot-toast'
 import type { IdentificationResultDto } from '@/types'
 
 const schema = z.object({
-  identificationNumber: z.string().min(5, 'Número de identificación requerido'),
+  identificationNumber: z.string().min(9, 'Ingrese al menos 9 dígitos'),
   email: z.string().email('Correo inválido'),
   phoneNumber: z.string().optional(),
   department: z.string().optional(),
@@ -36,7 +36,7 @@ export default function RegisterPage() {
 
   useEffect(() => {
     const digits = idNumber?.replace(/\D/g, '') ?? ''
-    if (digits.length < 5) {
+    if (digits.length < 9) {
       setLookupState('idle')
       setIdResult(null)
       return
@@ -45,7 +45,7 @@ export default function RegisterPage() {
     setLookupState('loading')
     const timer = setTimeout(async () => {
       try {
-        const res = await api.get(`/identifications/lookup/${encodeURIComponent(digits)}`)
+        const res = await api.get('/identifications/lookup', { params: { identificationNumber: digits } })
         setIdResult(res.data.data)
         setLookupState('found')
       } catch {
@@ -130,7 +130,7 @@ export default function RegisterPage() {
               <div className="rounded-lg bg-green-50 border border-green-200 px-3 py-2.5 text-sm">
                 <p className="font-semibold text-green-800">{idResult.fullName}</p>
                 <p className="text-green-600 text-xs mt-0.5">
-                  {idResult.identificationType} · {idResult.identificationNumber}
+                  {idResult.identificationTypeName ?? idResult.identificationType} · {idResult.identificationNumber}
                 </p>
               </div>
             )}

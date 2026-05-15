@@ -299,6 +299,7 @@ export interface BulkUpdateSettingsRequest {
 // ─── Identification ────────────────────────────────────────────────────────────
 export interface IdentificationResultDto {
   identificationType: string
+  identificationTypeName?: string
   identificationNumber: string
   fullName: string
   firstName?: string
@@ -309,5 +310,6 @@ export interface IdentificationResultDto {
   lastName2?: string
   legalName?: string
   source: string
-  fromCache: boolean
+  fromCache?: boolean
+  found?: boolean
 }
