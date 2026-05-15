@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, DoorOpen, CalendarDays, Users, Settings,
-  LogOut, Menu, X, BarChart3, ShieldCheck, Calendar
+  LogOut, Menu, X, BarChart3, ShieldCheck, Calendar, UserCircle
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { authApi } from '@/api/auth'
@@ -12,18 +12,24 @@ const navGroups = [
   {
     label: 'PRINCIPAL',
     items: [
-      { to: '/dashboard',    label: 'Dashboard', icon: LayoutDashboard, permission: null },
-      { to: '/rooms',        label: 'Salas',     icon: DoorOpen,        permission: 'Rooms.View' },
-      { to: '/reservations', label: 'Reservas',  icon: CalendarDays,    permission: null },
-      { to: '/calendar',     label: 'Calendario',icon: Calendar,        permission: null, disabled: true },
+      { to: '/dashboard',    label: 'Dashboard',  icon: LayoutDashboard, permission: null,          role: 'ADMINISTRATOR' },
+      { to: '/rooms',        label: 'Salas',      icon: DoorOpen,        permission: null,          role: null },
+      { to: '/reservations', label: 'Mis Reservas', icon: CalendarDays,  permission: null,          role: null },
+      { to: '/calendar',     label: 'Calendario', icon: Calendar,        permission: null,          role: null },
     ],
   },
   {
     label: 'ADMINISTRACIÓN',
     items: [
-      { to: '/admin/users',         label: 'Usuarios',   icon: Users,       permission: 'Users.View' },
-      { to: '/admin/reservations',  label: 'Auditoría',  icon: ShieldCheck, permission: 'Reservations.View' },
-      { to: '/settings',            label: 'Analytics',  icon: BarChart3,   permission: 'Settings.View' },
+      { to: '/admin/users',        label: 'Usuarios',  icon: Users,       permission: 'Users.View',         role: null },
+      { to: '/admin/reservations', label: 'Auditoría', icon: ShieldCheck, permission: 'Reservations.View',  role: null },
+      { to: '/settings',           label: 'Ajustes',   icon: BarChart3,   permission: 'Settings.View',      role: null },
+    ],
+  },
+  {
+    label: 'MI CUENTA',
+    items: [
+      { to: '/profile', label: 'Perfil', icon: UserCircle, permission: null, role: null },
     ],
   },
 ]
@@ -47,7 +53,7 @@ function getRoleLabel(roles: string[]): string {
 }
 
 function SidebarContent({ onClose }: { onClose?: () => void }) {
-  const { user, refreshToken, logout, hasPermission } = useAuthStore()
+  const { user, refreshToken, logout, hasPermission, hasRole } = useAuthStore()
   const navigate = useNavigate()
 
   async function handleLogout() {
@@ -86,7 +92,8 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
       <nav className="flex-1 overflow-y-auto py-5 px-3 space-y-5" aria-label="Navegación principal">
         {navGroups.map(group => {
           const visibleItems = group.items.filter(item =>
-            !item.permission || hasPermission(item.permission)
+            (!item.permission || hasPermission(item.permission)) &&
+            (!item.role || hasRole(item.role))
           )
           if (!visibleItems.length) return null
 
@@ -99,45 +106,34 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
                 {group.label}
               </p>
               <ul className="space-y-0.5">
-                {visibleItems.map(({ to, label, icon: Icon, disabled }) => (
+                {visibleItems.map(({ to, label, icon: Icon }) => (
                   <li key={to}>
-                    {disabled ? (
-                      <span
-                        className="flex items-center gap-3 rounded-[6px] px-2.5 py-2 text-sm"
-                        style={{ color: 'rgba(255,255,255,.3)', cursor: 'not-allowed' }}
-                        aria-disabled="true"
-                      >
-                        <Icon className="h-4 w-4 shrink-0" strokeWidth={1.5} />
-                        {label}
-                      </span>
-                    ) : (
-                      <NavLink
-                        to={to}
-                        onClick={onClose}
-                        className={({ isActive }) =>
-                          classNames(
-                            'flex items-center gap-3 rounded-[6px] px-2.5 py-2 text-sm font-medium transition-colors',
-                            isActive ? 'font-semibold' : 'hover:bg-black/10'
-                          )
-                        }
-                        style={({ isActive }) =>
-                          isActive
-                            ? { background: 'rgba(0,0,0,.22)', color: '#fff', borderLeft: '3px solid #F5C518', paddingLeft: '7px' }
-                            : { color: 'rgba(255,255,255,.75)' }
-                        }
-                      >
-                        {({ isActive }: { isActive: boolean }) => (
-                          <>
-                            <Icon
-                              className="h-4 w-4 shrink-0"
-                              strokeWidth={1.5}
-                              style={isActive ? { color: '#F5C518' } : undefined}
-                            />
-                            {label}
-                          </>
-                        )}
-                      </NavLink>
-                    )}
+                    <NavLink
+                      to={to}
+                      onClick={onClose}
+                      className={({ isActive }) =>
+                        classNames(
+                          'flex items-center gap-3 rounded-[6px] px-2.5 py-2 text-sm font-medium transition-colors',
+                          isActive ? 'font-semibold' : 'hover:bg-black/10'
+                        )
+                      }
+                      style={({ isActive }) =>
+                        isActive
+                          ? { background: 'rgba(0,0,0,.22)', color: '#fff', borderLeft: '3px solid #F5C518', paddingLeft: '7px' }
+                          : { color: 'rgba(255,255,255,.75)' }
+                      }
+                    >
+                      {({ isActive }: { isActive: boolean }) => (
+                        <>
+                          <Icon
+                            className="h-4 w-4 shrink-0"
+                            strokeWidth={1.5}
+                            style={isActive ? { color: '#F5C518' } : undefined}
+                          />
+                          {label}
+                        </>
+                      )}
+                    </NavLink>
                   </li>
                 ))}
               </ul>

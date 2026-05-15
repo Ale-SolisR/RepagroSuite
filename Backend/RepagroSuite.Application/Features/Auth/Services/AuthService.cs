@@ -94,7 +94,8 @@ public class AuthService : IAuthService
                 Email = user.Email,
                 ProfileImageUrl = user.ProfileImageUrl,
                 Roles = roles,
-                Permissions = permissions
+                Permissions = permissions,
+                IsMaster = user.Id == new Guid("33333333-3333-3333-3333-333333333333")
             }
         };
     }
@@ -140,7 +141,8 @@ public class AuthService : IAuthService
                 Email = user.Email,
                 ProfileImageUrl = user.ProfileImageUrl,
                 Roles = roles,
-                Permissions = permissions
+                Permissions = permissions,
+                IsMaster = user.Id == new Guid("33333333-3333-3333-3333-333333333333")
             }
         };
     }

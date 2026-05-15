@@ -7,13 +7,15 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ permission, redirectTo = '/login' }: ProtectedRouteProps) {
-  const { isAuthenticated, user, hasPermission } = useAuthStore()
+  const { isAuthenticated, user, hasPermission, hasRole } = useAuthStore()
 
   if (!isAuthenticated) return <Navigate to={redirectTo} replace />
 
   if (user?.mustChangePassword) return <Navigate to="/forced-change-password" replace />
 
-  if (permission && !hasPermission(permission)) return <Navigate to="/dashboard" replace />
+  if (permission && !hasPermission(permission)) {
+    return <Navigate to={hasRole('ADMINISTRATOR') ? '/dashboard' : '/rooms'} replace />
+  }
 
   return <Outlet />
 }

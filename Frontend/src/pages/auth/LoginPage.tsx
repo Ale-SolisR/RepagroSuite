@@ -162,9 +162,14 @@ export default function LoginPage() {
     setGeneralError(null)
     try {
       const res = await authApi.login(data)
-      const { accessToken, refreshToken, user } = res.data.data!
-      setAuth(accessToken, refreshToken, user)
-      navigate(user.mustChangePassword ? '/forced-change-password' : '/dashboard')
+      const { accessToken, refreshToken, user, mustChangePassword } = res.data.data!
+      setAuth(accessToken, refreshToken, { ...user, mustChangePassword, isMaster: user.isMaster })
+      if (mustChangePassword) {
+        navigate('/forced-change-password')
+      } else {
+        const isAdmin = user.roles?.includes('ADMINISTRATOR')
+        navigate(isAdmin ? '/dashboard' : '/rooms')
+      }
     } catch (err) {
       setGeneralError(extractApiError(err))
     }

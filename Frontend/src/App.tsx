@@ -17,6 +17,8 @@ import MyReservationsPage from '@/pages/reservations/MyReservationsPage'
 import AdminReservationsPage from '@/pages/reservations/AdminReservationsPage'
 import AdminUsersPage from '@/pages/users/AdminUsersPage'
 import SettingsPage from '@/pages/settings/SettingsPage'
+import ProfilePage from '@/pages/profile/ProfilePage'
+import CalendarPage from '@/pages/calendar/CalendarPage'
 
 const qc = new QueryClient({
   defaultOptions: {
@@ -40,8 +42,10 @@ export default function App() {
           <Route element={<ProtectedRoute />}>
             <Route element={<AppLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/reservations" element={<MyReservationsPage />} />
               <Route path="/rooms" element={<RoomsPage />} />
+              <Route path="/reservations" element={<MyReservationsPage />} />
+              <Route path="/calendar" element={<CalendarPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
 
               <Route element={<ProtectedRoute permission="Reservations.View" />}>
                 <Route path="/admin/reservations" element={<AdminReservationsPage />} />
@@ -55,8 +59,8 @@ export default function App() {
             </Route>
           </Route>
 
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<Navigate to="/rooms" replace />} />
+          <Route path="*" element={<Navigate to="/rooms" replace />} />
         </Routes>
       </BrowserRouter>
 

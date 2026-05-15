@@ -25,6 +25,7 @@ export interface AuthResponse {
   accessToken: string
   refreshToken: string
   expiresIn: number
+  mustChangePassword: boolean
   user: UserInfo
 }
 
@@ -36,6 +37,7 @@ export interface UserInfo {
   permissions: string[]
   mustChangePassword: boolean
   status: string
+  isMaster?: boolean
 }
 
 export interface ChangePasswordRequest {
@@ -77,6 +79,7 @@ export interface UserDto {
   statusDisplay: string
   profileImageUrl?: string
   mustChangePassword: boolean
+  isMaster?: boolean
   lastLoginAt?: string
   createdAt: string
   roles: string[]

@@ -7,6 +7,7 @@ import Button from '@/components/ui/Button'
 import Spinner from '@/components/ui/Spinner'
 import toast from 'react-hot-toast'
 import type { SettingDto } from '@/types'
+import { useAuthStore } from '@/store/authStore'
 
 // ─── Presets SMTP por proveedor ───────────────────────────────────────────────
 
@@ -358,6 +359,8 @@ function groupSettings(settings: SettingDto[]) {
 
 export default function SettingsPage() {
   const qc = useQueryClient()
+  const { user } = useAuthStore()
+  const isMaster = user?.isMaster ?? false
   const [values, setValues] = useState<Record<string, string>>({})
   const [modified, setModified] = useState<Set<string>>(new Set())
 
@@ -452,8 +455,8 @@ export default function SettingsPage() {
         </Button>
       </div>
 
-      {/* Sección EMAIL */}
-      {emailSettings.length > 0 && (
+      {/* Sección EMAIL — solo el master puede configurarla */}
+      {emailSettings.length > 0 && isMaster && (
         <EmailSection
           settings={emailSettings}
           values={values}
@@ -463,6 +466,12 @@ export default function SettingsPage() {
           isSaving={saveMutation.isPending}
           isTesting={testEmailMutation.isPending}
         />
+      )}
+      {emailSettings.length > 0 && !isMaster && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-6 flex items-center gap-3 text-sm text-gray-500">
+          <span className="text-amber-500 text-lg">⚙</span>
+          La configuración de correo electrónico solo puede ser modificada por el administrador maestro del sistema.
+        </div>
       )}
 
       {/* Resto de módulos */}

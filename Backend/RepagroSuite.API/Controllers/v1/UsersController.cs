@@ -112,6 +112,30 @@ public class UsersController : ControllerBase
         return Ok(ApiResponse<GenerateTemporaryPasswordResponseDto>.Ok(result));
     }
 
+    [HttpPost("{id:guid}/inactivate")]
+    [Authorize(Policy = "Users.Block")]
+    public async Task<ActionResult<ApiResponse<UserDto>>> Inactivate(Guid id, CancellationToken ct)
+    {
+        var result = await _userService.InactivateAsync(id, _currentUser.UserId!.Value, ct);
+        return Ok(ApiResponse<UserDto>.Ok(result, "Usuario inactivado."));
+    }
+
+    [HttpPost("{id:guid}/promote-admin")]
+    [Authorize(Roles = "ADMINISTRATOR")]
+    public async Task<ActionResult<ApiResponse<UserDto>>> PromoteToAdmin(Guid id, CancellationToken ct)
+    {
+        var result = await _userService.PromoteToAdminAsync(id, _currentUser.UserId!.Value, ct);
+        return Ok(ApiResponse<UserDto>.Ok(result, "Usuario promovido a Administrador."));
+    }
+
+    [HttpPost("{id:guid}/demote-admin")]
+    [Authorize(Roles = "ADMINISTRATOR")]
+    public async Task<ActionResult<ApiResponse<UserDto>>> DemoteFromAdmin(Guid id, CancellationToken ct)
+    {
+        var result = await _userService.DemoteFromAdminAsync(id, _currentUser.UserId!.Value, ct);
+        return Ok(ApiResponse<UserDto>.Ok(result, "Rol de Administrador removido."));
+    }
+
     [HttpPost("{id:guid}/force-password-change")]
     [Authorize(Policy = "Users.ForcePasswordChange")]
     public async Task<ActionResult<ApiResponse<object>>> ForcePasswordChange(Guid id, CancellationToken ct)

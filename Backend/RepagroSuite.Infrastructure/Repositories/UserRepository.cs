@@ -72,6 +72,7 @@ public class UserRepository : GenericRepository<User>, IUserRepository
             .OrderByDescending(u => u.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
+            .AsSplitQuery()
             .ToListAsync(cancellationToken);
 
         return (items, total);

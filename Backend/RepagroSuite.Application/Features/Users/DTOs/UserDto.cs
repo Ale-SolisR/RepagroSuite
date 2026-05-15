@@ -20,6 +20,7 @@ public class UserDto
     public string StatusName { get; set; } = string.Empty;
     public string? ProfileImageUrl { get; set; }
     public bool MustChangePassword { get; set; }
+    public bool IsMaster { get; set; }
     public DateTime? LastLoginAt { get; set; }
     public DateTime? LastPasswordChangedAt { get; set; }
     public IEnumerable<string> Roles { get; set; } = [];

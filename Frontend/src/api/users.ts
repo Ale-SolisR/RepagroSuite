@@ -29,6 +29,15 @@ export const usersApi = {
   forcePasswordChange: (id: string) =>
     api.post<ApiResponse<null>>(`/users/${id}/force-password-change`),
 
+  inactivate: (id: string) =>
+    api.post<ApiResponse<UserDto>>(`/users/${id}/inactivate`),
+
+  promoteAdmin: (id: string) =>
+    api.post<ApiResponse<UserDto>>(`/users/${id}/promote-admin`),
+
+  demoteAdmin: (id: string) =>
+    api.post<ApiResponse<UserDto>>(`/users/${id}/demote-admin`),
+
   delete: (id: string) =>
     api.delete<ApiResponse<null>>(`/users/${id}`),
 }

@@ -99,8 +99,8 @@ public class UserService : IUserService
         var user = await _uow.Users.GetWithRolesAsync(userId, cancellationToken)
             ?? throw new KeyNotFoundException("Usuario no encontrado.");
 
-        if (user.Status != UserStatus.Pending)
-            throw new InvalidOperationException("Solo se pueden aprobar usuarios en estado Pendiente.");
+        if (user.Status != UserStatus.Pending && user.Status != UserStatus.Rejected)
+            throw new InvalidOperationException("Solo se pueden aprobar usuarios en estado Pendiente o Rechazado.");
 
         var tempPassword = _passwordService.GenerateTemporaryPassword();
         user.PasswordHash = _passwordService.HashPassword(tempPassword);
@@ -146,7 +146,7 @@ public class UserService : IUserService
             ?? throw new KeyNotFoundException("Usuario no encontrado.");
 
         if (user.Status != UserStatus.Pending)
-            throw new InvalidOperationException("Solo se pueden rechazar usuarios en estado Pendiente.");
+            throw new InvalidOperationException("Solo se pueden rechazar usuarios en estado Pendiente. Los usuarios aprobados deben ser inactivados.");
 
         user.Status = UserStatus.Rejected;
         user.RejectionReason = dto.Reason.Trim();
@@ -252,6 +252,57 @@ public class UserService : IUserService
         await _auditService.LogAsync(adminId, "FORCE_PASSWORD_CHANGE", entityName: "User", entityId: userId.ToString(), module: "Users");
     }
 
+    public async Task<UserDto> InactivateAsync(Guid userId, Guid inactivatedBy, CancellationToken cancellationToken = default)
+    {
+        var user = await _uow.Users.GetByIdAsync(userId, cancellationToken)
+            ?? throw new KeyNotFoundException("Usuario no encontrado.");
+
+        if (user.Status != UserStatus.Active && user.Status != UserStatus.Blocked)
+            throw new InvalidOperationException("Solo se pueden inactivar usuarios en estado Activo o Bloqueado.");
+
+        user.Status = UserStatus.Inactive;
+        _uow.Users.Update(user);
+        await _uow.SaveChangesAsync(cancellationToken);
+        await _auditService.LogAsync(inactivatedBy, "USER_INACTIVATED", entityName: "User", entityId: userId.ToString(), module: "Users");
+        return MapToDto(user);
+    }
+
+    public async Task<UserDto> PromoteToAdminAsync(Guid userId, Guid promotedBy, CancellationToken cancellationToken = default)
+    {
+        var user = await _uow.Users.GetWithRolesAsync(userId, cancellationToken)
+            ?? throw new KeyNotFoundException("Usuario no encontrado.");
+
+        if (user.Status != UserStatus.Active)
+            throw new InvalidOperationException("Solo se pueden promover usuarios en estado Activo.");
+
+        var adminRoleId = new Guid("11111111-1111-1111-1111-111111111111");
+        if (user.UserRoles.Any(ur => ur.RoleId == adminRoleId))
+            throw new InvalidOperationException("El usuario ya tiene el rol de Administrador.");
+
+        user.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = adminRoleId, AssignedAt = DateTime.UtcNow, AssignedBy = promotedBy });
+        await _uow.SaveChangesAsync(cancellationToken);
+        await _auditService.LogAsync(promotedBy, "USER_PROMOTED_ADMIN", entityName: "User", entityId: userId.ToString(), module: "Users");
+        return MapToDto(user);
+    }
+
+    public async Task<UserDto> DemoteFromAdminAsync(Guid userId, Guid demotedBy, CancellationToken cancellationToken = default)
+    {
+        var user = await _uow.Users.GetWithRolesAsync(userId, cancellationToken)
+            ?? throw new KeyNotFoundException("Usuario no encontrado.");
+
+        if (user.Id == MasterUserId)
+            throw new InvalidOperationException("No se puede remover el rol de Administrador al usuario maestro del sistema.");
+
+        var adminRoleId = new Guid("11111111-1111-1111-1111-111111111111");
+        var userRole = user.UserRoles.FirstOrDefault(ur => ur.RoleId == adminRoleId)
+            ?? throw new InvalidOperationException("El usuario no tiene el rol de Administrador.");
+
+        user.UserRoles.Remove(userRole);
+        await _uow.SaveChangesAsync(cancellationToken);
+        await _auditService.LogAsync(demotedBy, "USER_DEMOTED_ADMIN", entityName: "User", entityId: userId.ToString(), module: "Users");
+        return MapToDto(user);
+    }
+
     public async Task DeleteAsync(Guid userId, Guid deletedBy, CancellationToken cancellationToken = default)
     {
         var user = await _uow.Users.GetByIdAsync(userId, cancellationToken)
@@ -261,6 +312,8 @@ public class UserService : IUserService
         await _uow.SaveChangesAsync(cancellationToken);
         await _auditService.LogAsync(deletedBy, "USER_DELETED", entityName: "User", entityId: userId.ToString(), module: "Users");
     }
+
+    private static readonly Guid MasterUserId = new("33333333-3333-3333-3333-333333333333");
 
     private static UserDto MapToDto(User user)
     {
@@ -291,9 +344,13 @@ public class UserService : IUserService
             },
             ProfileImageUrl = user.ProfileImageUrl,
             MustChangePassword = user.MustChangePassword,
+            IsMaster = user.Id == MasterUserId,
             LastLoginAt = user.LastLoginAt,
             LastPasswordChangedAt = user.LastPasswordChangedAt,
-            Roles = user.UserRoles.Select(ur => ur.Role.Name).ToList(),
+            Roles = user.UserRoles
+                .Select(ur => ur.Role?.Name)
+                .Where(name => name != null)
+                .ToList()!,
             CreatedAt = user.CreatedAt
         };
     }

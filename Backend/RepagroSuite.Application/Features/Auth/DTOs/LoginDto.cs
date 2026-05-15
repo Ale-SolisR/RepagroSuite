@@ -23,6 +23,7 @@ public class UserSessionDto
     public string? ProfileImageUrl { get; set; }
     public IEnumerable<string> Roles { get; set; } = [];
     public IEnumerable<string> Permissions { get; set; } = [];
+    public bool IsMaster { get; set; }
 }
 
 public class RefreshTokenRequestDto

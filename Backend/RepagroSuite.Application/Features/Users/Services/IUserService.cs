@@ -13,6 +13,9 @@ public interface IUserService
     Task<UserDto> RejectAsync(Guid userId, RejectUserDto dto, Guid rejectedBy, CancellationToken cancellationToken = default);
     Task<UserDto> BlockAsync(Guid userId, Guid blockedBy, CancellationToken cancellationToken = default);
     Task<UserDto> UnblockAsync(Guid userId, Guid unblockedBy, CancellationToken cancellationToken = default);
+    Task<UserDto> InactivateAsync(Guid userId, Guid inactivatedBy, CancellationToken cancellationToken = default);
+    Task<UserDto> PromoteToAdminAsync(Guid userId, Guid promotedBy, CancellationToken cancellationToken = default);
+    Task<UserDto> DemoteFromAdminAsync(Guid userId, Guid demotedBy, CancellationToken cancellationToken = default);
     Task<UserDto> UpdateAsync(Guid userId, UpdateUserDto dto, CancellationToken cancellationToken = default);
     Task<GenerateTemporaryPasswordResponseDto> GenerateTemporaryPasswordAsync(Guid userId, Guid adminId, CancellationToken cancellationToken = default);
     Task ForcePasswordChangeAsync(Guid userId, Guid adminId, CancellationToken cancellationToken = default);
