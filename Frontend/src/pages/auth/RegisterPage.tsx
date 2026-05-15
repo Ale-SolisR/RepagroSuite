@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Link, useNavigate } from 'react-router-dom'
-import { DoorOpen, Search } from 'lucide-react'
+import { DoorOpen, CheckCircle2, XCircle } from 'lucide-react'
 import api from '@/api/client'
 import { usersApi } from '@/api/users'
 import { extractApiError } from '@/utils'
@@ -15,25 +15,18 @@ import type { IdentificationResultDto } from '@/types'
 const schema = z.object({
   identificationNumber: z.string().min(5, 'Número de identificación requerido'),
   email: z.string().email('Correo inválido'),
-  password: z.string().min(8, 'Mínimo 8 caracteres').regex(
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z\d])/,
-    'Debe contener mayúscula, minúscula, número y carácter especial'
-  ),
-  confirmPassword: z.string(),
   phoneNumber: z.string().optional(),
   department: z.string().optional(),
   position: z.string().optional(),
-}).refine(d => d.password === d.confirmPassword, {
-  message: 'Las contraseñas no coinciden',
-  path: ['confirmPassword'],
 })
 
 type FormData = z.infer<typeof schema>
+type LookupState = 'idle' | 'loading' | 'found' | 'error'
 
 export default function RegisterPage() {
   const navigate = useNavigate()
+  const [lookupState, setLookupState] = useState<LookupState>('idle')
   const [idResult, setIdResult] = useState<IdentificationResultDto | null>(null)
-  const [lookingUp, setLookingUp] = useState(false)
 
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -41,34 +34,52 @@ export default function RegisterPage() {
 
   const idNumber = watch('identificationNumber')
 
-  async function lookupId() {
-    if (!idNumber?.trim()) return
-    setLookingUp(true)
-    try {
-      const res = await api.get(`/identifications/lookup/${encodeURIComponent(idNumber.trim())}`)
-      setIdResult(res.data.data)
-      toast.success('Identificación encontrada')
-    } catch (err) {
-      toast.error(extractApiError(err))
+  useEffect(() => {
+    const digits = idNumber?.replace(/\D/g, '') ?? ''
+    if (digits.length < 5) {
+      setLookupState('idle')
       setIdResult(null)
-    } finally {
-      setLookingUp(false)
+      return
     }
-  }
+
+    setLookupState('loading')
+    const timer = setTimeout(async () => {
+      try {
+        const res = await api.get(`/identifications/lookup/${encodeURIComponent(digits)}`)
+        setIdResult(res.data.data)
+        setLookupState('found')
+      } catch {
+        setIdResult(null)
+        setLookupState('error')
+      }
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [idNumber])
 
   async function onSubmit(data: FormData) {
     try {
       await usersApi.register(data)
-      toast.success('Solicitud enviada. Espere la aprobación del administrador.')
+      toast.success('Solicitud enviada. Un administrador revisará su solicitud.')
       navigate('/login')
     } catch (err) {
       toast.error(extractApiError(err))
     }
   }
 
+  const idBorderClass =
+    errors.identificationNumber
+      ? 'border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-500'
+      : lookupState === 'found'
+      ? 'border-green-500 focus:border-green-600 focus:ring-1 focus:ring-green-600'
+      : lookupState === 'error'
+      ? 'border-amber-400 focus:border-amber-500 focus:ring-1 focus:ring-amber-500'
+      : 'border-gray-300 focus:border-green-600 focus:ring-1 focus:ring-green-600'
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-green-100 p-4">
       <div className="w-full max-w-lg">
+
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center h-14 w-14 rounded-full bg-green-700 mb-3">
             <DoorOpen className="h-7 w-7 text-white" />
@@ -79,28 +90,54 @@ export default function RegisterPage() {
 
         <div className="bg-white rounded-2xl shadow-xl p-8">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            {/* Identification lookup */}
-            <div className="flex gap-2 items-end">
-              <div className="flex-1">
-                <Input
-                  label="Número de Identificación"
+
+            {/* Número de identificación con auto-lookup */}
+            <div className="flex flex-col gap-1">
+              <label htmlFor="id-number" className="text-sm font-medium text-gray-700">
+                Número de Identificación <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  id="id-number"
+                  type="text"
+                  inputMode="numeric"
                   placeholder="Ej: 123456789"
-                  error={errors.identificationNumber?.message}
-                  required
+                  className={[
+                    'w-full rounded-md border px-3 py-2 pr-9 text-sm shadow-sm outline-none transition',
+                    'placeholder:text-gray-400 disabled:bg-gray-50 disabled:text-gray-500',
+                    idBorderClass,
+                  ].join(' ')}
                   {...register('identificationNumber')}
                 />
+                <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                  {lookupState === 'loading' && (
+                    <svg className="h-4 w-4 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                  )}
+                  {lookupState === 'found' && <CheckCircle2 className="h-4 w-4 text-green-600" />}
+                  {lookupState === 'error' && <XCircle className="h-4 w-4 text-amber-500" />}
+                </div>
               </div>
-              <Button type="button" variant="secondary" onClick={lookupId} loading={lookingUp} className="shrink-0 mb-0.5">
-                <Search className="h-4 w-4" />
-                Verificar
-              </Button>
+              {errors.identificationNumber && (
+                <p className="text-xs text-red-600">{errors.identificationNumber.message}</p>
+              )}
             </div>
 
-            {idResult && (
-              <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-sm">
+            {/* Resultado del lookup */}
+            {lookupState === 'found' && idResult && (
+              <div className="rounded-lg bg-green-50 border border-green-200 px-3 py-2.5 text-sm">
                 <p className="font-semibold text-green-800">{idResult.fullName}</p>
-                <p className="text-green-600 text-xs mt-0.5">{idResult.identificationType} — {idResult.identificationNumber}</p>
+                <p className="text-green-600 text-xs mt-0.5">
+                  {idResult.identificationType} · {idResult.identificationNumber}
+                </p>
               </div>
+            )}
+            {lookupState === 'error' && (
+              <p className="text-xs text-amber-600 -mt-1">
+                No se encontró información para esta identificación. Puede continuar; será verificada al momento de la aprobación.
+              </p>
             )}
 
             <Input
@@ -111,25 +148,6 @@ export default function RegisterPage() {
               required
               {...register('email')}
             />
-
-            <div className="grid grid-cols-2 gap-3">
-              <Input
-                label="Contraseña"
-                type="password"
-                placeholder="••••••••"
-                error={errors.password?.message}
-                required
-                {...register('password')}
-              />
-              <Input
-                label="Confirmar Contraseña"
-                type="password"
-                placeholder="••••••••"
-                error={errors.confirmPassword?.message}
-                required
-                {...register('confirmPassword')}
-              />
-            </div>
 
             <div className="grid grid-cols-2 gap-3">
               <Input
@@ -162,6 +180,12 @@ export default function RegisterPage() {
             </Link>
           </p>
         </div>
+
+        {/* Info sobre el proceso */}
+        <p className="text-center text-xs text-gray-400 mt-5 px-4">
+          Una vez enviada la solicitud, recibirás un correo con el resultado de la revisión.
+          Si es aprobada, se te enviará una contraseña temporal para tu primer acceso.
+        </p>
       </div>
     </div>
   )

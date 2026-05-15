@@ -85,8 +85,6 @@ export interface UserDto {
 export interface RegisterRequest {
   identificationNumber: string
   email: string
-  password: string
-  confirmPassword: string
   phoneNumber?: string
   department?: string
   position?: string
