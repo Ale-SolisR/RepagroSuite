@@ -26,6 +26,9 @@ export const usersApi = {
   generateTemporaryPassword: (id: string) =>
     api.post<ApiResponse<null>>(`/users/${id}/generate-temporary-password`),
 
+  changePassword: (id: string, newPassword: string) =>
+    api.post<ApiResponse<null>>(`/users/${id}/change-password`, { newPassword }),
+
   forcePasswordChange: (id: string) =>
     api.post<ApiResponse<null>>(`/users/${id}/force-password-change`),
 

@@ -38,15 +38,18 @@ export default function App() {
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/forced-change-password" element={<ForcedChangePasswordPage />} />
 
-          {/* Protected */}
+          {/* Protected — accesible a cualquier autenticado */}
           <Route element={<ProtectedRoute />}>
             <Route element={<AppLayout />}>
-              <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/rooms" element={<RoomsPage />} />
               <Route path="/reservations" element={<MyReservationsPage />} />
               <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/profile" element={<ProfilePage />} />
 
+              {/* Solo administradores y master */}
+              <Route element={<ProtectedRoute role="ADMINISTRATOR" />}>
+                <Route path="/dashboard" element={<DashboardPage />} />
+              </Route>
               <Route element={<ProtectedRoute permission="Reservations.View" />}>
                 <Route path="/admin/reservations" element={<AdminReservationsPage />} />
               </Route>

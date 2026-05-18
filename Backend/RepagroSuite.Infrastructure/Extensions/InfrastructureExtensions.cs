@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,15 +21,40 @@ public static class InfrastructureExtensions
             )
         );
 
+        // GoMeta es un proveedor externo: retry + circuit breaker para resiliencia.
+        // - Retry: hasta 2 reintentos con backoff exponencial en fallas transitorias (5xx, timeouts).
+        // - Circuit breaker: si falla el 50% de >=8 requests en 30s, abre el circuito 30s
+        //   (evita que el panel de registro de usuarios cuelgue cuando GoMeta está caído).
         services.AddHttpClient("GoMeta", client =>
         {
             client.BaseAddress = new Uri("https://apis.gometa.org/cedulas/");
             client.Timeout = TimeSpan.FromSeconds(10);
+        }).AddStandardResilienceHandler(options =>
+        {
+            options.Retry.MaxRetryAttempts = 2;
+            options.Retry.Delay = TimeSpan.FromMilliseconds(300);
+            options.Retry.BackoffType = Polly.DelayBackoffType.Exponential;
+            options.CircuitBreaker.MinimumThroughput = 8;
+            options.CircuitBreaker.FailureRatio = 0.5;
+            options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(30);
+            options.CircuitBreaker.BreakDuration = TimeSpan.FromSeconds(30);
+            options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(8);
+            options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(25);
         });
 
         services.AddHttpContextAccessor();
 
+        // Data Protection — persiste llaves para que sobrevivan a reinicios.
+        // En clúster: cambiar a PersistKeysToAzureBlobStorage / SQL para que las réplicas compartan llaves.
+        services.AddDataProtection()
+            .SetApplicationName("RepagroSuite")
+            .PersistKeysToFileSystem(new DirectoryInfo(
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RepagroSuite", "dp-keys")));
+
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddSingleton<ISecretProtector, SecretProtector>();
+        services.AddSingleton<IEmailQueue, InMemoryEmailQueue>();
+        services.AddHostedService<EmailWorker>();
         services.AddScoped<IPasswordService, PasswordService>();
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<IEmailService, EmailService>();

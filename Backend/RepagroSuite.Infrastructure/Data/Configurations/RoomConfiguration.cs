@@ -21,7 +21,8 @@ public class RoomConfiguration : IEntityTypeConfiguration<Room>
         builder.Property(x => x.Floor).HasColumnName("Piso").HasMaxLength(50);
         builder.Property(x => x.Description).HasColumnName("Descripcion").HasMaxLength(1000);
         builder.Property(x => x.Status).HasColumnName("Estado");
-        builder.Property(x => x.ImageUrl).HasColumnName("UrlImagen").HasMaxLength(500);
+        // Sin límite: puede contener una URL externa o un data URL base64 con la imagen embebida.
+        builder.Property(x => x.ImageUrl).HasColumnName("UrlImagen").HasColumnType("nvarchar(max)");
         builder.Property(x => x.Color).HasColumnName("Color").HasMaxLength(30);
 
         builder.HasMany(x => x.RoomFeatures).WithOne(x => x.Room).HasForeignKey(x => x.RoomId).OnDelete(DeleteBehavior.Cascade);

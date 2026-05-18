@@ -60,4 +60,9 @@ public class GenericRepository<T> : IGenericRepository<T> where T : BaseEntity
     }
 
     public IQueryable<T> Query() => _dbSet.AsQueryable();
+
+    public void SetOriginalRowVersion(T entity, byte[] originalRowVersion)
+    {
+        _context.Entry(entity).Property(e => e.RowVersion).OriginalValue = originalRowVersion;
+    }
 }

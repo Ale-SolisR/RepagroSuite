@@ -52,7 +52,7 @@ public class UserRepository : GenericRepository<User>, IUserRepository
     public async Task<(IEnumerable<User> Items, int Total)> GetPagedAsync(
         int page, int pageSize, string? search = null, UserStatus? status = null, CancellationToken cancellationToken = default)
     {
-        var query = _dbSet.AsQueryable();
+        var query = _dbSet.AsNoTracking().AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(search))
         {

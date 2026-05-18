@@ -8,44 +8,42 @@ using RepagroSuite.Infrastructure.Data;
 
 namespace RepagroSuite.Infrastructure.Services;
 
+// Fachada pública. Los servicios HTTP llaman aquí; los envíos no SMTP-test van por cola.
+// TestConnectionAsync y TestAndSendAsync sí ejecutan SMTP sincrónico (uso desde panel Settings).
 public class EmailService : IEmailService
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<EmailService> _logger;
+    private readonly ISecretProtector _protector;
+    private readonly IEmailQueue _queue;
 
-    public EmailService(ApplicationDbContext context, ILogger<EmailService> logger)
+    public EmailService(
+        ApplicationDbContext context,
+        ILogger<EmailService> logger,
+        ISecretProtector protector,
+        IEmailQueue queue)
     {
         _context = context;
         _logger = logger;
+        _protector = protector;
+        _queue = queue;
     }
 
-    public async Task SendAsync(string to, string subject, string htmlBody, CancellationToken cancellationToken = default)
+    public Task SendAsync(string to, string subject, string htmlBody, CancellationToken cancellationToken = default)
     {
-        var config = await GetSmtpConfigAsync(cancellationToken);
-        if (!config.Enabled) { _logger.LogInformation("Email service disabled. Skipping send to {To}", to); return; }
-
-        try
-        {
-            var message = BuildMessage(to, subject, htmlBody, config);
-            await SendMessageAsync(message, config, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error sending email to {To}: {Subject}", to, subject);
-            throw;
-        }
+        _queue.Enqueue(new EmailMessage(to, subject, htmlBody, null, null));
+        return Task.CompletedTask;
     }
 
-    public async Task SendTemplateAsync(string to, string templateName, Dictionary<string, string> variables, CancellationToken cancellationToken = default)
+    public Task SendTemplateAsync(string to, string templateName, Dictionary<string, string> variables, CancellationToken cancellationToken = default)
     {
-        var body = BuildTemplateBody(templateName, variables);
-        var subject = GetTemplateSubject(templateName, variables);
-        await SendAsync(to, subject, body, cancellationToken);
+        _queue.Enqueue(new EmailMessage(to, null, null, templateName, variables));
+        return Task.CompletedTask;
     }
 
     public async Task<bool> TestConnectionAsync(CancellationToken cancellationToken = default)
     {
-        var config = await GetSmtpConfigAsync(cancellationToken);
+        var config = await EmailTemplates.GetSmtpConfigAsync(_context, _protector, cancellationToken);
         try
         {
             using var client = new SmtpClient();
@@ -63,15 +61,24 @@ public class EmailService : IEmailService
         }
     }
 
-    // Envía correo de prueba ignorando la bandera EMAIL.ENABLED
     public async Task<bool> TestAndSendAsync(string to, CancellationToken cancellationToken = default)
     {
-        var config = await GetSmtpConfigAsync(cancellationToken);
+        var config = await EmailTemplates.GetSmtpConfigAsync(_context, _protector, cancellationToken);
         try
         {
-            var msg = BuildMessage(to, "Prueba de conexión SMTP — RepagroSuite",
-                "<h2>¡Conexión exitosa!</h2><p>El servidor SMTP de <strong>RepagroSuite</strong> está configurado correctamente.</p>", config);
-            await SendMessageAsync(msg, config, cancellationToken);
+            var msg = new MimeMessage();
+            msg.From.Add(new MailboxAddress(config.FromName, config.FromAddress));
+            msg.To.Add(MailboxAddress.Parse(to));
+            msg.Subject = "Prueba de conexión SMTP — RepagroSuite";
+            msg.Body = new TextPart("html") { Text = "<h2>¡Conexión exitosa!</h2><p>El servidor SMTP de <strong>RepagroSuite</strong> está configurado correctamente.</p>" };
+
+            using var client = new SmtpClient();
+            await client.ConnectAsync(config.SmtpHost, config.SmtpPort,
+                config.UseSsl ? SecureSocketOptions.StartTls : SecureSocketOptions.None, cancellationToken);
+            if (!string.IsNullOrEmpty(config.Username))
+                await client.AuthenticateAsync(config.Username, config.Password, cancellationToken);
+            await client.SendAsync(msg, cancellationToken);
+            await client.DisconnectAsync(true, cancellationToken);
             return true;
         }
         catch (Exception ex)
@@ -80,31 +87,27 @@ public class EmailService : IEmailService
             return false;
         }
     }
+}
 
-    private static MimeMessage BuildMessage(string to, string subject, string htmlBody, SmtpConfig config)
+// Helpers compartidos entre EmailService y EmailWorker.
+internal static class EmailTemplates
+{
+    public class SmtpConfig
     {
-        var msg = new MimeMessage();
-        msg.From.Add(new MailboxAddress(config.FromName, config.FromAddress));
-        msg.To.Add(MailboxAddress.Parse(to));
-        msg.Subject = subject;
-        msg.Body = new TextPart("html") { Text = htmlBody };
-        return msg;
+        public bool Enabled { get; set; }
+        public string FromName { get; set; } = string.Empty;
+        public string FromAddress { get; set; } = string.Empty;
+        public string SmtpHost { get; set; } = string.Empty;
+        public int SmtpPort { get; set; } = 587;
+        public bool UseSsl { get; set; } = true;
+        public string Username { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
     }
 
-    private static async Task SendMessageAsync(MimeMessage msg, SmtpConfig config, CancellationToken ct)
+    public static async Task<SmtpConfig> GetSmtpConfigAsync(ApplicationDbContext ctx, ISecretProtector protector, CancellationToken ct)
     {
-        using var client = new SmtpClient();
-        await client.ConnectAsync(config.SmtpHost, config.SmtpPort,
-            config.UseSsl ? SecureSocketOptions.StartTls : SecureSocketOptions.None, ct);
-        if (!string.IsNullOrEmpty(config.Username))
-            await client.AuthenticateAsync(config.Username, config.Password, ct);
-        await client.SendAsync(msg, ct);
-        await client.DisconnectAsync(true, ct);
-    }
-
-    private async Task<SmtpConfig> GetSmtpConfigAsync(CancellationToken ct)
-    {
-        var settings = await _context.SystemSettings
+        var settings = await ctx.SystemSettings
+            .AsNoTracking()
             .Where(s => s.Module == "EMAIL" && !s.IsDeleted)
             .ToListAsync(ct);
 
@@ -121,26 +124,24 @@ public class EmailService : IEmailService
             SmtpPort = GetInt("EMAIL.SMTP_PORT", 587),
             UseSsl = GetBool("EMAIL.SMTP_USE_SSL"),
             Username = Get("EMAIL.SMTP_USERNAME"),
-            Password = Get("EMAIL.SMTP_PASSWORD"),
+            Password = protector.Unprotect(Get("EMAIL.SMTP_PASSWORD")) ?? string.Empty,
         };
     }
 
-    private static string GetTemplateSubject(string templateName, Dictionary<string, string> vars) =>
-        templateName switch
-        {
-            "user_approved" => "Su cuenta ha sido aprobada - RepagroSuite",
-            "user_rejected" => "Su solicitud de registro fue rechazada - RepagroSuite",
-            "password_reset" => "Recuperación de contraseña - RepagroSuite",
-            "password_changed" => "Su contraseña fue actualizada - RepagroSuite",
-            "reservation_approved" => "Reserva aprobada - RepagroSuite",
-            "reservation_rejected" => "Reserva rechazada - RepagroSuite",
-            _ => $"Notificación de RepagroSuite"
-        };
+    public static string GetSubject(string templateName) => templateName switch
+    {
+        "user_approved" => "Su cuenta ha sido aprobada - RepagroSuite",
+        "user_rejected" => "Su solicitud de registro fue rechazada - RepagroSuite",
+        "password_reset" => "Recuperación de contraseña - RepagroSuite",
+        "password_changed" => "Su contraseña fue actualizada - RepagroSuite",
+        "reservation_approved" => "Reserva aprobada - RepagroSuite",
+        "reservation_rejected" => "Reserva rechazada - RepagroSuite",
+        _ => "Notificación de RepagroSuite"
+    };
 
-    private static string BuildTemplateBody(string templateName, Dictionary<string, string> vars)
+    public static string BuildBody(string templateName, Dictionary<string, string> vars)
     {
         string Get(string key) => vars.TryGetValue(key, out var v) ? v : string.Empty;
-
         return templateName switch
         {
             "user_approved" => $@"
@@ -185,19 +186,7 @@ public class EmailService : IEmailService
                 <p>Su solicitud de reserva para <strong>{Get("roomName")}</strong> no pudo ser aprobada.</p>
                 <p><strong>Motivo:</strong> {Get("adminComment")}</p>",
 
-            _ => $"<p>Notificación del sistema RepagroSuite.</p>"
+            _ => "<p>Notificación del sistema RepagroSuite.</p>"
         };
-    }
-
-    private class SmtpConfig
-    {
-        public bool Enabled { get; set; }
-        public string FromName { get; set; } = string.Empty;
-        public string FromAddress { get; set; } = string.Empty;
-        public string SmtpHost { get; set; } = string.Empty;
-        public int SmtpPort { get; set; } = 587;
-        public bool UseSsl { get; set; } = true;
-        public string Username { get; set; } = string.Empty;
-        public string Password { get; set; } = string.Empty;
     }
 }

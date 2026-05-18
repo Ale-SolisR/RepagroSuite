@@ -18,4 +18,5 @@ public interface IRoomService
     Task<RoomBlockDto> CreateBlockAsync(CreateRoomBlockDto dto, Guid createdBy, CancellationToken cancellationToken = default);
     Task DeleteBlockAsync(Guid blockId, Guid deletedBy, CancellationToken cancellationToken = default);
     Task<IEnumerable<AvailableSlotDto>> GetAvailableSlotsAsync(Guid roomId, DateTime date, CancellationToken cancellationToken = default);
+    Task<IEnumerable<FeatureDto>> GetActiveFeaturesAsync(CancellationToken cancellationToken = default);
 }

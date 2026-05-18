@@ -1,3 +1,4 @@
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using RepagroSuite.Domain.Interfaces;
@@ -29,6 +30,30 @@ public class UnitOfWork : IUnitOfWork
 
     public async Task BeginTransactionAsync(CancellationToken cancellationToken = default)
         => _transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, cancellationToken);
+
+    public async Task AcquireRoomLockAsync(Guid roomId, int timeoutMs = 5000, CancellationToken cancellationToken = default)
+    {
+        if (_transaction == null)
+            throw new InvalidOperationException("AcquireRoomLockAsync requiere una transacción activa. Llame primero a BeginTransactionAsync.");
+
+        var resourceParam = new SqlParameter("@Resource", $"room-reservation:{roomId}");
+        var timeoutParam = new SqlParameter("@LockTimeout", timeoutMs);
+        var resultParam = new SqlParameter("@result", System.Data.SqlDbType.Int)
+        {
+            Direction = System.Data.ParameterDirection.Output
+        };
+
+        // sp_getapplock devuelve >= 0 si adquirió el lock, < 0 si falló.
+        // Se libera automáticamente al hacer commit/rollback de la transacción.
+        await _context.Database.ExecuteSqlRawAsync(
+            "EXEC @result = sp_getapplock @Resource = @Resource, @LockMode = N'Exclusive', @LockOwner = N'Transaction', @LockTimeout = @LockTimeout",
+            resourceParam, timeoutParam, resultParam);
+
+        var code = (int)(resultParam.Value ?? -1);
+        if (code < 0)
+            throw new InvalidOperationException(
+                "El sistema está procesando otra solicitud para esta sala. Intente nuevamente en unos segundos.");
+    }
 
     public async Task CommitTransactionAsync(CancellationToken cancellationToken = default)
     {

@@ -118,6 +118,9 @@ export interface RoomDto {
   imageUrl?: string
   color?: string
   features: FeatureDto[]
+  // Token de versión para optimistic locking. El cliente lo reenvía al hacer PUT
+  // y el backend devuelve 409 CONCURRENCY_CONFLICT si otro admin lo modificó mientras tanto.
+  rowVersion?: string
 }
 
 export interface FeatureDto {
@@ -133,6 +136,7 @@ export interface CreateRoomRequest {
   location?: string
   floor?: string
   description?: string
+  imageUrl?: string
   color?: string
   featureIds?: string[]
 }

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using FluentValidation;
+using Microsoft.EntityFrameworkCore;
 
 namespace RepagroSuite.API.Middleware;
 
@@ -39,6 +40,9 @@ public class GlobalExceptionMiddleware
             ),
             UnauthorizedAccessException uex => (HttpStatusCode.Unauthorized, "UNAUTHORIZED", uex.Message, (Dictionary<string, List<string>>?)null),
             KeyNotFoundException knfex => (HttpStatusCode.NotFound, "NOT_FOUND", knfex.Message, (Dictionary<string, List<string>>?)null),
+            DbUpdateConcurrencyException => (HttpStatusCode.Conflict, "CONCURRENCY_CONFLICT",
+                "Otro usuario modificó este registro mientras lo editabas. Recarga e intenta de nuevo.",
+                (Dictionary<string, List<string>>?)null),
             InvalidOperationException ioex => (HttpStatusCode.UnprocessableEntity, "BUSINESS_RULE_VIOLATION", ioex.Message, (Dictionary<string, List<string>>?)null),
             _ => (HttpStatusCode.InternalServerError, "INTERNAL_ERROR", "Ocurrió un error inesperado. Intente nuevamente.", (Dictionary<string, List<string>>?)null)
         };

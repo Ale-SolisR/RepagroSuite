@@ -1,169 +1,59 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useNavigate, Link } from 'react-router-dom'
-import { Eye, EyeOff, AlertCircle } from 'lucide-react'
+import { Eye, EyeOff, AlertCircle, ArrowLeft, CheckCircle2, XCircle } from 'lucide-react'
 import { authApi } from '@/api/auth'
 import { useAuthStore } from '@/store/authStore'
 import { extractApiError } from '@/utils'
-import repagroLogo from '@/assets/repagro-logo.png'
+import api from '@/api/client'
+import { usersApi } from '@/api/users'
+import Input from '@/components/ui/Input'
+import BrandPanel from '@/components/auth/BrandPanel'
+import toast from 'react-hot-toast'
+import type { IdentificationResultDto } from '@/types'
 
-// ─── Schema ───────────────────────────────────────────────────────────────────
-const schema = z.object({
+// ─── Schemas ─────────────────────────────────────────────────────────────────
+const loginSchema = z.object({
   email: z.string().email('Correo inválido'),
   password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
 })
-type FormData = z.infer<typeof schema>
+type LoginFormData = z.infer<typeof loginSchema>
+
+const registerSchema = z.object({
+  identificationNumber: z.string().min(9, 'Ingrese al menos 9 dígitos'),
+  email: z.string().email('Correo inválido'),
+  phoneNumber: z.string().optional(),
+  department: z.string().optional(),
+  position: z.string().optional(),
+})
+type RegisterFormData = z.infer<typeof registerSchema>
+type LookupState = 'idle' | 'loading' | 'found' | 'error'
+
+type Mode = 'login' | 'register'
 
 
-// ─── Panel izquierdo (marca Repagro) ─────────────────────────────────────────
-function BrandPanel() {
-  return (
-    <div
-      className="hidden lg:flex flex-col justify-between p-12 relative overflow-hidden"
-      style={{ background: 'linear-gradient(135deg, #003E2D 0%, #005947 55%, #006F55 100%)' }}
-      aria-hidden="true"
-    >
-      {/* Motivo geométrico dorado — esquina superior derecha */}
-      <div className="absolute top-0 right-0 w-[340px] h-[340px] pointer-events-none">
-        {/* Halo radial difuso */}
-        <div
-          className="absolute rounded-full"
-          style={{
-            top: -80, right: -80, width: 280, height: 280,
-            background: 'radial-gradient(circle, rgba(245,197,24,.28), transparent 65%)',
-            filter: 'blur(20px)',
-          }}
-        />
-        {/* SVG — barras y constelación */}
-        <svg
-          viewBox="0 0 340 340"
-          className="absolute inset-0 w-full h-full"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <defs>
-            <linearGradient id="goldShine" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%"   stopColor="#FFEFA8" stopOpacity="0" />
-              <stop offset="30%"  stopColor="#FFD84D" stopOpacity="1" />
-              <stop offset="55%"  stopColor="#FFF6D6" stopOpacity="1" />
-              <stop offset="80%"  stopColor="#F5C518" stopOpacity="1" />
-              <stop offset="100%" stopColor="#D9A800" stopOpacity="1" />
-            </linearGradient>
-            <linearGradient id="goldShineThin" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%"   stopColor="#FFEFA8" stopOpacity="0" />
-              <stop offset="100%" stopColor="#F5C518" stopOpacity="1" />
-            </linearGradient>
-          </defs>
-          {/* Barra principal */}
-          <rect x="52"  y="180" width="288" height="14" rx="2" fill="url(#goldShine)" />
-          {/* Barra media */}
-          <rect x="92"  y="202" width="248" height="6"  rx="1" fill="url(#goldShineThin)" />
-          {/* Barra fina */}
-          <rect x="172" y="214" width="168" height="3"  rx="1" fill="url(#goldShineThin)" opacity="0.85" />
-          {/* Tick horizontal */}
-          <rect x="252" y="222" width="88"  height="2"  rx="1" fill="#FFD84D" opacity="0.7" />
-          {/* Acento vertical */}
-          <rect x="320" y="120" width="3"   height="118" rx="1" fill="#F5C518" opacity="0.85" />
-          {/* Acento diagonal */}
-          <rect x="280" y="140" width="2.5" height="60"  rx="1" fill="#FFD84D" opacity="0.55"
-            transform="rotate(28 280 140)" />
-          {/* Constelación */}
-          <circle cx="290" cy="155" r="3"   fill="#F5C518" />
-          <circle cx="308" cy="168" r="2"   fill="#FFD84D" />
-          <circle cx="275" cy="172" r="1.5" fill="#FFEFA8" />
-        </svg>
-        {/* Anillo exterior */}
-        <div
-          className="absolute rounded-full"
-          style={{
-            top: 110, right: 30,
-            width: 160, height: 160,
-            border: '1.5px solid rgba(245,197,24,.35)',
-          }}
-        />
-        {/* Anillo interior */}
-        <div
-          className="absolute rounded-full"
-          style={{
-            top: 136, right: 56,
-            width: 108, height: 108,
-            border: '1px solid rgba(255,239,168,.20)',
-          }}
-        />
-      </div>
-
-      {/* Logo */}
-      <div className="relative z-10 flex items-center">
-        <div className="flex items-center justify-center rounded-xl bg-white px-5 py-3 shrink-0">
-          <img src={repagroLogo} alt="Repagro" className="h-16 w-auto" />
-        </div>
-      </div>
-
-      {/* Copy central */}
-      <div className="relative z-10">
-        <p
-          className="font-mono text-[13px] tracking-[.14em] uppercase mb-5"
-          style={{ color: '#FFD84D' }}
-        >
-          Repagro Suite
-        </p>
-        <h1
-          className="text-[40px] font-medium leading-[1.18] text-white mb-4"
-          style={{ maxWidth: 380 }}
-        >
-          Una plataforma<br />para tu trabajo<br />diario.
-        </h1>
-        <p className="text-[15px]" style={{ color: 'rgba(255,255,255,.70)', maxWidth: 380 }}>
-          Salas, inventario, activos TI, boletas y más.<br />Todo en un solo lugar.
-        </p>
-      </div>
-
-      {/* Pie de panel */}
-      <div className="relative z-10 flex items-center justify-between">
-        <span className="font-mono text-[12px]" style={{ color: 'rgba(255,255,255,.5)' }}>
-          © 2026 Repagro · v6.1
-        </span>
-        {/* Decoración dorada */}
-        <div className="flex items-center gap-1.5">
-          <div
-            className="h-px w-14"
-            style={{ background: 'linear-gradient(to right, transparent, #F5C518)' }}
-          />
-          <div
-            className="h-2 w-2 rounded-full shrink-0"
-            style={{ background: '#F5C518', boxShadow: '0 0 8px 3px rgba(245,197,24,.55)' }}
-          />
-          <div
-            className="h-px w-14"
-            style={{ background: 'linear-gradient(to left, transparent, #F5C518)' }}
-          />
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─── Página principal ─────────────────────────────────────────────────────────
-export default function LoginPage() {
+// ─── Formulario de Login ─────────────────────────────────────────────────────
+function LoginForm({ onSwitchMode }: { onSwitchMode: (mode: Mode) => void }) {
   const navigate = useNavigate()
   const { setAuth } = useAuthStore()
   const [showPassword, setShowPassword] = useState(false)
-  const [rememberMe, setRememberMe]     = useState(false)
   const [generalError, setGeneralError] = useState<string | null>(null)
 
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<FormData>({ resolver: zodResolver(schema) })
+  } = useForm<LoginFormData>({ resolver: zodResolver(loginSchema) })
 
-  async function onSubmit(data: FormData) {
+  async function onSubmit(data: LoginFormData) {
     setGeneralError(null)
     try {
       const res = await authApi.login(data)
-      const { accessToken, refreshToken, user, mustChangePassword } = res.data.data!
-      setAuth(accessToken, refreshToken, { ...user, mustChangePassword, isMaster: user.isMaster })
+      const { accessToken, user, mustChangePassword } = res.data.data!
+      // refresh token llega como cookie httpOnly — no lo tocamos.
+      setAuth(accessToken, { ...user, mustChangePassword, isMaster: user.isMaster })
       if (mustChangePassword) {
         navigate('/forced-change-password')
       } else {
@@ -176,171 +66,344 @@ export default function LoginPage() {
   }
 
   return (
+    <>
+      {/* Encabezado */}
+      <div className="mb-8">
+        <h2
+          className="text-[32px] font-semibold tracking-tight leading-tight"
+          style={{ color: '#1F2933' }}
+        >
+          Iniciar sesión
+        </h2>
+        <p className="mt-2 text-[15px]" style={{ color: '#5F6B7A' }}>
+          Ingresa con tu cuenta corporativa.
+        </p>
+      </div>
+
+      {/* Error general */}
+      {generalError && (
+        <div
+          className="mb-5 flex items-start gap-2.5 rounded-md border px-4 py-3 text-sm"
+          style={{ background: '#FEF2F2', borderColor: '#FECACA', color: '#991B1B' }}
+          role="alert"
+        >
+          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" style={{ color: '#B42318' }} aria-hidden="true" />
+          {generalError}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
+
+        {/* Campo correo */}
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="email" className="text-[13px] font-medium" style={{ color: '#1F2933' }}>
+            Correo
+          </label>
+          <input
+            id="email"
+            type="email"
+            placeholder="tu.nombre@repagro.com"
+            autoComplete="email"
+            aria-invalid={errors.email ? 'true' : 'false'}
+            aria-describedby={errors.email ? 'email-err' : undefined}
+            {...register('email')}
+            className="form-input"
+          />
+          {errors.email && (
+            <p id="email-err" className="text-[13px]" style={{ color: '#B42318' }}>
+              {errors.email.message}
+            </p>
+          )}
+        </div>
+
+        {/* Campo contraseña */}
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between">
+            <label htmlFor="password" className="text-[13px] font-medium" style={{ color: '#1F2933' }}>
+              Contraseña
+            </label>
+            <Link
+              to="/forgot-password"
+              className="text-[13px] font-medium transition-colors hover:underline"
+              style={{ color: '#005947' }}
+            >
+              ¿Olvidaste tu contraseña?
+            </Link>
+          </div>
+          <div className="relative">
+            <input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              placeholder="••••••••"
+              autoComplete="current-password"
+              aria-invalid={errors.password ? 'true' : 'false'}
+              aria-describedby={errors.password ? 'password-err' : undefined}
+              {...register('password')}
+              className="form-input"
+              style={{ paddingRight: '2.75rem' }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(p => !p)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-0.5 transition-colors"
+              style={{ color: '#9CA3AF' }}
+              aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+            >
+              {showPassword
+                ? <EyeOff className="h-4 w-4" strokeWidth={1.5} />
+                : <Eye    className="h-4 w-4" strokeWidth={1.5} />
+              }
+            </button>
+          </div>
+          {errors.password && (
+            <p id="password-err" className="text-[13px]" style={{ color: '#B42318' }}>
+              {errors.password.message}
+            </p>
+          )}
+        </div>
+
+        {/* Botón ingresar */}
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="flex h-12 w-full items-center justify-center gap-2 rounded-[6px] text-[15px] font-medium text-white transition disabled:opacity-60"
+          style={{ background: '#006F55' }}
+          onMouseEnter={e => { if (!isSubmitting) e.currentTarget.style.background = '#005947' }}
+          onMouseLeave={e => { if (!isSubmitting) e.currentTarget.style.background = '#006F55' }}
+        >
+          {isSubmitting ? (
+            <>
+              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+              </svg>
+              Verificando…
+            </>
+          ) : (
+            'Ingresar'
+          )}
+        </button>
+      </form>
+
+      {/* Pie de formulario */}
+      <p className="mt-8 text-center text-[14px]" style={{ color: '#5F6B7A' }}>
+        ¿No tienes cuenta?{' '}
+        <button
+          type="button"
+          onClick={() => onSwitchMode('register')}
+          className="font-medium transition-colors hover:underline"
+          style={{ color: '#006F55' }}
+        >
+          Solicita acceso
+        </button>
+      </p>
+    </>
+  )
+}
+
+
+// ─── Formulario de Solicitud de Acceso ──────────────────────────────────────
+function RegisterForm({ onSwitchMode }: { onSwitchMode: (mode: Mode) => void }) {
+  const [lookupState, setLookupState] = useState<LookupState>('idle')
+  const [idResult, setIdResult] = useState<IdentificationResultDto | null>(null)
+
+  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<RegisterFormData>({
+    resolver: zodResolver(registerSchema),
+  })
+
+  const idNumber = watch('identificationNumber')
+
+  useEffect(() => {
+    const digits = idNumber?.replace(/\D/g, '') ?? ''
+    if (digits.length < 9) {
+      setLookupState('idle')
+      setIdResult(null)
+      return
+    }
+
+    setLookupState('loading')
+    const timer = setTimeout(async () => {
+      try {
+        const res = await api.get('/identifications/lookup', { params: { identificationNumber: digits } })
+        setIdResult(res.data.data)
+        setLookupState('found')
+      } catch {
+        setIdResult(null)
+        setLookupState('error')
+      }
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [idNumber])
+
+  async function onSubmit(data: RegisterFormData) {
+    try {
+      await usersApi.register(data)
+      toast.success('Solicitud enviada. Un administrador revisará su solicitud.')
+      onSwitchMode('login')
+    } catch (err) {
+      toast.error(extractApiError(err))
+    }
+  }
+
+  const idBorderClass =
+    errors.identificationNumber
+      ? 'border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-500'
+      : lookupState === 'found'
+      ? 'border-green-500 focus:border-green-600 focus:ring-1 focus:ring-green-600'
+      : lookupState === 'error'
+      ? 'border-amber-400 focus:border-amber-500 focus:ring-1 focus:ring-amber-500'
+      : 'border-gray-300 focus:border-green-600 focus:ring-1 focus:ring-green-600'
+
+  return (
+    <>
+      {/* Encabezado */}
+      <div className="mb-6">
+        <button
+          type="button"
+          onClick={() => onSwitchMode('login')}
+          className="mb-3 inline-flex items-center gap-1.5 text-[13px] font-medium transition-colors hover:underline"
+          style={{ color: '#005947' }}
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Volver a iniciar sesión
+        </button>
+        <h2
+          className="text-[32px] font-semibold tracking-tight leading-tight"
+          style={{ color: '#1F2933' }}
+        >
+          Solicitar acceso
+        </h2>
+        <p className="mt-2 text-[15px]" style={{ color: '#5F6B7A' }}>
+          Completa el formulario y un administrador revisará tu solicitud.
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+
+        {/* Número de identificación con auto-lookup */}
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="id-number" className="text-[13px] font-medium" style={{ color: '#1F2933' }}>
+            Número de Identificación <span style={{ color: '#B42318' }}>*</span>
+          </label>
+          <div className="relative">
+            <input
+              id="id-number"
+              type="text"
+              inputMode="numeric"
+              placeholder="Ej: 123456789"
+              className={[
+                'w-full rounded-md border px-3 py-2.5 pr-9 text-sm outline-none transition',
+                'placeholder:text-gray-400 disabled:bg-gray-50 disabled:text-gray-500',
+                idBorderClass,
+              ].join(' ')}
+              {...register('identificationNumber')}
+            />
+            <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
+              {lookupState === 'loading' && (
+                <svg className="h-4 w-4 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                </svg>
+              )}
+              {lookupState === 'found' && <CheckCircle2 className="h-4 w-4 text-green-600" />}
+              {lookupState === 'error' && <XCircle className="h-4 w-4 text-amber-500" />}
+            </div>
+          </div>
+          {errors.identificationNumber && (
+            <p className="text-[13px]" style={{ color: '#B42318' }}>{errors.identificationNumber.message}</p>
+          )}
+        </div>
+
+        {/* Resultado del lookup */}
+        {lookupState === 'found' && idResult && (
+          <div className="rounded-lg bg-green-50 border border-green-200 px-3 py-2.5 text-sm">
+            <p className="font-semibold text-green-800">{idResult.fullName}</p>
+            <p className="text-green-600 text-xs mt-0.5">
+              {idResult.identificationTypeName ?? idResult.identificationType} · {idResult.identificationNumber}
+            </p>
+          </div>
+        )}
+        {lookupState === 'error' && (
+          <p className="text-xs text-amber-600 -mt-1">
+            No se encontró información para esta identificación. Puede continuar; será verificada al momento de la aprobación.
+          </p>
+        )}
+
+        <Input
+          label="Correo Electrónico Institucional"
+          type="email"
+          placeholder="usuario@repagro.com"
+          error={errors.email?.message}
+          required
+          {...register('email')}
+        />
+
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            label="Teléfono"
+            placeholder="8888-8888"
+            {...register('phoneNumber')}
+          />
+          <Input
+            label="Departamento"
+            placeholder="Ej: Contabilidad"
+            {...register('department')}
+          />
+        </div>
+
+        <Input
+          label="Puesto"
+          placeholder="Ej: Analista"
+          {...register('position')}
+        />
+
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="flex h-12 w-full items-center justify-center gap-2 rounded-[6px] text-[15px] font-medium text-white transition disabled:opacity-60"
+          style={{ background: '#006F55' }}
+          onMouseEnter={e => { if (!isSubmitting) e.currentTarget.style.background = '#005947' }}
+          onMouseLeave={e => { if (!isSubmitting) e.currentTarget.style.background = '#006F55' }}
+        >
+          {isSubmitting ? (
+            <>
+              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+              </svg>
+              Enviando…
+            </>
+          ) : (
+            'Enviar Solicitud'
+          )}
+        </button>
+      </form>
+
+      <p className="mt-6 text-center text-[12px]" style={{ color: '#9CA3AF' }}>
+        Una vez enviada la solicitud, recibirás un correo con el resultado de la revisión.
+        Si es aprobada, se te enviará una contraseña temporal para tu primer acceso.
+      </p>
+    </>
+  )
+}
+
+
+// ─── Página principal ─────────────────────────────────────────────────────────
+export default function LoginPage() {
+  const [mode, setMode] = useState<Mode>('login')
+
+  return (
     <div className="min-h-screen grid lg:grid-cols-2">
       <BrandPanel />
 
       {/* Panel del formulario */}
       <div className="flex flex-col items-center justify-center bg-paper px-6 py-12">
-        <div className="w-full" style={{ maxWidth: 420 }}>
-
-          {/* Encabezado */}
-          <div className="mb-8">
-            <h2
-              className="text-[32px] font-semibold tracking-tight leading-tight"
-              style={{ color: '#1F2933' }}
-            >
-              Iniciar sesión
-            </h2>
-            <p className="mt-2 text-[15px]" style={{ color: '#5F6B7A' }}>
-              Ingresa con tu cuenta corporativa.
-            </p>
-          </div>
-
-          {/* Error general */}
-          {generalError && (
-            <div
-              className="mb-5 flex items-start gap-2.5 rounded-md border px-4 py-3 text-sm"
-              style={{ background: '#FEF2F2', borderColor: '#FECACA', color: '#991B1B' }}
-              role="alert"
-            >
-              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" style={{ color: '#B42318' }} aria-hidden="true" />
-              {generalError}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
-
-            {/* Campo correo */}
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="email" className="text-[13px] font-medium" style={{ color: '#1F2933' }}>
-                Correo
-              </label>
-              <input
-                id="email"
-                type="email"
-                placeholder="tu.nombre@repagro.com"
-                autoComplete="email"
-                aria-invalid={errors.email ? 'true' : 'false'}
-                aria-describedby={errors.email ? 'email-err' : undefined}
-                {...register('email')}
-                className="form-input"
-              />
-              {errors.email && (
-                <p id="email-err" className="text-[13px]" style={{ color: '#B42318' }}>
-                  {errors.email.message}
-                </p>
-              )}
-            </div>
-
-            {/* Campo contraseña */}
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between">
-                <label htmlFor="password" className="text-[13px] font-medium" style={{ color: '#1F2933' }}>
-                  Contraseña
-                </label>
-                <Link
-                  to="/forgot-password"
-                  className="text-[13px] font-medium transition-colors hover:underline"
-                  style={{ color: '#005947' }}
-                >
-                  ¿Olvidaste tu contraseña?
-                </Link>
-              </div>
-              <div className="relative">
-                <input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="••••••••"
-                  autoComplete="current-password"
-                  aria-invalid={errors.password ? 'true' : 'false'}
-                  aria-describedby={errors.password ? 'password-err' : undefined}
-                  {...register('password')}
-                  className="form-input"
-                  style={{ paddingRight: '2.75rem' }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(p => !p)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-0.5 transition-colors"
-                  style={{ color: '#9CA3AF' }}
-                  aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                >
-                  {showPassword
-                    ? <EyeOff className="h-4 w-4" strokeWidth={1.5} />
-                    : <Eye    className="h-4 w-4" strokeWidth={1.5} />
-                  }
-                </button>
-              </div>
-              {errors.password && (
-                <p id="password-err" className="text-[13px]" style={{ color: '#B42318' }}>
-                  {errors.password.message}
-                </p>
-              )}
-            </div>
-
-            {/* Mantener sesión */}
-            <label className="flex cursor-pointer items-center gap-2.5 select-none">
-              <button
-                type="button"
-                role="checkbox"
-                aria-checked={rememberMe}
-                onClick={() => setRememberMe(p => !p)}
-                className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition"
-                style={{
-                  background:   rememberMe ? '#006F55' : '#fff',
-                  borderColor:  rememberMe ? '#006F55' : '#D9DEE5',
-                }}
-              >
-                {rememberMe && (
-                  <svg width="10" height="8" viewBox="0 0 10 8" aria-hidden="true">
-                    <path
-                      d="M1 4l2.5 2.5L9 1"
-                      stroke="#fff" strokeWidth="1.5"
-                      strokeLinecap="round" strokeLinejoin="round"
-                      fill="none"
-                    />
-                  </svg>
-                )}
-              </button>
-              <span className="text-sm" style={{ color: '#1F2933' }}>
-                Mantener sesión iniciada
-              </span>
-            </label>
-
-            {/* Botón ingresar */}
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-[6px] text-[15px] font-medium text-white transition disabled:opacity-60"
-              style={{ background: '#006F55' }}
-              onMouseEnter={e => { if (!isSubmitting) e.currentTarget.style.background = '#005947' }}
-              onMouseLeave={e => { if (!isSubmitting) e.currentTarget.style.background = '#006F55' }}
-            >
-              {isSubmitting ? (
-                <>
-                  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                  </svg>
-                  Verificando…
-                </>
-              ) : (
-                'Ingresar'
-              )}
-            </button>
-          </form>
-
-          {/* Pie de formulario */}
-          <p className="mt-8 text-center text-[14px]" style={{ color: '#5F6B7A' }}>
-            ¿No tienes cuenta?{' '}
-            <Link
-              to="/register"
-              className="font-medium transition-colors hover:underline"
-              style={{ color: '#006F55' }}
-            >
-              Solicita acceso
-            </Link>
-          </p>
+        <div className="w-full" style={{ maxWidth: 460 }}>
+          {mode === 'login'
+            ? <LoginForm onSwitchMode={setMode} />
+            : <RegisterForm onSwitchMode={setMode} />
+          }
         </div>
       </div>
     </div>

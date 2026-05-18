@@ -238,7 +238,9 @@ public class AuthService : IAuthService
 
         if (user == null || user.Status != UserStatus.Active) return;
 
-        var token = Convert.ToBase64String(Guid.NewGuid().ToByteArray()) + Convert.ToBase64String(Guid.NewGuid().ToByteArray());
+        // Token criptográficamente seguro: 256 bits desde RNG, URL-safe Base64.
+        var bytes = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
+        var token = Convert.ToBase64String(bytes).Replace('+', '-').Replace('/', '_').TrimEnd('=');
         user.PasswordResetToken = token;
         user.PasswordResetTokenExpiresAt = DateTime.UtcNow.AddHours(24);
         user.UpdatedAt = DateTime.UtcNow;

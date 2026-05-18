@@ -53,7 +53,6 @@ TemporaryDependencyNodeTargetIdentifier=net9.0
 /warnaserror+:NU1605,SYSLIB0011
 
 [sourceFiles]
-Class1.cs
 Data/
  ApplicationDbContext.cs
  Configurations/
@@ -67,6 +66,12 @@ Data/
   20260514200439_CreacionInicial.Designer.cs
   20260514204507_ActualizarAdminSeed.cs
   20260514204507_ActualizarAdminSeed.Designer.cs
+  20260515154154_AgregarConfiguracionSmtpCredenciales.cs
+  20260515154154_AgregarConfiguracionSmtpCredenciales.Designer.cs
+  20260518170325_UrlImagenSinLimite.cs
+  20260518170325_UrlImagenSinLimite.Designer.cs
+  20260518201946_IndiceReservasUsuarioEstadoFecha.cs
+  20260518201946_IndiceReservasUsuarioEstadoFecha.Designer.cs
   ApplicationDbContextModelSnapshot.cs
  UnitOfWork.cs
 Extensions/InfrastructureExtensions.cs
@@ -83,8 +88,11 @@ Services/
  AuditService.cs
  CurrentUserService.cs
  EmailService.cs
+ EmailWorker.cs
  IdentificationLookupService.cs
+ InMemoryEmailQueue.cs
  PasswordService.cs
+ SecretProtector.cs
  SettingsService.cs
  TokenService.cs
 
@@ -397,19 +405,27 @@ Services/
  System.Xml.XPath.XDocument.dll
  WindowsBase.dll
 <NUGET>/
- automapper/13.0.1/lib/net6.0/AutoMapper.dll
  azure.core/1.38.0/lib/net6.0/Azure.Core.dll
  azure.identity/1.11.4/lib/netstandard2.0/Azure.Identity.dll
  bcrypt.net-next/4.0.3/lib/net6.0/BCrypt.Net-Next.dll
- bouncycastle.cryptography/2.5.1/lib/net6.0/BouncyCastle.Cryptography.dll
+ bouncycastle.cryptography/2.6.2/lib/net6.0/BouncyCastle.Cryptography.dll
  fluentvalidation/11.11.0/lib/net8.0/FluentValidation.dll
- mailkit/4.12.1/lib/net8.0/MailKit.dll
+ mailkit/4.16.0/lib/net8.0/MailKit.dll
  microsoft.bcl.asyncinterfaces/7.0.0/lib/netstandard2.1/Microsoft.Bcl.AsyncInterfaces.dll
  microsoft.data.sqlclient/5.1.6/ref/net6.0/Microsoft.Data.SqlClient.dll
  microsoft.entityframeworkcore.abstractions/9.0.5/lib/net8.0/Microsoft.EntityFrameworkCore.Abstractions.dll
  microsoft.entityframeworkcore.relational/9.0.5/lib/net8.0/Microsoft.EntityFrameworkCore.Relational.dll
  microsoft.entityframeworkcore.sqlserver/9.0.5/lib/net8.0/Microsoft.EntityFrameworkCore.SqlServer.dll
  microsoft.entityframeworkcore/9.0.5/lib/net8.0/Microsoft.EntityFrameworkCore.dll
+ microsoft.extensions.ambientmetadata.application/9.0.0/lib/net9.0/Microsoft.Extensions.AmbientMetadata.Application.dll
+ microsoft.extensions.compliance.abstractions/9.0.0/lib/net9.0/Microsoft.Extensions.Compliance.Abstractions.dll
+ microsoft.extensions.dependencyinjection.autoactivation/9.0.0/lib/net9.0/Microsoft.Extensions.DependencyInjection.AutoActivation.dll
+ microsoft.extensions.diagnostics.exceptionsummarization/9.0.0/lib/net9.0/Microsoft.Extensions.Diagnostics.ExceptionSummarization.dll
+ microsoft.extensions.http.diagnostics/9.0.0/lib/net9.0/Microsoft.Extensions.Http.Diagnostics.dll
+ microsoft.extensions.http.resilience/9.0.0/lib/net9.0/Microsoft.Extensions.Http.Resilience.dll
+ microsoft.extensions.resilience/9.0.0/lib/net9.0/Microsoft.Extensions.Resilience.dll
+ microsoft.extensions.telemetry.abstractions/9.0.0/lib/net9.0/Microsoft.Extensions.Telemetry.Abstractions.dll
+ microsoft.extensions.telemetry/9.0.0/lib/net9.0/Microsoft.Extensions.Telemetry.dll
  microsoft.identity.client.extensions.msal/4.61.3/lib/net6.0/Microsoft.Identity.Client.Extensions.Msal.dll
  microsoft.identity.client/4.61.3/lib/net6.0/Microsoft.Identity.Client.dll
  microsoft.identitymodel.abstractions/8.9.0/lib/net9.0/Microsoft.IdentityModel.Abstractions.dll
@@ -418,8 +434,12 @@ Services/
  microsoft.identitymodel.protocols.openidconnect/6.35.0/lib/net6.0/Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
  microsoft.identitymodel.protocols/6.35.0/lib/net6.0/Microsoft.IdentityModel.Protocols.dll
  microsoft.identitymodel.tokens/8.9.0/lib/net9.0/Microsoft.IdentityModel.Tokens.dll
+ microsoft.io.recyclablememorystream/3.0.0/lib/net6.0/Microsoft.IO.RecyclableMemoryStream.dll
  microsoft.sqlserver.server/1.0.0/lib/netstandard2.0/Microsoft.SqlServer.Server.dll
- mimekit/4.12.0/lib/net8.0/MimeKit.dll
+ mimekit/4.16.0/lib/net8.0/MimeKit.dll
+ polly.core/8.4.2/lib/net8.0/Polly.Core.dll
+ polly.extensions/8.4.2/lib/net8.0/Polly.Extensions.dll
+ polly.ratelimiting/8.4.2/lib/net8.0/Polly.RateLimiting.dll
  serilog.extensions.hosting/9.0.0/lib/net9.0/Serilog.Extensions.Hosting.dll
  serilog.extensions.logging/9.0.0/lib/net9.0/Serilog.Extensions.Logging.dll
  serilog.sinks.console/6.0.0/lib/net8.0/Serilog.Sinks.Console.dll
@@ -436,23 +456,26 @@ Services/
  Microsoft.AspNetCore.App.Analyzers.dll
  Microsoft.AspNetCore.App.CodeFixes.dll
  Microsoft.AspNetCore.Components.Analyzers.dll
-<DOTNET>/packs/Microsoft.AspNetCore.App.Ref/9.0.16/analyzers/dotnet/roslyn4.4/cs/
- Microsoft.Extensions.Logging.Generators.dll
- Microsoft.Extensions.Options.SourceGeneration.dll
-<DOTNET>/packs/Microsoft.NETCore.App.Ref/9.0.16/analyzers/dotnet/cs/
- Microsoft.Interop.ComInterfaceGenerator.dll
- Microsoft.Interop.JavaScript.JSImportGenerator.dll
- Microsoft.Interop.LibraryImportGenerator.dll
- Microsoft.Interop.SourceGeneration.dll
- System.Text.Json.SourceGeneration.dll
- System.Text.RegularExpressions.Generator.dll
+<DOTNET>/packs/
+ Microsoft.AspNetCore.App.Ref/9.0.16/analyzers/dotnet/roslyn4.4/cs/Microsoft.Extensions.Options.SourceGeneration.dll
+ Microsoft.NETCore.App.Ref/9.0.16/analyzers/dotnet/cs/
+  Microsoft.Interop.ComInterfaceGenerator.dll
+  Microsoft.Interop.JavaScript.JSImportGenerator.dll
+  Microsoft.Interop.LibraryImportGenerator.dll
+  Microsoft.Interop.SourceGeneration.dll
+  System.Text.Json.SourceGeneration.dll
+  System.Text.RegularExpressions.Generator.dll
 <DOTNET>/sdk/9.0.314/Sdks/Microsoft.NET.Sdk/analyzers/
  Microsoft.CodeAnalysis.CSharp.NetAnalyzers.dll
  Microsoft.CodeAnalysis.NetAnalyzers.dll
 <NUGET>/microsoft.codeanalysis.analyzers/3.3.4/analyzers/dotnet/cs/
  Microsoft.CodeAnalysis.Analyzers.dll
  Microsoft.CodeAnalysis.CSharp.Analyzers.dll
-<NUGET>/microsoft.entityframeworkcore.analyzers/9.0.5/analyzers/dotnet/cs/Microsoft.EntityFrameworkCore.Analyzers.dll
+<NUGET>/
+ microsoft.entityframeworkcore.analyzers/9.0.5/analyzers/dotnet/cs/Microsoft.EntityFrameworkCore.Analyzers.dll
+ microsoft.extensions.telemetry.abstractions/9.0.0/analyzers/dotnet/cs/
+  Microsoft.Gen.Logging.dll
+  Microsoft.Gen.Metrics.dll
 
 [analyzerConfigFiles]
 <DOTNET>/sdk/9.0.314/Sdks/Microsoft.NET.Sdk/analyzers/build/config/analysislevel_9_default.globalconfig

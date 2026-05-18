@@ -71,3 +71,8 @@ public class GenerateTemporaryPasswordResponseDto
     public bool Sent { get; set; }
     public string? Message { get; set; }
 }
+
+public class ChangeUserPasswordDto
+{
+    public string NewPassword { get; set; } = string.Empty;
+}

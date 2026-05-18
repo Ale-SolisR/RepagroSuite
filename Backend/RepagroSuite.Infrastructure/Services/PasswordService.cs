@@ -1,11 +1,10 @@
+using System.Security.Cryptography;
 using RepagroSuite.Application.Common.Interfaces;
 
 namespace RepagroSuite.Infrastructure.Services;
 
 public class PasswordService : IPasswordService
 {
-    private static readonly string[] SpecialChars = ["@", "#", "$", "!", "%", "&", "*", "-", "_", "+", "=", "?"];
-
     public string HashPassword(string password)
         => BCrypt.Net.BCrypt.HashPassword(password, BCrypt.Net.BCrypt.GenerateSalt(11));
 
@@ -14,25 +13,29 @@ public class PasswordService : IPasswordService
 
     public string GenerateTemporaryPassword(int length = 12)
     {
+        // Usar PRNG criptográfico: dos invocaciones simultáneas NO pueden colisionar.
         const string upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
         const string lower = "abcdefghjkmnpqrstuvwxyz";
         const string digits = "23456789";
         const string special = "@#$!%&*-_";
 
-        var rng = new Random();
-        var chars = new List<char>
-        {
-            upper[rng.Next(upper.Length)],
-            lower[rng.Next(lower.Length)],
-            digits[rng.Next(digits.Length)],
-            special[rng.Next(special.Length)]
-        };
+        var chars = new char[length];
+        chars[0] = upper[RandomNumberGenerator.GetInt32(upper.Length)];
+        chars[1] = lower[RandomNumberGenerator.GetInt32(lower.Length)];
+        chars[2] = digits[RandomNumberGenerator.GetInt32(digits.Length)];
+        chars[3] = special[RandomNumberGenerator.GetInt32(special.Length)];
 
         var all = upper + lower + digits + special;
-        for (int i = chars.Count; i < length; i++)
-            chars.Add(all[rng.Next(all.Length)]);
+        for (int i = 4; i < length; i++)
+            chars[i] = all[RandomNumberGenerator.GetInt32(all.Length)];
 
-        return new string(chars.OrderBy(_ => rng.Next()).ToArray());
+        // Shuffle Fisher-Yates con CSPRNG.
+        for (int i = length - 1; i > 0; i--)
+        {
+            int j = RandomNumberGenerator.GetInt32(i + 1);
+            (chars[i], chars[j]) = (chars[j], chars[i]);
+        }
+        return new string(chars);
     }
 
     public bool IsPasswordPolicyCompliant(string password, out List<string> violations)

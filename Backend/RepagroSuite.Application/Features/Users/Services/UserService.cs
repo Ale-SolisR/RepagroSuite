@@ -175,6 +175,9 @@ public class UserService : IUserService
         var user = await _uow.Users.GetByIdAsync(userId, cancellationToken)
             ?? throw new KeyNotFoundException("Usuario no encontrado.");
 
+        if (user.Id == MasterUserId)
+            throw new InvalidOperationException("No se puede bloquear al administrador maestro del sistema.");
+
         user.Status = UserStatus.Blocked;
         _uow.Users.Update(user);
         await _uow.SaveChangesAsync(cancellationToken);
@@ -212,8 +215,10 @@ public class UserService : IUserService
 
     public async Task<GenerateTemporaryPasswordResponseDto> GenerateTemporaryPasswordAsync(Guid userId, Guid adminId, CancellationToken cancellationToken = default)
     {
-        var user = await _uow.Users.GetByIdAsync(userId, cancellationToken)
+        var user = await _uow.Users.GetWithRolesAsync(userId, cancellationToken)
             ?? throw new KeyNotFoundException("Usuario no encontrado.");
+
+        EnsureCanChangePasswordOf(user, adminId);
 
         var tempPassword = _passwordService.GenerateTemporaryPassword();
         user.PasswordHash = _passwordService.HashPassword(tempPassword);
@@ -246,6 +251,9 @@ public class UserService : IUserService
         var user = await _uow.Users.GetByIdAsync(userId, cancellationToken)
             ?? throw new KeyNotFoundException("Usuario no encontrado.");
 
+        if (user.Id == MasterUserId)
+            throw new InvalidOperationException("No se puede forzar el cambio de contraseña al administrador maestro del sistema.");
+
         user.MustChangePassword = true;
         _uow.Users.Update(user);
         await _uow.SaveChangesAsync(cancellationToken);
@@ -256,6 +264,9 @@ public class UserService : IUserService
     {
         var user = await _uow.Users.GetByIdAsync(userId, cancellationToken)
             ?? throw new KeyNotFoundException("Usuario no encontrado.");
+
+        if (user.Id == MasterUserId)
+            throw new InvalidOperationException("No se puede inactivar al administrador maestro del sistema.");
 
         if (user.Status != UserStatus.Active && user.Status != UserStatus.Blocked)
             throw new InvalidOperationException("Solo se pueden inactivar usuarios en estado Activo o Bloqueado.");
@@ -269,6 +280,9 @@ public class UserService : IUserService
 
     public async Task<UserDto> PromoteToAdminAsync(Guid userId, Guid promotedBy, CancellationToken cancellationToken = default)
     {
+        if (promotedBy != MasterUserId)
+            throw new InvalidOperationException("Solo el administrador maestro puede designar nuevos administradores.");
+
         var user = await _uow.Users.GetWithRolesAsync(userId, cancellationToken)
             ?? throw new KeyNotFoundException("Usuario no encontrado.");
 
@@ -287,6 +301,9 @@ public class UserService : IUserService
 
     public async Task<UserDto> DemoteFromAdminAsync(Guid userId, Guid demotedBy, CancellationToken cancellationToken = default)
     {
+        if (demotedBy != MasterUserId)
+            throw new InvalidOperationException("Solo el administrador maestro puede remover el rol de Administrador.");
+
         var user = await _uow.Users.GetWithRolesAsync(userId, cancellationToken)
             ?? throw new KeyNotFoundException("Usuario no encontrado.");
 
@@ -303,10 +320,54 @@ public class UserService : IUserService
         return MapToDto(user);
     }
 
+    public async Task ChangeUserPasswordAsync(Guid userId, ChangeUserPasswordDto dto, Guid adminId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(dto.NewPassword) || dto.NewPassword.Length < 8)
+            throw new InvalidOperationException("La contraseña debe tener al menos 8 caracteres.");
+
+        if (!System.Text.RegularExpressions.Regex.IsMatch(dto.NewPassword, "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^a-zA-Z\\d])"))
+            throw new InvalidOperationException("La contraseña debe contener mayúscula, minúscula, número y carácter especial.");
+
+        var user = await _uow.Users.GetWithRolesAsync(userId, cancellationToken)
+            ?? throw new KeyNotFoundException("Usuario no encontrado.");
+
+        EnsureCanChangePasswordOf(user, adminId);
+
+        if (user.Id == adminId)
+            throw new InvalidOperationException("Para cambiar tu propia contraseña, usa la sección de perfil.");
+
+        user.PasswordHash = _passwordService.HashPassword(dto.NewPassword);
+        user.MustChangePassword = true;
+        user.TemporaryPasswordExpiresAt = DateTime.UtcNow.AddHours(72);
+        user.LastPasswordChangedAt = DateTime.UtcNow;
+        _uow.Users.Update(user);
+        await _uow.SaveChangesAsync(cancellationToken);
+
+        await _auditService.LogAsync(adminId, "USER_PASSWORD_CHANGED_BY_ADMIN", entityName: "User", entityId: userId.ToString(), module: "Users");
+    }
+
+    // Reglas de autorización para cambiar la contraseña de otro usuario:
+    //   - El master puede cambiar la contraseña de cualquiera.
+    //   - Cualquier otro admin solo puede cambiar contraseñas de usuarios normales (no admins, no master).
+    private static void EnsureCanChangePasswordOf(User target, Guid actorId)
+    {
+        if (actorId == MasterUserId) return;
+
+        if (target.Id == MasterUserId)
+            throw new InvalidOperationException("Solo el administrador maestro puede cambiar su propia contraseña.");
+
+        var adminRoleId = new Guid("11111111-1111-1111-1111-111111111111");
+        if (target.UserRoles.Any(ur => ur.RoleId == adminRoleId) && target.Id != actorId)
+            throw new InvalidOperationException("Solo el administrador maestro puede cambiar la contraseña de otros administradores.");
+    }
+
     public async Task DeleteAsync(Guid userId, Guid deletedBy, CancellationToken cancellationToken = default)
     {
         var user = await _uow.Users.GetByIdAsync(userId, cancellationToken)
             ?? throw new KeyNotFoundException("Usuario no encontrado.");
+
+        if (user.Id == MasterUserId)
+            throw new InvalidOperationException("No se puede eliminar al administrador maestro del sistema.");
 
         _uow.Users.SoftDelete(user, deletedBy);
         await _uow.SaveChangesAsync(cancellationToken);

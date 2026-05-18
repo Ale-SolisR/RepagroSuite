@@ -11,7 +11,7 @@ public class ReservationRepository : GenericRepository<Reservation>, IReservatio
     public ReservationRepository(ApplicationDbContext context) : base(context) { }
 
     public async Task<bool> HasConflictAsync(Guid roomId, DateTime start, DateTime end, Guid? excludeReservationId = null, CancellationToken cancellationToken = default)
-        => await _dbSet.AnyAsync(r =>
+        => await _dbSet.AsNoTracking().AnyAsync(r =>
             !r.IsDeleted &&
             r.RoomId == roomId &&
             (r.Status == ReservationStatus.Approved || r.Status == ReservationStatus.Pending) &&
@@ -22,6 +22,7 @@ public class ReservationRepository : GenericRepository<Reservation>, IReservatio
     public async Task<IEnumerable<Reservation>> GetByRoomAsync(Guid roomId, DateTime? from = null, DateTime? to = null, CancellationToken cancellationToken = default)
     {
         var query = _dbSet
+            .AsNoTracking()
             .Include(r => r.User)
             .Where(r => r.RoomId == roomId);
 
@@ -33,6 +34,7 @@ public class ReservationRepository : GenericRepository<Reservation>, IReservatio
 
     public async Task<IEnumerable<Reservation>> GetByUserAsync(Guid userId, CancellationToken cancellationToken = default)
         => await _dbSet
+            .AsNoTracking()
             .Include(r => r.Room)
             .Where(r => r.UserId == userId)
             .OrderByDescending(r => r.StartDateTime)
@@ -50,6 +52,7 @@ public class ReservationRepository : GenericRepository<Reservation>, IReservatio
         CancellationToken cancellationToken = default)
     {
         var query = _dbSet
+            .AsNoTracking()
             .Include(r => r.Room)
             .Include(r => r.User)
             .AsQueryable();
@@ -73,6 +76,7 @@ public class ReservationRepository : GenericRepository<Reservation>, IReservatio
     public async Task<IEnumerable<Reservation>> GetForCalendarAsync(DateTime from, DateTime to, Guid? roomId = null, CancellationToken cancellationToken = default)
     {
         var query = _dbSet
+            .AsNoTracking()
             .Include(r => r.Room)
             .Include(r => r.User)
             .Where(r =>

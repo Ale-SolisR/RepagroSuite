@@ -8,11 +8,12 @@ export const authApi = {
   login: (data: LoginRequest) =>
     api.post<ApiResponse<AuthResponse>>('/auth/login', data),
 
-  refresh: (refreshToken: string) =>
-    api.post<ApiResponse<AuthResponse>>('/auth/refresh', { refreshToken }),
+  // El refresh token vive en cookie httpOnly: no se envía ni se recibe por body.
+  refresh: () =>
+    api.post<ApiResponse<AuthResponse>>('/auth/refresh', {}),
 
-  logout: (refreshToken: string) =>
-    api.post<ApiResponse<null>>('/auth/logout', { refreshToken }),
+  logout: () =>
+    api.post<ApiResponse<null>>('/auth/logout', {}),
 
   changePassword: (data: ChangePasswordRequest) =>
     api.post<ApiResponse<null>>('/auth/change-password', data),

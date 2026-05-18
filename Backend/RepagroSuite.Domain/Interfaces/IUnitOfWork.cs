@@ -11,4 +11,9 @@ public interface IUnitOfWork : IDisposable
     Task BeginTransactionAsync(CancellationToken cancellationToken = default);
     Task CommitTransactionAsync(CancellationToken cancellationToken = default);
     Task RollbackTransactionAsync(CancellationToken cancellationToken = default);
+
+    // Lock exclusivo por sala usando sp_getapplock (SQL Server).
+    // Se libera automáticamente al hacer commit/rollback de la transacción actual.
+    // Debe llamarse DENTRO de una transacción ya abierta.
+    Task AcquireRoomLockAsync(Guid roomId, int timeoutMs = 5000, CancellationToken cancellationToken = default);
 }

@@ -15,9 +15,12 @@ public class RoomDto
     public string StatusName { get; set; } = string.Empty;
     public string? ImageUrl { get; set; }
     public string? Color { get; set; }
-    public IEnumerable<string> Features { get; set; } = [];
+    public IEnumerable<FeatureDto> Features { get; set; } = [];
     public IEnumerable<RoomAvailabilityDto> Availabilities { get; set; } = [];
     public DateTime CreatedAt { get; set; }
+    // Token de concurrencia optimista — el cliente lo devuelve en UpdateRoomDto para que
+    // SaveChanges detecte si otro admin modificó la sala entre el GET y el PUT.
+    public string? RowVersion { get; set; }
 }
 
 public class RoomAvailabilityDto
@@ -49,6 +52,13 @@ public class RoomBlockDto
     public DateTime? SpecificEndDateTime { get; set; }
 }
 
+public class FeatureDto
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? IconName { get; set; }
+}
+
 public class CreateRoomDto
 {
     public string Name { get; set; } = string.Empty;
@@ -74,6 +84,9 @@ public class UpdateRoomDto
     public string? Color { get; set; }
     public List<Guid> FeatureIds { get; set; } = [];
     public List<UpsertRoomAvailabilityDto> Availabilities { get; set; } = [];
+    // Si llega null, no se valida concurrencia (compatible con clientes que no lo envían aún).
+    // Si llega valor, EF Core compara contra la versión en BD y lanza DbUpdateConcurrencyException si difiere.
+    public string? RowVersion { get; set; }
 }
 
 public class UpsertRoomAvailabilityDto

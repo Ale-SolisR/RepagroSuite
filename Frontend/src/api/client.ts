@@ -1,9 +1,12 @@
 import axios from 'axios'
 import { useAuthStore } from '@/store/authStore'
 
+// withCredentials: imprescindible para que el navegador envíe la cookie httpOnly
+// del refresh token (rp_rt) al hacer /auth/refresh y /auth/logout.
 const api = axios.create({
   baseURL: '/api/v1',
   headers: { 'Content-Type': 'application/json' },
+  withCredentials: true,
 })
 
 api.interceptors.request.use((config) => {
@@ -28,10 +31,10 @@ api.interceptors.response.use(
       original._retry = true
       refreshing = true
       try {
-        const { refreshToken, setTokens, logout } = useAuthStore.getState()
-        if (!refreshToken) { logout(); return Promise.reject(error) }
-        const { data } = await axios.post('/api/v1/auth/refresh', { refreshToken })
-        setTokens(data.data.accessToken, data.data.refreshToken)
+        // El refresh token va en cookie httpOnly: no necesitamos enviarlo en el body.
+        // El navegador adjunta la cookie automáticamente por withCredentials.
+        const { data } = await axios.post('/api/v1/auth/refresh', {}, { withCredentials: true })
+        useAuthStore.getState().setAccessToken(data.data.accessToken)
         queue.forEach((p) => p.resolve(null))
         queue = []
         return api(original)

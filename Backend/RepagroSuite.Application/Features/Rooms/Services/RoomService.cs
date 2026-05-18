@@ -11,11 +11,13 @@ public class RoomService : IRoomService
 {
     private readonly IUnitOfWork _uow;
     private readonly IAuditService _auditService;
+    private readonly IRealtimeNotifier _realtime;
 
-    public RoomService(IUnitOfWork uow, IAuditService auditService)
+    public RoomService(IUnitOfWork uow, IAuditService auditService, IRealtimeNotifier realtime)
     {
         _uow = uow;
         _auditService = auditService;
+        _realtime = realtime;
     }
 
     public async Task<RoomDto> CreateAsync(CreateRoomDto dto, Guid createdBy, CancellationToken cancellationToken = default)
@@ -60,6 +62,7 @@ public class RoomService : IRoomService
         await _uow.SaveChangesAsync(cancellationToken);
 
         await _auditService.LogAsync(createdBy, "ROOM_CREATED", entityName: "Room", entityId: room.Id.ToString(), module: "Rooms");
+        await _realtime.RoomChangedAsync(room.Id, "created", cancellationToken);
         return await GetByIdAsync(room.Id, cancellationToken);
     }
 
@@ -67,6 +70,21 @@ public class RoomService : IRoomService
     {
         var room = await _uow.Rooms.GetWithDetailsAsync(roomId, cancellationToken)
             ?? throw new KeyNotFoundException("Sala no encontrada.");
+
+        // Optimistic concurrency: si el cliente envió un RowVersion, lo seteamos como "original"
+        // para que SaveChanges lance DbUpdateConcurrencyException si otro admin cambió la sala mientras tanto.
+        if (!string.IsNullOrEmpty(dto.RowVersion))
+        {
+            try
+            {
+                var clientVersion = Convert.FromBase64String(dto.RowVersion);
+                _uow.Rooms.SetOriginalRowVersion(room, clientVersion);
+            }
+            catch (FormatException)
+            {
+                throw new InvalidOperationException("Token de versión inválido. Recargue la sala e intente nuevamente.");
+            }
+        }
 
         room.Name = dto.Name.Trim();
         room.Capacity = dto.Capacity;
@@ -103,6 +121,7 @@ public class RoomService : IRoomService
         await _uow.SaveChangesAsync(cancellationToken);
 
         await _auditService.LogAsync(updatedBy, "ROOM_UPDATED", entityName: "Room", entityId: roomId.ToString(), module: "Rooms");
+        await _realtime.RoomChangedAsync(roomId, "updated", cancellationToken);
         return await GetByIdAsync(roomId, cancellationToken);
     }
 
@@ -136,6 +155,7 @@ public class RoomService : IRoomService
         await _uow.SaveChangesAsync(cancellationToken);
 
         await _auditService.LogAsync(updatedBy, $"ROOM_STATUS_CHANGED_{newStatus.ToString().ToUpper()}", entityName: "Room", entityId: roomId.ToString(), module: "Rooms");
+        await _realtime.RoomChangedAsync(roomId, "status_changed", cancellationToken);
         return MapToDto(room);
     }
 
@@ -147,6 +167,7 @@ public class RoomService : IRoomService
         _uow.Rooms.SoftDelete(room, deletedBy);
         await _uow.SaveChangesAsync(cancellationToken);
         await _auditService.LogAsync(deletedBy, "ROOM_DELETED", entityName: "Room", entityId: roomId.ToString(), module: "Rooms");
+        await _realtime.RoomChangedAsync(roomId, "deleted", cancellationToken);
     }
 
     public async Task<IEnumerable<RoomDto>> GetAvailableAsync(DateTime start, DateTime end, int? minCapacity = null, CancellationToken cancellationToken = default)
@@ -228,9 +249,7 @@ public class RoomService : IRoomService
 
     public async Task DeleteBlockAsync(Guid blockId, Guid deletedBy, CancellationToken cancellationToken = default)
     {
-        // Find block through Room repository
-        var rooms = await _uow.Rooms.GetAllAsync(cancellationToken);
-        var block = rooms.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Id == blockId)
+        var block = await _uow.Rooms.GetBlockByIdAsync(blockId, cancellationToken)
             ?? throw new KeyNotFoundException("Bloqueo no encontrado.");
 
         block.IsActive = false;
@@ -238,6 +257,7 @@ public class RoomService : IRoomService
         block.DeletedAt = DateTime.UtcNow;
         block.DeletedBy = deletedBy;
         await _uow.SaveChangesAsync(cancellationToken);
+        await _auditService.LogAsync(deletedBy, "ROOM_BLOCK_DELETED", entityName: "RoomBlock", entityId: blockId.ToString(), module: "Rooms");
     }
 
     public async Task<IEnumerable<AvailableSlotDto>> GetAvailableSlotsAsync(Guid roomId, DateTime date, CancellationToken cancellationToken = default)
@@ -280,6 +300,17 @@ public class RoomService : IRoomService
         return slots;
     }
 
+    public async Task<IEnumerable<FeatureDto>> GetActiveFeaturesAsync(CancellationToken cancellationToken = default)
+    {
+        var features = await _uow.Rooms.GetActiveFeaturesAsync(cancellationToken);
+        return features.Select(f => new FeatureDto
+        {
+            Id = f.Id,
+            Name = f.Name,
+            IconName = f.IconName,
+        });
+    }
+
     private static RoomDto MapToDto(Room r) => new()
     {
         Id = r.Id,
@@ -300,7 +331,10 @@ public class RoomService : IRoomService
         },
         ImageUrl = r.ImageUrl,
         Color = r.Color,
-        Features = r.RoomFeatures.Where(rf => rf.Feature?.IsActive == true).Select(rf => rf.Feature.Name),
+        RowVersion = r.RowVersion is { Length: > 0 } ? Convert.ToBase64String(r.RowVersion) : null,
+        Features = r.RoomFeatures
+            .Where(rf => rf.Feature?.IsActive == true)
+            .Select(rf => new FeatureDto { Id = rf.Feature.Id, Name = rf.Feature.Name, IconName = rf.Feature.IconName }),
         Availabilities = r.Availabilities.Select(a => new RoomAvailabilityDto
         {
             Id = a.Id,

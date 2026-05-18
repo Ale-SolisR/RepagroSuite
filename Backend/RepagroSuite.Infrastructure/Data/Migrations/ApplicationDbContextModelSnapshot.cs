@@ -1147,6 +1147,9 @@ namespace RepagroSuite.Infrastructure.Data.Migrations
 
                     b.HasIndex("UserId");
 
+                    b.HasIndex("UserId", "Status", "StartDateTime")
+                        .HasDatabaseName("IX_Reservas_UsuarioId_Estado_FechaHoraInicio");
+
                     b.HasIndex("RoomId", "StartDateTime", "EndDateTime", "Status");
 
                     b.ToTable("Reservas", (string)null);
@@ -1539,8 +1542,7 @@ namespace RepagroSuite.Infrastructure.Data.Migrations
                         .HasColumnName("Piso");
 
                     b.Property<string>("ImageUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("UrlImagen");
 
                     b.Property<bool>("IsDeleted")

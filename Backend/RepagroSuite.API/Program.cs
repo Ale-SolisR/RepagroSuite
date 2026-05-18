@@ -2,8 +2,10 @@ using FluentValidation;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using RepagroSuite.Application.Extensions;
@@ -74,6 +76,15 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
         options.Events = new JwtBearerEvents
         {
+            // SignalR WebSockets no soporta header Authorization: aceptar token por query.
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                    context.Token = accessToken;
+                return Task.CompletedTask;
+            },
             OnChallenge = context =>
             {
                 context.HandleResponse();
@@ -122,6 +133,47 @@ builder.Services.AddAuthorization(options =>
         options.AddPolicy(perm, policy => policy.RequireClaim("permission", perm));
 });
 
+// Rate limiting — protege login/refresh/forgot-password contra fuerza bruta y abuso.
+var authPerMinute = builder.Configuration.GetValue("RateLimit:AuthRequestsPerMinute", 5);
+var refreshPerMinute = builder.Configuration.GetValue("RateLimit:RefreshRequestsPerMinute", 20);
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (ctx, ct) =>
+    {
+        ctx.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        ctx.HttpContext.Response.ContentType = "application/json";
+        await ctx.HttpContext.Response.WriteAsync(JsonSerializer.Serialize(new
+        {
+            success = false,
+            code = "RATE_LIMITED",
+            message = "Demasiados intentos. Espere unos segundos e intente nuevamente."
+        }), ct);
+    };
+
+    // Política para login y forgot-password: muy estricta, por IP.
+    options.AddPolicy("auth-strict", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = authPerMinute,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+
+    // Política para refresh: más permisiva (un usuario activo puede refrescar varias veces).
+    options.AddPolicy("auth-refresh", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = refreshPerMinute,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+});
+
 // Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -158,6 +210,10 @@ builder.Services.AddSwaggerGen(options =>
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<ApplicationDbContext>();
 
+// SignalR + notificador
+builder.Services.AddSignalR();
+builder.Services.AddScoped<RepagroSuite.Application.Common.Interfaces.IRealtimeNotifier, RepagroSuite.API.Hubs.SignalRNotifier>();
+
 // Application + Infrastructure DI
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -170,7 +226,16 @@ var app = builder.Build();
 // Migrations on startup
 await app.Services.ApplyMigrationsAsync();
 
-app.UseSerilogRequestLogging();
+// Correlation ID PRIMERO para que aparezca en todos los logs subsiguientes.
+app.UseMiddleware<RepagroSuite.API.Middleware.CorrelationIdMiddleware>();
+app.UseSerilogRequestLogging(opts =>
+{
+    opts.EnrichDiagnosticContext = (diag, http) =>
+    {
+        if (http.Items.TryGetValue("X-Correlation-Id", out var cid))
+            diag.Set("CorrelationId", cid);
+    };
+});
 
 if (app.Environment.IsDevelopment())
 {
@@ -181,6 +246,11 @@ if (app.Environment.IsDevelopment())
         c.RoutePrefix = "swagger";
     });
 }
+else
+{
+    // En producción: HSTS para forzar HTTPS (1 año, incluye subdominios).
+    app.UseHsts();
+}
 
 app.UseHttpsRedirection();
 app.UseCors("DefaultCors");
@@ -190,8 +260,10 @@ app.UseMiddleware<RepagroSuite.API.Middleware.GlobalExceptionMiddleware>();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapControllers();
+app.MapHub<RepagroSuite.API.Hubs.AppHub>("/hubs/app");
 app.MapHealthChecks("/health");
 
 app.Run();

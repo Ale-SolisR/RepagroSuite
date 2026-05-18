@@ -17,4 +17,7 @@ public interface IGenericRepository<T> where T : BaseEntity
     void Remove(T entity);
     void SoftDelete(T entity, Guid? deletedBy = null);
     IQueryable<T> Query();
+    // Setea el "valor original" del RowVersion para que SaveChanges lance
+    // DbUpdateConcurrencyException si la versión en BD es distinta (optimistic locking).
+    void SetOriginalRowVersion(T entity, byte[] originalRowVersion);
 }

@@ -53,13 +53,15 @@ TemporaryDependencyNodeTargetIdentifier=net9.0
 /warnaserror+:NU1605,SYSLIB0011
 
 [sourceFiles]
-Class1.cs
 Common/Interfaces/
  IAuditService.cs
  ICurrentUserService.cs
+ IEmailQueue.cs
  IEmailService.cs
  IIdentificationLookupService.cs
  IPasswordService.cs
+ IRealtimeNotifier.cs
+ ISecretProtector.cs
  ITokenService.cs
 Common/Models/ApiResponse.cs
 Extensions/ApplicationExtensions.cs
@@ -269,7 +271,6 @@ obj/Debug/net9.0/
  System.Xml.XPath.XDocument.dll
  WindowsBase.dll
 <NUGET>/
- automapper/13.0.1/lib/net6.0/AutoMapper.dll
  fluentvalidation/11.11.0/lib/net8.0/FluentValidation.dll
  microsoft.extensions.dependencyinjection.abstractions/9.0.5/lib/net9.0/Microsoft.Extensions.DependencyInjection.Abstractions.dll
  microsoft.extensions.logging.abstractions/9.0.5/lib/net9.0/Microsoft.Extensions.Logging.Abstractions.dll

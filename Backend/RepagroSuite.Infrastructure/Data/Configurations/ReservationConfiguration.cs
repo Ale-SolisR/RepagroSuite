@@ -34,6 +34,9 @@ public class ReservationConfiguration : IEntityTypeConfiguration<Reservation>
 
         builder.HasIndex(x => new { x.RoomId, x.StartDateTime, x.EndDateTime, x.Status });
         builder.HasIndex(x => x.UserId);
+        // Acelera "mis reservas" filtradas por estado y ordenadas por fecha (consulta caliente).
+        builder.HasIndex(x => new { x.UserId, x.Status, x.StartDateTime })
+            .HasDatabaseName("IX_Reservas_UsuarioId_Estado_FechaHoraInicio");
 
         builder.HasOne(x => x.Room).WithMany(x => x.Reservations).HasForeignKey(x => x.RoomId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.User).WithMany(x => x.Reservations).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);

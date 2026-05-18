@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import {
-  LayoutDashboard, DoorOpen, CalendarDays, Users, Settings,
-  LogOut, Menu, X, BarChart3, ShieldCheck, Calendar, UserCircle
+  LayoutDashboard, DoorOpen, CalendarDays, Users,
+  LogOut, Menu, X, BarChart3, ShieldCheck, Calendar, UserCircle,
+  ChevronsLeft, Crown, ChevronUp,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { authApi } from '@/api/auth'
@@ -10,16 +11,16 @@ import { classNames } from '@/utils'
 
 const navGroups = [
   {
-    label: 'PRINCIPAL',
+    label: 'Principal',
     items: [
-      { to: '/dashboard',    label: 'Dashboard',  icon: LayoutDashboard, permission: null,          role: 'ADMINISTRATOR' },
-      { to: '/rooms',        label: 'Salas',      icon: DoorOpen,        permission: null,          role: null },
-      { to: '/reservations', label: 'Mis Reservas', icon: CalendarDays,  permission: null,          role: null },
-      { to: '/calendar',     label: 'Calendario', icon: Calendar,        permission: null,          role: null },
+      { to: '/dashboard',    label: 'Dashboard',     icon: LayoutDashboard, permission: null,                role: 'ADMINISTRATOR' },
+      { to: '/rooms',        label: 'Salas',         icon: DoorOpen,        permission: null,                role: null },
+      { to: '/reservations', label: 'Mis reservas',  icon: CalendarDays,    permission: null,                role: null },
+      { to: '/calendar',     label: 'Calendario',    icon: Calendar,        permission: null,                role: null },
     ],
   },
   {
-    label: 'ADMINISTRACIÓN',
+    label: 'Administración',
     items: [
       { to: '/admin/users',        label: 'Usuarios',  icon: Users,       permission: 'Users.View',         role: null },
       { to: '/admin/reservations', label: 'Auditoría', icon: ShieldCheck, permission: 'Reservations.View',  role: null },
@@ -27,7 +28,7 @@ const navGroups = [
     ],
   },
   {
-    label: 'MI CUENTA',
+    label: 'Mi cuenta',
     items: [
       { to: '/profile', label: 'Perfil', icon: UserCircle, permission: null, role: null },
     ],
@@ -40,11 +41,14 @@ function getInitials(name: string) {
   return name.substring(0, 2).toUpperCase()
 }
 
-function getRoleLabel(roles: string[]): string {
+function getRoleLabel(roles: string[], isMaster: boolean): string {
+  if (isMaster) return 'Administrador Maestro'
   if (!roles?.length) return 'Usuario'
   const role = roles[0]
   const labels: Record<string, string> = {
     Admin: 'Administrador',
+    ADMINISTRATOR: 'Administrador',
+    Administrator: 'Administrador',
     Manager: 'Coordinador',
     User: 'Usuario',
     Coordinator: 'Coordinador',
@@ -52,44 +56,94 @@ function getRoleLabel(roles: string[]): string {
   return labels[role] ?? role
 }
 
-function SidebarContent({ onClose }: { onClose?: () => void }) {
-  const { user, refreshToken, logout, hasPermission, hasRole } = useAuthStore()
+function SidebarContent({
+  onClose, collapsed, onToggleCollapse,
+}: {
+  onClose?: () => void
+  collapsed?: boolean
+  onToggleCollapse?: () => void
+}) {
+  const { user, logout, hasPermission, hasRole } = useAuthStore()
   const navigate = useNavigate()
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
 
   async function handleLogout() {
     try {
-      if (refreshToken) await authApi.logout(refreshToken)
+      // El refresh token va por cookie; el backend lo lee solo.
+      await authApi.logout()
     } catch { /* ignore */ } finally {
       logout()
       navigate('/login')
     }
   }
 
+  const isMaster = user?.isMaster ?? false
+
   return (
-    <div className="flex h-full w-60 flex-col" style={{ background: '#005947' }}>
+    <div
+      className={classNames(
+        'flex h-full flex-col text-white relative transition-all duration-300',
+        collapsed ? 'w-[68px]' : 'w-[248px]',
+      )}
+      style={{
+        background: 'linear-gradient(180deg, #00382A 0%, #005947 60%, #006F55 100%)',
+      }}
+    >
+      {/* Adorno superior dorado sutil */}
+      <div className="absolute top-0 right-0 w-24 h-24 pointer-events-none opacity-40"
+        style={{
+          background: 'radial-gradient(circle at top right, rgba(245,197,24,.25), transparent 60%)',
+        }}
+      />
+
       {/* Logo */}
-      <div className="flex h-16 items-center gap-3 px-5 shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,.12)' }}>
+      <div className="flex h-16 items-center gap-3 px-4 shrink-0 relative"
+        style={{ borderBottom: '1px solid rgba(255,255,255,.08)' }}
+      >
         <div
-          className="flex h-7 w-7 items-center justify-center rounded-[6px] shrink-0"
+          className="flex h-8 w-8 items-center justify-center rounded-lg shrink-0 shadow-sm ring-1 ring-white/20"
           style={{ background: '#fff' }}
         >
-          <span className="text-sm font-bold" style={{ color: '#005947' }}>R</span>
+          <span className="text-[15px] font-bold" style={{ color: '#005947' }}>R</span>
         </div>
-        <span className="text-[15px] font-semibold text-white tracking-tight">Repagro</span>
+        {!collapsed && (
+          <div className="flex-1 min-w-0">
+            <p className="text-[15px] font-semibold tracking-tight leading-none">Repagro</p>
+            <p className="text-[10px] text-white/45 tracking-wider mt-0.5">SUITE · v6.1</p>
+          </div>
+        )}
         {onClose && (
           <button
             onClick={onClose}
-            className="ml-auto rounded p-1 transition-colors"
-            style={{ color: 'rgba(255,255,255,.7)' }}
+            className="ml-auto rounded p-1 transition-colors text-white/70 hover:text-white"
             aria-label="Cerrar menú"
           >
             <X className="h-4 w-4" />
           </button>
         )}
+        {onToggleCollapse && !onClose && (
+          <button
+            onClick={onToggleCollapse}
+            className={classNames(
+              'absolute top-1/2 -translate-y-1/2 -right-3 flex h-6 w-6 items-center justify-center rounded-full bg-white text-gray-600 shadow-md ring-1 ring-gray-200 hover:text-gray-900 hover:scale-110 transition-all z-30',
+              collapsed && 'rotate-180'
+            )}
+            aria-label={collapsed ? 'Expandir' : 'Contraer'}
+            title={collapsed ? 'Expandir menú' : 'Contraer menú'}
+          >
+            <ChevronsLeft className="h-3 w-3" strokeWidth={2.5} />
+          </button>
+        )}
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-5 px-3 space-y-5" aria-label="Navegación principal">
+      <nav
+        className={classNames(
+          'flex-1 overflow-y-auto overflow-x-hidden py-4 space-y-5',
+          collapsed ? 'px-2' : 'px-3'
+        )}
+        aria-label="Navegación principal"
+      >
         {navGroups.map(group => {
           const visibleItems = group.items.filter(item =>
             (!item.permission || hasPermission(item.permission)) &&
@@ -99,38 +153,54 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
 
           return (
             <div key={group.label}>
-              <p
-                className="mb-1.5 px-2 text-[11px] font-medium tracking-[.1em] uppercase"
-                style={{ color: 'rgba(255,255,255,.45)' }}
-              >
-                {group.label}
-              </p>
+              {!collapsed && (
+                <p className="mb-2 px-2 text-[10px] font-semibold tracking-[.12em] uppercase text-white/40">
+                  {group.label}
+                </p>
+              )}
+              {collapsed && (
+                <div className="mx-auto h-px w-6 bg-white/10 mb-2" />
+              )}
               <ul className="space-y-0.5">
                 {visibleItems.map(({ to, label, icon: Icon }) => (
                   <li key={to}>
                     <NavLink
                       to={to}
                       onClick={onClose}
+                      title={collapsed ? label : undefined}
                       className={({ isActive }) =>
                         classNames(
-                          'flex items-center gap-3 rounded-[6px] px-2.5 py-2 text-sm font-medium transition-colors',
-                          isActive ? 'font-semibold' : 'hover:bg-black/10'
+                          'group relative flex items-center rounded-lg font-medium transition-all duration-150',
+                          collapsed ? 'h-10 w-full justify-center' : 'gap-3 px-2.5 py-2 text-[13.5px]',
+                          isActive
+                            ? 'bg-white/[.14] text-white shadow-sm'
+                            : 'text-white/70 hover:bg-white/[.07] hover:text-white',
                         )
-                      }
-                      style={({ isActive }) =>
-                        isActive
-                          ? { background: 'rgba(0,0,0,.22)', color: '#fff', borderLeft: '3px solid #F5C518', paddingLeft: '7px' }
-                          : { color: 'rgba(255,255,255,.75)' }
                       }
                     >
                       {({ isActive }: { isActive: boolean }) => (
                         <>
+                          {/* Indicador activo lateral dorado */}
+                          {isActive && !collapsed && (
+                            <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-amber-400" />
+                          )}
                           <Icon
-                            className="h-4 w-4 shrink-0"
-                            strokeWidth={1.5}
+                            className={classNames(
+                              'shrink-0 transition-colors',
+                              collapsed ? 'h-[18px] w-[18px]' : 'h-[17px] w-[17px]',
+                            )}
+                            strokeWidth={isActive ? 2 : 1.75}
                             style={isActive ? { color: '#F5C518' } : undefined}
                           />
-                          {label}
+                          {!collapsed && (
+                            <span className="truncate flex-1 leading-none">{label}</span>
+                          )}
+                          {/* Tooltip cuando está colapsado */}
+                          {collapsed && (
+                            <span className="absolute left-full ml-3 z-50 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[11px] font-medium text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg">
+                              {label}
+                            </span>
+                          )}
                         </>
                       )}
                     </NavLink>
@@ -143,31 +213,85 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
       </nav>
 
       {/* User footer */}
-      <div className="shrink-0 px-3 pb-4" style={{ borderTop: '1px solid rgba(255,255,255,.12)', paddingTop: '12px' }}>
-        <div className="flex items-center gap-2.5 rounded-[6px] px-2 py-2 mb-1">
-          <div
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold"
-            style={{ background: '#F5C518', color: '#003E2D' }}
+      <div
+        className={classNames('shrink-0', collapsed ? 'px-2 pb-3' : 'px-3 pb-3')}
+        style={{ borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: '10px' }}
+      >
+        {collapsed ? (
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center h-10 rounded-lg text-white/60 hover:text-white hover:bg-white/[.07] transition-colors group relative"
+            title="Cerrar sesión"
           >
-            {getInitials(user?.fullName ?? 'U')}
+            <div
+              className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold ring-2 ring-white/10"
+              style={{ background: isMaster ? '#F5C518' : '#E5E7EB', color: '#003E2D' }}
+            >
+              {getInitials(user?.fullName ?? 'U')}
+            </div>
+            <span className="absolute left-full ml-3 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[11px] font-medium text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg z-50">
+              Cerrar sesión
+            </span>
+          </button>
+        ) : (
+          <div className="relative">
+            <button
+              onClick={() => setUserMenuOpen(o => !o)}
+              className="w-full flex items-center gap-2.5 rounded-lg px-2 py-2 transition-colors hover:bg-white/[.07]"
+            >
+              <div className="relative shrink-0">
+                <div
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-[12px] font-bold ring-2 ring-white/10"
+                  style={{ background: isMaster ? '#F5C518' : '#E5E7EB', color: '#003E2D' }}
+                >
+                  {getInitials(user?.fullName ?? 'U')}
+                </div>
+                {isMaster && (
+                  <div className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-400 ring-2"
+                    style={{ background: '#F5C518', ['--tw-ring-color' as any]: '#005947' }}>
+                    <Crown className="h-2.5 w-2.5 text-white" strokeWidth={2.5} />
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0 flex-1 text-left">
+                <p className="truncate text-[13px] font-semibold text-white leading-tight">
+                  {user?.fullName}
+                </p>
+                <p
+                  className="truncate text-[10.5px] mt-0.5"
+                  style={{ color: isMaster ? '#F5C518' : 'rgba(255,255,255,.55)' }}
+                >
+                  {getRoleLabel(user?.roles ?? [], isMaster)}
+                </p>
+              </div>
+              <ChevronUp className={classNames(
+                'h-3.5 w-3.5 text-white/40 transition-transform shrink-0',
+                userMenuOpen ? '' : 'rotate-180',
+              )} />
+            </button>
+
+            {/* Dropdown */}
+            {userMenuOpen && (
+              <div className="absolute bottom-full left-0 right-0 mb-1.5 rounded-lg bg-white shadow-xl ring-1 ring-black/5 overflow-hidden">
+                <button
+                  onClick={() => { setUserMenuOpen(false); navigate('/profile') }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <UserCircle className="h-4 w-4 text-gray-400" />
+                  Ver mi perfil
+                </button>
+                <div className="border-t border-gray-100" />
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Cerrar sesión
+                </button>
+              </div>
+            )}
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-white leading-tight">
-              {user?.fullName}
-            </p>
-            <p className="truncate text-[11px]" style={{ color: 'rgba(255,255,255,.5)' }}>
-              {getRoleLabel(user?.roles ?? [])}
-            </p>
-          </div>
-        </div>
-        <button
-          onClick={handleLogout}
-          className="flex w-full items-center gap-2.5 rounded-[6px] px-2 py-2 text-sm transition-colors hover:bg-black/10"
-          style={{ color: 'rgba(255,255,255,.6)' }}
-        >
-          <LogOut className="h-4 w-4 shrink-0" strokeWidth={1.5} />
-          Cerrar sesión
-        </button>
+        )}
       </div>
     </div>
   )
@@ -175,12 +299,13 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
 
 export default function AppLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
 
   return (
-    <div className="flex h-screen overflow-hidden bg-bg">
+    <div className="flex h-screen overflow-hidden bg-gray-50">
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex shrink-0">
-        <SidebarContent />
+      <aside className="hidden lg:flex shrink-0 relative z-20">
+        <SidebarContent collapsed={collapsed} onToggleCollapse={() => setCollapsed(c => !c)} />
       </aside>
 
       {/* Mobile drawer overlay */}
@@ -199,13 +324,10 @@ export default function AppLayout() {
       {/* Main area */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Mobile top strip */}
-        <div
-          className="flex h-12 shrink-0 items-center gap-3 border-b px-4 lg:hidden"
-          style={{ background: '#fff', borderColor: '#D9DEE5' }}
-        >
+        <div className="flex h-12 shrink-0 items-center gap-3 border-b border-gray-200 px-4 lg:hidden bg-white">
           <button
             onClick={() => setDrawerOpen(true)}
-            className="rounded p-1 text-ink2 transition-colors hover:text-ink"
+            className="rounded p-1 text-gray-600 transition-colors hover:text-gray-900"
             aria-label="Abrir menú"
           >
             <Menu className="h-5 w-5" />
@@ -217,7 +339,7 @@ export default function AppLayout() {
             >
               R
             </div>
-            <span className="text-sm font-semibold text-ink">Repagro</span>
+            <span className="text-sm font-semibold text-gray-900">Repagro</span>
           </div>
         </div>
 

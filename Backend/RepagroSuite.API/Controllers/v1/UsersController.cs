@@ -136,6 +136,15 @@ public class UsersController : ControllerBase
         return Ok(ApiResponse<UserDto>.Ok(result, "Rol de Administrador removido."));
     }
 
+    [HttpPost("{id:guid}/change-password")]
+    [Authorize(Policy = "Users.GenerateTemporaryPassword")]
+    public async Task<ActionResult<ApiResponse<object>>> ChangePassword(
+        Guid id, [FromBody] ChangeUserPasswordDto dto, CancellationToken ct)
+    {
+        await _userService.ChangeUserPasswordAsync(id, dto, _currentUser.UserId!.Value, ct);
+        return Ok(ApiResponse<object>.Ok(null!, "Contraseña actualizada correctamente."));
+    }
+
     [HttpPost("{id:guid}/force-password-change")]
     [Authorize(Policy = "Users.ForcePasswordChange")]
     public async Task<ActionResult<ApiResponse<object>>> ForcePasswordChange(Guid id, CancellationToken ct)

@@ -11,12 +11,14 @@ public class SettingsService : SettingsServiceBase
 {
     private readonly ApplicationDbContext _context;
     private readonly IAuditService _auditService;
+    private readonly ISecretProtector _protector;
 
-    public SettingsService(ApplicationDbContext context, IEmailService emailService, IAuditService auditService)
+    public SettingsService(ApplicationDbContext context, IEmailService emailService, IAuditService auditService, ISecretProtector protector)
         : base(emailService)
     {
         _context = context;
         _auditService = auditService;
+        _protector = protector;
     }
 
     public override async Task<IEnumerable<SystemSettingDto>> GetAllAsync(string? module = null, CancellationToken cancellationToken = default)
@@ -44,13 +46,22 @@ public class SettingsService : SettingsServiceBase
             throw new InvalidOperationException("Esta configuración es de solo lectura.");
 
         var oldValue = setting.Value;
-        setting.Value = dto.Value?.Trim();
+        var newValue = dto.Value?.Trim();
+
+        // Si el campo está marcado como cifrado, lo protegemos antes de persistir.
+        // Si el usuario envía vacío, lo dejamos vacío (significa "borrar credencial").
+        setting.Value = setting.IsEncrypted && !string.IsNullOrEmpty(newValue)
+            ? _protector.Protect(newValue)
+            : newValue;
         setting.UpdatedAt = DateTime.UtcNow;
         setting.UpdatedBy = updatedBy;
 
         await _context.SaveChangesAsync(cancellationToken);
+        // Para auditoría: si era cifrado, no logueamos el valor real (sólo marca de cambio).
         await _auditService.LogAsync(updatedBy, "SETTING_UPDATED", entityName: "SystemSetting", entityId: key,
-            oldValues: new { Value = oldValue }, newValues: new { Value = setting.Value }, module: "Settings");
+            oldValues: new { Value = setting.IsEncrypted ? "***" : oldValue },
+            newValues: new { Value = setting.IsEncrypted ? "***" : setting.Value },
+            module: "Settings");
     }
 
     public override async Task UpdateBulkAsync(UpdateSettingsBulkDto dto, Guid updatedBy, CancellationToken cancellationToken = default)
@@ -60,7 +71,10 @@ public class SettingsService : SettingsServiceBase
             var setting = await _context.SystemSettings.FirstOrDefaultAsync(s => s.Key == key && !s.IsDeleted, cancellationToken);
             if (setting == null || setting.IsReadOnly) continue;
 
-            setting.Value = value?.Trim();
+            var trimmed = value?.Trim();
+            setting.Value = setting.IsEncrypted && !string.IsNullOrEmpty(trimmed)
+                ? _protector.Protect(trimmed)
+                : trimmed;
             setting.UpdatedAt = DateTime.UtcNow;
             setting.UpdatedBy = updatedBy;
         }

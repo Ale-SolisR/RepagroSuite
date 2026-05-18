@@ -12,64 +12,91 @@ public class ReservationService : IReservationService
     private readonly IUnitOfWork _uow;
     private readonly IAuditService _auditService;
     private readonly IEmailService _emailService;
+    private readonly IRealtimeNotifier _realtime;
 
-    public ReservationService(IUnitOfWork uow, IAuditService auditService, IEmailService emailService)
+    public ReservationService(IUnitOfWork uow, IAuditService auditService, IEmailService emailService, IRealtimeNotifier realtime)
     {
         _uow = uow;
         _auditService = auditService;
         _emailService = emailService;
+        _realtime = realtime;
     }
 
     public async Task<ReservationDto> CreateAsync(Guid userId, CreateReservationDto dto, CancellationToken cancellationToken = default)
     {
-        await ValidateReservationAsync(dto.RoomId, dto.StartDateTime, dto.EndDateTime, dto.PeopleCount, null, cancellationToken);
-
-        var reservation = new Reservation
+        // Transacción + lock pesimista por sala para evitar doble booking bajo concurrencia.
+        // Sin esto, dos requests simultáneos para el mismo slot pasarían ambos la validación
+        // de HasConflictAsync e insertarían reservas duplicadas.
+        await _uow.BeginTransactionAsync(cancellationToken);
+        try
         {
-            RoomId = dto.RoomId,
-            UserId = userId,
-            StartDateTime = dto.StartDateTime,
-            EndDateTime = dto.EndDateTime,
-            PeopleCount = dto.PeopleCount,
-            Purpose = dto.Purpose.Trim(),
-            Notes = dto.Notes?.Trim(),
-            Status = ReservationStatus.Pending
-        };
+            await _uow.AcquireRoomLockAsync(dto.RoomId, timeoutMs: 5000, cancellationToken);
+            await ValidateReservationAsync(dto.RoomId, dto.StartDateTime, dto.EndDateTime, dto.PeopleCount, null, cancellationToken);
 
-        await _uow.Reservations.AddAsync(reservation, cancellationToken);
-        await _uow.SaveChangesAsync(cancellationToken);
+            var reservation = new Reservation
+            {
+                RoomId = dto.RoomId,
+                UserId = userId,
+                StartDateTime = dto.StartDateTime,
+                EndDateTime = dto.EndDateTime,
+                PeopleCount = dto.PeopleCount,
+                Purpose = dto.Purpose.Trim(),
+                Notes = dto.Notes?.Trim(),
+                Status = ReservationStatus.Pending
+            };
 
-        await _auditService.LogAsync(userId, "RESERVATION_CREATED", entityName: "Reservation", entityId: reservation.Id.ToString(), module: "Reservations");
+            await _uow.Reservations.AddAsync(reservation, cancellationToken);
+            await _uow.SaveChangesAsync(cancellationToken);
+            await _uow.CommitTransactionAsync(cancellationToken);
 
-        return await GetByIdAsync(reservation.Id, cancellationToken);
+            await _auditService.LogAsync(userId, "RESERVATION_CREATED", entityName: "Reservation", entityId: reservation.Id.ToString(), module: "Reservations");
+            await _realtime.ReservationChangedAsync(reservation.Id, reservation.RoomId, "created", cancellationToken);
+            return await GetByIdAsync(reservation.Id, cancellationToken);
+        }
+        catch
+        {
+            await _uow.RollbackTransactionAsync(cancellationToken);
+            throw;
+        }
     }
 
     public async Task<ReservationDto> AdminDirectCreateAsync(Guid adminId, AdminDirectReservationDto dto, CancellationToken cancellationToken = default)
     {
-        await ValidateReservationAsync(dto.RoomId, dto.StartDateTime, dto.EndDateTime, dto.PeopleCount, null, cancellationToken);
-
-        var targetUserId = dto.UserId ?? adminId;
-        var reservation = new Reservation
+        await _uow.BeginTransactionAsync(cancellationToken);
+        try
         {
-            RoomId = dto.RoomId,
-            UserId = targetUserId,
-            StartDateTime = dto.StartDateTime,
-            EndDateTime = dto.EndDateTime,
-            PeopleCount = dto.PeopleCount,
-            Purpose = dto.Purpose.Trim(),
-            Notes = dto.Notes?.Trim(),
-            Status = ReservationStatus.Approved,
-            IsDirectAdminReservation = true,
-            ApprovedByUserId = adminId,
-            ApprovedAt = DateTime.UtcNow
-        };
+            await _uow.AcquireRoomLockAsync(dto.RoomId, timeoutMs: 5000, cancellationToken);
+            await ValidateReservationAsync(dto.RoomId, dto.StartDateTime, dto.EndDateTime, dto.PeopleCount, null, cancellationToken);
 
-        await _uow.Reservations.AddAsync(reservation, cancellationToken);
-        await _uow.SaveChangesAsync(cancellationToken);
+            var targetUserId = dto.UserId ?? adminId;
+            var reservation = new Reservation
+            {
+                RoomId = dto.RoomId,
+                UserId = targetUserId,
+                StartDateTime = dto.StartDateTime,
+                EndDateTime = dto.EndDateTime,
+                PeopleCount = dto.PeopleCount,
+                Purpose = dto.Purpose.Trim(),
+                Notes = dto.Notes?.Trim(),
+                Status = ReservationStatus.Approved,
+                IsDirectAdminReservation = true,
+                ApprovedByUserId = adminId,
+                ApprovedAt = DateTime.UtcNow
+            };
 
-        await _auditService.LogAsync(adminId, "RESERVATION_DIRECT_CREATED", entityName: "Reservation", entityId: reservation.Id.ToString(), module: "Reservations");
+            await _uow.Reservations.AddAsync(reservation, cancellationToken);
+            await _uow.SaveChangesAsync(cancellationToken);
+            await _uow.CommitTransactionAsync(cancellationToken);
 
-        return await GetByIdAsync(reservation.Id, cancellationToken);
+            await _auditService.LogAsync(adminId, "RESERVATION_DIRECT_CREATED", entityName: "Reservation", entityId: reservation.Id.ToString(), module: "Reservations");
+            await _realtime.ReservationChangedAsync(reservation.Id, reservation.RoomId, "created", cancellationToken);
+            return await GetByIdAsync(reservation.Id, cancellationToken);
+        }
+        catch
+        {
+            await _uow.RollbackTransactionAsync(cancellationToken);
+            throw;
+        }
     }
 
     public async Task<ReservationDto> GetByIdAsync(Guid reservationId, CancellationToken cancellationToken = default)
@@ -102,6 +129,9 @@ public class ReservationService : IReservationService
             if (reservation.Status != ReservationStatus.Pending)
                 throw new InvalidOperationException("Solo se pueden aprobar reservas en estado Pendiente.");
 
+            // Lock por sala para evitar que otro admin apruebe una reserva conflictiva al mismo tiempo.
+            await _uow.AcquireRoomLockAsync(reservation.RoomId, timeoutMs: 5000, cancellationToken);
+
             // Re-validate conflict within transaction
             if (await _uow.Reservations.HasConflictAsync(reservation.RoomId, reservation.StartDateTime, reservation.EndDateTime, reservationId, cancellationToken))
                 throw new InvalidOperationException("La sala ya fue reservada en ese horario. Existe un conflicto de disponibilidad.");
@@ -115,6 +145,7 @@ public class ReservationService : IReservationService
             await _uow.CommitTransactionAsync(cancellationToken);
 
             await _auditService.LogAsync(approvedBy, "RESERVATION_APPROVED", entityName: "Reservation", entityId: reservationId.ToString(), module: "Reservations");
+            await _realtime.ReservationChangedAsync(reservation.Id, reservation.RoomId, "approved", cancellationToken);
 
             try
             {
@@ -154,6 +185,7 @@ public class ReservationService : IReservationService
         await _uow.SaveChangesAsync(cancellationToken);
 
         await _auditService.LogAsync(rejectedBy, "RESERVATION_REJECTED", entityName: "Reservation", entityId: reservationId.ToString(), module: "Reservations");
+        await _realtime.ReservationChangedAsync(reservation.Id, reservation.RoomId, "rejected", cancellationToken);
 
         try
         {
@@ -184,6 +216,7 @@ public class ReservationService : IReservationService
         await _uow.SaveChangesAsync(cancellationToken);
 
         await _auditService.LogAsync(cancelledBy, "RESERVATION_CANCELLED", entityName: "Reservation", entityId: reservationId.ToString(), module: "Reservations");
+        await _realtime.ReservationChangedAsync(reservation.Id, reservation.RoomId, "cancelled", cancellationToken);
 
         return MapToDto(reservation);
     }

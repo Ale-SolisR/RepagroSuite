@@ -19,5 +19,6 @@ public interface IUserService
     Task<UserDto> UpdateAsync(Guid userId, UpdateUserDto dto, CancellationToken cancellationToken = default);
     Task<GenerateTemporaryPasswordResponseDto> GenerateTemporaryPasswordAsync(Guid userId, Guid adminId, CancellationToken cancellationToken = default);
     Task ForcePasswordChangeAsync(Guid userId, Guid adminId, CancellationToken cancellationToken = default);
+    Task ChangeUserPasswordAsync(Guid userId, ChangeUserPasswordDto dto, Guid adminId, CancellationToken cancellationToken = default);
     Task DeleteAsync(Guid userId, Guid deletedBy, CancellationToken cancellationToken = default);
 }

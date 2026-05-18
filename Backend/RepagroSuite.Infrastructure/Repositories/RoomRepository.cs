@@ -26,6 +26,7 @@ public class RoomRepository : GenericRepository<Room>, IRoomRepository
     public async Task<IEnumerable<Room>> GetAvailableRoomsAsync(DateTime start, DateTime end, int? minCapacity = null, CancellationToken cancellationToken = default)
     {
         var conflictingRoomIds = await _context.Reservations
+            .AsNoTracking()
             .Where(r => !r.IsDeleted &&
                         (r.Status == ReservationStatus.Approved || r.Status == ReservationStatus.Pending) &&
                         r.StartDateTime < end && r.EndDateTime > start)
@@ -34,6 +35,7 @@ public class RoomRepository : GenericRepository<Room>, IRoomRepository
             .ToListAsync(cancellationToken);
 
         var query = _dbSet
+            .AsNoTracking()
             .Include(r => r.RoomFeatures).ThenInclude(rf => rf.Feature)
             .Where(r => r.Status == RoomStatus.Available && !conflictingRoomIds.Contains(r.Id));
 
@@ -46,7 +48,7 @@ public class RoomRepository : GenericRepository<Room>, IRoomRepository
     public async Task<(IEnumerable<Room> Items, int Total)> GetPagedAsync(
         int page, int pageSize, string? search = null, RoomStatus? status = null, CancellationToken cancellationToken = default)
     {
-        var query = _dbSet.Include(r => r.RoomFeatures).ThenInclude(rf => rf.Feature).AsQueryable();
+        var query = _dbSet.AsNoTracking().Include(r => r.RoomFeatures).ThenInclude(rf => rf.Feature).AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -69,6 +71,7 @@ public class RoomRepository : GenericRepository<Room>, IRoomRepository
 
     public async Task<IEnumerable<RoomAvailability>> GetAvailabilitiesAsync(Guid roomId, CancellationToken cancellationToken = default)
         => await _context.Set<RoomAvailability>()
+            .AsNoTracking()
             .Where(a => a.RoomId == roomId && !a.IsDeleted)
             .OrderBy(a => a.DayOfWeek)
             .ToListAsync(cancellationToken);
@@ -82,4 +85,15 @@ public class RoomRepository : GenericRepository<Room>, IRoomRepository
         _context.Set<RoomAvailability>().RemoveRange(existing);
         await _context.Set<RoomAvailability>().AddRangeAsync(newAvailabilities, cancellationToken);
     }
+
+    public async Task<IEnumerable<Feature>> GetActiveFeaturesAsync(CancellationToken cancellationToken = default)
+        => await _context.Features
+            .AsNoTracking()
+            .Where(f => f.IsActive && !f.IsDeleted)
+            .OrderBy(f => f.Name)
+            .ToListAsync(cancellationToken);
+
+    public async Task<RoomBlock?> GetBlockByIdAsync(Guid blockId, CancellationToken cancellationToken = default)
+        => await _context.Set<RoomBlock>()
+            .FirstOrDefaultAsync(b => b.Id == blockId && !b.IsDeleted, cancellationToken);
 }

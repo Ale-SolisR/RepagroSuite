@@ -23,3 +23,11 @@ Thumbs.db
 # ── Secrets / env ────────────────────────────────────────────────────
 *.env
 .env.*
+
+# Sólo permitimos appsettings.json y appsettings.Example.json
+# Cualquier appsettings.<entorno>.json local (Production, Staging, etc.) NO va a git.
+Backend/**/appsettings.Production.json
+Backend/**/appsettings.Staging.json
+Backend/**/appsettings.Local.json
+Backend/**/secrets.json
+**/UserSecrets/

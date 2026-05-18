@@ -53,6 +53,13 @@ public class RoomsController : ControllerBase
         return Ok(ApiResponse<IEnumerable<RoomDto>>.Ok(result));
     }
 
+    [HttpGet("features")]
+    public async Task<ActionResult<ApiResponse<IEnumerable<FeatureDto>>>> GetFeatures(CancellationToken ct)
+    {
+        var result = await _roomService.GetActiveFeaturesAsync(ct);
+        return Ok(ApiResponse<IEnumerable<FeatureDto>>.Ok(result));
+    }
+
     [HttpGet("{id:guid}/slots")]
     [Authorize(Policy = "Rooms.View")]
     public async Task<ActionResult<ApiResponse<IEnumerable<AvailableSlotDto>>>> GetSlots(
