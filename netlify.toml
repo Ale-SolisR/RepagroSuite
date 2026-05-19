@@ -1,0 +1,62 @@
+# Configuración de Netlify para RepagroSuite Frontend
+# Auto-deploy desde GitHub: cada push a main dispara build + publish.
+#
+# Estrategia: Netlify proxy hacia Site4Now (mismo origen desde la perspectiva del navegador).
+#   - /api/* y /hubs/* → reverse proxy al backend
+#   - Cookie httpOnly del refresh token funciona sin cambios (mismo origen)
+#   - CORS no se dispara (el navegador no ve cross-origin)
+#   - No requiere variables de entorno
+
+[build]
+  base = "Frontend/"
+  command = "npm run build"
+  publish = "dist/"
+
+[build.environment]
+  # Pin de Node para builds reproducibles
+  NODE_VERSION = "20"
+  # Disable telemetry para builds más rápidos
+  CI = "true"
+
+# ─── Proxy a la API del backend ──────────────────────────────────────────
+# Importante: estas reglas deben venir ANTES del fallback SPA, porque Netlify
+# evalúa redirects en orden y el primero que matchea gana.
+
+[[redirects]]
+  from = "/api/*"
+  to = "https://asolis-001-site1.anytempurl.com/api/:splat"
+  status = 200
+  force = true
+
+# SignalR: Netlify soporta upgrade a WebSocket en redirects con :splat.
+[[redirects]]
+  from = "/hubs/*"
+  to = "https://asolis-001-site1.anytempurl.com/hubs/:splat"
+  status = 200
+  force = true
+
+# ─── SPA fallback: cualquier ruta no estática → index.html ───────────────
+# Sin esto, React Router devuelve 404 al refrescar /calendar, /dashboard, etc.
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# ─── Cache headers para assets versionados ──────────────────────────────
+# Vite genera nombres con hash (index-abc123.js) → cache eterno seguro.
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# index.html y resto: sin cache agresivo (siempre revalidar)
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"

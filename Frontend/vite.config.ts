@@ -18,6 +18,13 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      // SignalR Hub para tiempo real. `ws: true` habilita el upgrade a WebSocket.
+      '/hubs': {
+        target: 'https://localhost:7266',
+        changeOrigin: true,
+        secure: false,
+        ws: true,
+      },
     },
   },
 })
