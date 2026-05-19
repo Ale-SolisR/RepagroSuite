@@ -16,17 +16,20 @@ public class EmailService : IEmailService
     private readonly ILogger<EmailService> _logger;
     private readonly ISecretProtector _protector;
     private readonly IEmailQueue _queue;
+    private readonly IAppCache _cache;
 
     public EmailService(
         ApplicationDbContext context,
         ILogger<EmailService> logger,
         ISecretProtector protector,
-        IEmailQueue queue)
+        IEmailQueue queue,
+        IAppCache cache)
     {
         _context = context;
         _logger = logger;
         _protector = protector;
         _queue = queue;
+        _cache = cache;
     }
 
     public Task SendAsync(string to, string subject, string htmlBody, CancellationToken cancellationToken = default)
@@ -43,7 +46,9 @@ public class EmailService : IEmailService
 
     public async Task<bool> TestConnectionAsync(CancellationToken cancellationToken = default)
     {
-        var config = await EmailTemplates.GetSmtpConfigAsync(_context, _protector, cancellationToken);
+        // Tests bypass cache para reflejar cambios al instante después de un guardado.
+        _cache.Remove(CacheKeys.SmtpConfig);
+        var config = await EmailTemplates.GetSmtpConfigAsync(_context, _protector, _cache, cancellationToken);
         try
         {
             using var client = new SmtpClient();
@@ -63,7 +68,8 @@ public class EmailService : IEmailService
 
     public async Task<bool> TestAndSendAsync(string to, CancellationToken cancellationToken = default)
     {
-        var config = await EmailTemplates.GetSmtpConfigAsync(_context, _protector, cancellationToken);
+        _cache.Remove(CacheKeys.SmtpConfig);
+        var config = await EmailTemplates.GetSmtpConfigAsync(_context, _protector, _cache, cancellationToken);
         try
         {
             var msg = new MimeMessage();
@@ -104,28 +110,33 @@ internal static class EmailTemplates
         public string Password { get; set; } = string.Empty;
     }
 
-    public static async Task<SmtpConfig> GetSmtpConfigAsync(ApplicationDbContext ctx, ISecretProtector protector, CancellationToken ct)
+    public static Task<SmtpConfig> GetSmtpConfigAsync(ApplicationDbContext ctx, ISecretProtector protector, IAppCache cache, CancellationToken ct)
     {
-        var settings = await ctx.SystemSettings
-            .AsNoTracking()
-            .Where(s => s.Module == "EMAIL" && !s.IsDeleted)
-            .ToListAsync(ct);
-
-        string Get(string key) => settings.FirstOrDefault(s => s.Key == key)?.Value ?? string.Empty;
-        bool GetBool(string key) => Get(key).Equals("true", StringComparison.OrdinalIgnoreCase);
-        int GetInt(string key, int def) => int.TryParse(Get(key), out var v) ? v : def;
-
-        return new SmtpConfig
+        // SMTP se consultaba por CADA envío. Ahora cacheamos 10 min:
+        // las actualizaciones via panel Settings invalidan la clave (ver SettingsService.UpdateAsync).
+        return cache.GetOrCreateAsync(CacheKeys.SmtpConfig, TimeSpan.FromMinutes(10), async token =>
         {
-            Enabled = GetBool("EMAIL.ENABLED"),
-            FromName = Get("EMAIL.FROM_NAME"),
-            FromAddress = Get("EMAIL.FROM_ADDRESS"),
-            SmtpHost = Get("EMAIL.SMTP_HOST"),
-            SmtpPort = GetInt("EMAIL.SMTP_PORT", 587),
-            UseSsl = GetBool("EMAIL.SMTP_USE_SSL"),
-            Username = Get("EMAIL.SMTP_USERNAME"),
-            Password = protector.Unprotect(Get("EMAIL.SMTP_PASSWORD")) ?? string.Empty,
-        };
+            var settings = await ctx.SystemSettings
+                .AsNoTracking()
+                .Where(s => s.Module == "EMAIL" && !s.IsDeleted)
+                .ToListAsync(token);
+
+            string Get(string key) => settings.FirstOrDefault(s => s.Key == key)?.Value ?? string.Empty;
+            bool GetBool(string key) => Get(key).Equals("true", StringComparison.OrdinalIgnoreCase);
+            int GetInt(string key, int def) => int.TryParse(Get(key), out var v) ? v : def;
+
+            return new SmtpConfig
+            {
+                Enabled = GetBool("EMAIL.ENABLED"),
+                FromName = Get("EMAIL.FROM_NAME"),
+                FromAddress = Get("EMAIL.FROM_ADDRESS"),
+                SmtpHost = Get("EMAIL.SMTP_HOST"),
+                SmtpPort = GetInt("EMAIL.SMTP_PORT", 587),
+                UseSsl = GetBool("EMAIL.SMTP_USE_SSL"),
+                Username = Get("EMAIL.SMTP_USERNAME"),
+                Password = protector.Unprotect(Get("EMAIL.SMTP_PASSWORD")) ?? string.Empty,
+            };
+        }, ct);
     }
 
     public static string GetSubject(string templateName) => templateName switch

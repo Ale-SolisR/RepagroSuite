@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Check, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { reservationsApi } from '@/api/reservations'
 import { formatDateTime, extractApiError } from '@/utils'
+import { qk, staleTimes, invalidate } from '@/lib/queryKeys'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Spinner from '@/components/ui/Spinner'
@@ -33,24 +34,25 @@ export default function AdminReservationsPage() {
   const [rejectTarget, setRejectTarget] = useState<ReservationDto | null>(null)
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admin-reservations', page, activeTab],
+    queryKey: qk.reservations.admin(page, activeTab),
     queryFn: () => reservationsApi.getAll({
       page, pageSize: 20,
       status: activeTab || undefined,
     }).then(r => r.data.data!),
+    staleTime: staleTimes.adminReservations,
   })
 
   const approveMutation = useMutation({
     mutationFn: ({ id, comment }: { id: string; comment?: string }) =>
       reservationsApi.approve(id, { comment }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-reservations'] }); toast.success('Reserva aprobada'); setApproveTarget(null) },
+    onSuccess: () => { invalidate.reservations(qc); toast.success('Reserva aprobada'); setApproveTarget(null) },
     onError: (err) => toast.error(extractApiError(err)),
   })
 
   const rejectMutation = useMutation({
     mutationFn: ({ id, reason }: { id: string; reason: string }) =>
       reservationsApi.reject(id, { reason }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-reservations'] }); toast.success('Reserva rechazada'); setRejectTarget(null) },
+    onSuccess: () => { invalidate.reservations(qc); toast.success('Reserva rechazada'); setRejectTarget(null) },
     onError: (err) => toast.error(extractApiError(err)),
   })
 

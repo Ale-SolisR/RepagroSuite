@@ -223,17 +223,19 @@ public class ReservationService : IReservationService
 
     public async Task<IEnumerable<CalendarEventDto>> GetCalendarEventsAsync(DateTime from, DateTime to, Guid? roomId = null, CancellationToken cancellationToken = default)
     {
-        var reservations = await _uow.Reservations.GetForCalendarAsync(from, to, roomId, cancellationToken);
-        return reservations.Select(r => new CalendarEventDto
+        var projections = await _uow.Reservations.GetForCalendarAsync(from, to, roomId, cancellationToken);
+        return projections.Select(p => new CalendarEventDto
         {
-            Id = r.Id,
-            Title = $"{r.Room?.Name} - {r.User?.FullName}",
-            Start = r.StartDateTime,
-            End = r.EndDateTime,
-            Color = r.Room?.Color,
-            RoomName = r.Room?.Name ?? string.Empty,
-            UserName = r.User?.FullName ?? string.Empty,
-            Status = r.Status.ToString()
+            Id = p.Id,
+            Title = $"{p.RoomName} - {p.UserFullName}",
+            Start = p.StartDateTime,
+            End = p.EndDateTime,
+            Color = p.RoomColor,
+            RoomId = p.RoomId,
+            RoomName = p.RoomName,
+            UserId = p.UserId,
+            UserName = p.UserFullName,
+            Status = p.Status.ToString()
         });
     }
 

@@ -5,6 +5,7 @@ import type { LucideIcon } from 'lucide-react'
 import { usersApi } from '@/api/users'
 import { formatDate, extractApiError } from '@/utils'
 import { useAuthStore } from '@/store/authStore'
+import { qk, staleTimes, invalidate } from '@/lib/queryKeys'
 import Spinner from '@/components/ui/Spinner'
 import Modal from '@/components/ui/Modal'
 import Textarea from '@/components/ui/Textarea'
@@ -175,49 +176,50 @@ export default function AdminUsersPage() {
   function closeModal() { setSelectedUser(null); setModalView('detail') }
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admin-users', page, activeTab, search],
+    queryKey: qk.users.admin(page, activeTab, search),
     queryFn: () => usersApi.getAll({
       page,
       pageSize: 20,
       status: activeTab || undefined,
       search: search || undefined,
     }).then(r => r.data.data!),
+    staleTime: staleTimes.users,
   })
 
   const approveMutation = useMutation({
     mutationFn: (id: string) => usersApi.approve(id, { roleIds: [] }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-users'] }); toast.success('Usuario aprobado'); closeModal() },
+    onSuccess: () => { invalidate.users(qc); toast.success('Usuario aprobado'); closeModal() },
     onError: (err) => toast.error(extractApiError(err)),
   })
 
   const rejectMutation = useMutation({
     mutationFn: ({ id, reason }: { id: string; reason: string }) => usersApi.reject(id, { reason }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-users'] }); toast.success('Usuario rechazado'); closeModal() },
+    onSuccess: () => { invalidate.users(qc); toast.success('Usuario rechazado'); closeModal() },
     onError: (err) => toast.error(extractApiError(err)),
   })
 
   const blockMutation = useMutation({
     mutationFn: ({ id, block }: { id: string; block: boolean }) =>
       block ? usersApi.block(id) : usersApi.unblock(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-users'] }); toast.success('Estado actualizado'); closeModal() },
+    onSuccess: () => { invalidate.users(qc); toast.success('Estado actualizado'); closeModal() },
     onError: (err) => toast.error(extractApiError(err)),
   })
 
   const inactivateMutation = useMutation({
     mutationFn: (id: string) => usersApi.inactivate(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-users'] }); toast.success('Usuario inactivado'); closeModal() },
+    onSuccess: () => { invalidate.users(qc); toast.success('Usuario inactivado'); closeModal() },
     onError: (err) => toast.error(extractApiError(err)),
   })
 
   const promoteMutation = useMutation({
     mutationFn: (id: string) => usersApi.promoteAdmin(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-users'] }); toast.success('Usuario promovido a Administrador'); closeModal() },
+    onSuccess: () => { invalidate.users(qc); toast.success('Usuario promovido a Administrador'); closeModal() },
     onError: (err) => toast.error(extractApiError(err)),
   })
 
   const demoteMutation = useMutation({
     mutationFn: (id: string) => usersApi.demoteAdmin(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-users'] }); toast.success('Rol de Administrador removido'); closeModal() },
+    onSuccess: () => { invalidate.users(qc); toast.success('Rol de Administrador removido'); closeModal() },
     onError: (err) => toast.error(extractApiError(err)),
   })
 

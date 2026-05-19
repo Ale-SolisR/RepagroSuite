@@ -12,12 +12,14 @@ public class RoomService : IRoomService
     private readonly IUnitOfWork _uow;
     private readonly IAuditService _auditService;
     private readonly IRealtimeNotifier _realtime;
+    private readonly IAppCache _cache;
 
-    public RoomService(IUnitOfWork uow, IAuditService auditService, IRealtimeNotifier realtime)
+    public RoomService(IUnitOfWork uow, IAuditService auditService, IRealtimeNotifier realtime, IAppCache cache)
     {
         _uow = uow;
         _auditService = auditService;
         _realtime = realtime;
+        _cache = cache;
     }
 
     public async Task<RoomDto> CreateAsync(CreateRoomDto dto, Guid createdBy, CancellationToken cancellationToken = default)
@@ -302,13 +304,18 @@ public class RoomService : IRoomService
 
     public async Task<IEnumerable<FeatureDto>> GetActiveFeaturesAsync(CancellationToken cancellationToken = default)
     {
-        var features = await _uow.Rooms.GetActiveFeaturesAsync(cancellationToken);
-        return features.Select(f => new FeatureDto
+        // Features cambian raras veces: cache 1 hora. Si en el futuro hay un endpoint
+        // para administrarlas, llamar a _cache.Remove(CacheKeys.ActiveFeatures) tras update.
+        return await _cache.GetOrCreateAsync(CacheKeys.ActiveFeatures, TimeSpan.FromHours(1), async ct =>
         {
-            Id = f.Id,
-            Name = f.Name,
-            IconName = f.IconName,
-        });
+            var features = await _uow.Rooms.GetActiveFeaturesAsync(ct);
+            return features.Select(f => new FeatureDto
+            {
+                Id = f.Id,
+                Name = f.Name,
+                IconName = f.IconName,
+            }).ToList();
+        }, cancellationToken);
     }
 
     private static RoomDto MapToDto(Room r) => new()

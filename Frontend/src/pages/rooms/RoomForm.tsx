@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { roomsApi } from '@/api/rooms'
 import { extractApiError, classNames } from '@/utils'
+import { qk, staleTimes, invalidate } from '@/lib/queryKeys'
 import Button from '@/components/ui/Button'
 import toast from 'react-hot-toast'
 import type { RoomDto } from '@/types'
@@ -85,8 +86,9 @@ export default function RoomForm({ room, onClose }: { room?: RoomDto; onClose: (
   })
 
   const { data: features } = useQuery({
-    queryKey: ['features'],
+    queryKey: qk.rooms.features,
     queryFn: () => roomsApi.getFeatures().then(r => r.data.data ?? []),
+    staleTime: staleTimes.features,
   })
 
   const codeEdited = useRef(false)
@@ -123,7 +125,7 @@ export default function RoomForm({ room, onClose }: { room?: RoomDto; onClose: (
       // mostrará "Otro usuario modificó este registro mientras lo editabas".
       isEdit ? roomsApi.update(room.id, { ...data, rowVersion: room.rowVersion }) : roomsApi.create(data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['rooms'] })
+      invalidate.rooms(qc)
       toast.success(isEdit ? 'Sala actualizada correctamente' : 'Sala creada correctamente')
       onClose()
     },
@@ -139,7 +141,7 @@ export default function RoomForm({ room, onClose }: { room?: RoomDto; onClose: (
       return { prev }
     },
     onSuccess: (res, newStatus) => {
-      qc.invalidateQueries({ queryKey: ['rooms'] })
+      invalidate.rooms(qc)
       const confirmedStatus = res.data.data?.status ?? newStatus
       setCurrentStatus(confirmedStatus)
       const label = STATUS_OPTIONS.find(o => o.value === confirmedStatus)?.label ?? confirmedStatus

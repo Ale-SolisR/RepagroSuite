@@ -71,7 +71,9 @@ public class CalendarEventDto
     public DateTime Start { get; set; }
     public DateTime End { get; set; }
     public string? Color { get; set; }
+    public Guid RoomId { get; set; }
     public string RoomName { get; set; } = string.Empty;
+    public Guid UserId { get; set; }
     public string UserName { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
 }

@@ -8,6 +8,7 @@ import { roomsApi } from '@/api/rooms'
 import { useAuthStore } from '@/store/authStore'
 import { extractApiError, classNames } from '@/utils'
 import { useRealtime } from '@/hooks/useRealtime'
+import { qk, staleTimes, invalidate } from '@/lib/queryKeys'
 import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
 import RoomForm from './RoomForm'
@@ -267,20 +268,21 @@ export default function RoomsPage() {
   const [view, setView] = useState<'grid' | 'list'>('grid')
 
   const { data, isLoading } = useQuery({
-    queryKey: ['rooms', page],
+    queryKey: qk.rooms.paged(page, 20),
     queryFn: () => roomsApi.getAll({ page, pageSize: 20 }).then(r => r.data.data!),
+    staleTime: staleTimes.rooms,
   })
 
   // Si otro admin crea/edita/borra una sala, refrescamos sin reload manual.
   useRealtime(event => {
     if (event.type === 'room.changed') {
-      qc.invalidateQueries({ queryKey: ['rooms'] })
+      invalidate.rooms(qc)
     }
   })
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => roomsApi.delete(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['rooms'] }); toast.success('Sala eliminada') },
+    onSuccess: () => { invalidate.rooms(qc); toast.success('Sala eliminada') },
     onError: (err) => toast.error(extractApiError(err)),
   })
 

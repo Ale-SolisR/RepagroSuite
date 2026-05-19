@@ -63,7 +63,7 @@ export interface ResetPasswordRequest {
 }
 
 // ─── Users ─────────────────────────────────────────────────────────────────────
-export type UserStatus = 'Pending' | 'Active' | 'Rejected' | 'Blocked'
+export type UserStatus = 'Pending' | 'Active' | 'Rejected' | 'Blocked' | 'Inactive'
 export type IdentificationType = 'PhysicalId' | 'Dimex' | 'Passport' | 'Juridical'
 
 export interface UserDto {
@@ -141,7 +141,10 @@ export interface CreateRoomRequest {
   featureIds?: string[]
 }
 
-export interface UpdateRoomRequest extends CreateRoomRequest {}
+export interface UpdateRoomRequest extends CreateRoomRequest {
+  // Token de versión devuelto por el backend en GET; lo reenviamos para optimistic locking.
+  rowVersion?: string
+}
 
 export interface RoomAvailabilityDto {
   id: string

@@ -1,4 +1,5 @@
 using FluentValidation;
+using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -6,6 +7,8 @@ using System.Threading.RateLimiting;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.ResponseCompression;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using RepagroSuite.Application.Extensions;
@@ -207,8 +210,32 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 // Health Checks
+//   /health/live  → ¿el proceso responde? (sin tocar BD; útil para Kubernetes livenessProbe)
+//   /health/ready → ¿podemos servir tráfico? (verifica BD; readinessProbe)
+//   /health       → conjunto (compat)
 builder.Services.AddHealthChecks()
-    .AddDbContextCheck<ApplicationDbContext>();
+    .AddCheck("self", () => HealthCheckResult.Healthy(), tags: ["live"])
+    .AddDbContextCheck<ApplicationDbContext>("database", tags: ["ready"]);
+
+// Response compression — Brotli para clientes modernos, Gzip como fallback.
+// El calendario y la lista de usuarios envían JSON grande; con compresión bajan ~60-70%.
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+    options.MimeTypes =
+    [
+        "application/json",
+        "application/javascript",
+        "text/css",
+        "text/html",
+        "text/plain",
+        "text/json",
+    ];
+});
+builder.Services.Configure<BrotliCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
+builder.Services.Configure<GzipCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
 
 // SignalR + notificador
 builder.Services.AddSignalR();
@@ -223,8 +250,12 @@ builder.Services.AddValidatorsFromAssembly(typeof(RepagroSuite.Application.Exten
 
 var app = builder.Build();
 
-// Migrations on startup
-await app.Services.ApplyMigrationsAsync();
+// Migraciones en startup: SOLO si se opta explícitamente (flag de config) o en Development.
+// En Production se recomienda correr `dotnet ef database update` desde CI/CD para evitar
+// problemas con réplicas / blue-green (dos instancias intentando migrar a la vez).
+var runMigrationsOnStartup = builder.Configuration.GetValue("Database:RunMigrationsOnStartup", app.Environment.IsDevelopment());
+if (runMigrationsOnStartup)
+    await app.Services.ApplyMigrationsAsync();
 
 // Correlation ID PRIMERO para que aparezca en todos los logs subsiguientes.
 app.UseMiddleware<RepagroSuite.API.Middleware.CorrelationIdMiddleware>();
@@ -252,6 +283,7 @@ else
     app.UseHsts();
 }
 
+app.UseResponseCompression();
 app.UseHttpsRedirection();
 app.UseCors("DefaultCors");
 
@@ -264,6 +296,16 @@ app.UseRateLimiter();
 
 app.MapControllers();
 app.MapHub<RepagroSuite.API.Hubs.AppHub>("/hubs/app");
-app.MapHealthChecks("/health");
+
+// Health endpoints separados:
+app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = r => r.Tags.Contains("live"),
+});
+app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = r => r.Tags.Contains("ready"),
+});
+app.MapHealthChecks("/health"); // conjunto, compat
 
 app.Run();

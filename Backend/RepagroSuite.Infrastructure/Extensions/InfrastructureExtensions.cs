@@ -51,6 +51,8 @@ public static class InfrastructureExtensions
             .PersistKeysToFileSystem(new DirectoryInfo(
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RepagroSuite", "dp-keys")));
 
+        services.AddMemoryCache();
+        services.AddSingleton<IAppCache, MemoryAppCache>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddSingleton<ISecretProtector, SecretProtector>();
         services.AddSingleton<IEmailQueue, InMemoryEmailQueue>();

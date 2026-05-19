@@ -12,13 +12,15 @@ public class SettingsService : SettingsServiceBase
     private readonly ApplicationDbContext _context;
     private readonly IAuditService _auditService;
     private readonly ISecretProtector _protector;
+    private readonly IAppCache _cache;
 
-    public SettingsService(ApplicationDbContext context, IEmailService emailService, IAuditService auditService, ISecretProtector protector)
+    public SettingsService(ApplicationDbContext context, IEmailService emailService, IAuditService auditService, ISecretProtector protector, IAppCache cache)
         : base(emailService)
     {
         _context = context;
         _auditService = auditService;
         _protector = protector;
+        _cache = cache;
     }
 
     public override async Task<IEnumerable<SystemSettingDto>> GetAllAsync(string? module = null, CancellationToken cancellationToken = default)
@@ -57,6 +59,7 @@ public class SettingsService : SettingsServiceBase
         setting.UpdatedBy = updatedBy;
 
         await _context.SaveChangesAsync(cancellationToken);
+        InvalidateModuleCache(setting.Module);
         // Para auditoría: si era cifrado, no logueamos el valor real (sólo marca de cambio).
         await _auditService.LogAsync(updatedBy, "SETTING_UPDATED", entityName: "SystemSetting", entityId: key,
             oldValues: new { Value = setting.IsEncrypted ? "***" : oldValue },
@@ -66,6 +69,7 @@ public class SettingsService : SettingsServiceBase
 
     public override async Task UpdateBulkAsync(UpdateSettingsBulkDto dto, Guid updatedBy, CancellationToken cancellationToken = default)
     {
+        var modulesTouched = new HashSet<string>();
         foreach (var (key, value) in dto.Settings)
         {
             var setting = await _context.SystemSettings.FirstOrDefaultAsync(s => s.Key == key && !s.IsDeleted, cancellationToken);
@@ -77,10 +81,19 @@ public class SettingsService : SettingsServiceBase
                 : trimmed;
             setting.UpdatedAt = DateTime.UtcNow;
             setting.UpdatedBy = updatedBy;
+            if (!string.IsNullOrEmpty(setting.Module)) modulesTouched.Add(setting.Module);
         }
 
         await _context.SaveChangesAsync(cancellationToken);
+        foreach (var m in modulesTouched) InvalidateModuleCache(m);
         await _auditService.LogAsync(updatedBy, "SETTINGS_BULK_UPDATED", module: "Settings");
+    }
+
+    // Invalida claves de cache dependientes del módulo modificado.
+    private void InvalidateModuleCache(string? module)
+    {
+        if (string.Equals(module, "EMAIL", StringComparison.OrdinalIgnoreCase))
+            _cache.Remove(CacheKeys.SmtpConfig);
     }
 
     private static SystemSettingDto MapToDto(SystemSetting s) => new()

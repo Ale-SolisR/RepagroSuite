@@ -16,6 +16,7 @@ import { reservationsApi } from '@/api/reservations'
 import { roomsApi } from '@/api/rooms'
 import { extractApiError, classNames } from '@/utils'
 import { useRealtime } from '@/hooks/useRealtime'
+import { qk, staleTimes, invalidate } from '@/lib/queryKeys'
 import Modal from '@/components/ui/Modal'
 import Button from '@/components/ui/Button'
 import toast from 'react-hot-toast'
@@ -92,7 +93,10 @@ const reservationSchema = z.object({
   message: 'La hora de fin debe ser posterior a la de inicio',
   path: ['endTime'],
 })
-type ReservationForm = z.infer<typeof reservationSchema>
+// El input puede ser string (lo que escribe el usuario en <input type="number">) y zod coerce
+// lo convierte a number en el output. Mantener ambos tipos separados evita un error TS en el resolver.
+type ReservationFormInput = z.input<typeof reservationSchema>
+type ReservationForm = z.output<typeof reservationSchema>
 
 // ─── EventBlock ───────────────────────────────────────────────────────────────
 function EventBlock({ event, onClick }: { event: CalendarEventDto; onClick: () => void }) {
@@ -268,18 +272,20 @@ export default function CalendarPage() {
 
   // ── Data ────────────────────────────────────────────────────────────────────
   const { data: events = [], isLoading } = useQuery({
-    queryKey: ['calendar', format(weekStart, 'yyyy-MM-dd')],
+    queryKey: qk.reservations.calendar(format(weekStart, 'yyyy-MM-dd')),
     queryFn: async () => {
       const from = formatISO(startOfDay(weekStart))
       const to   = formatISO(startOfDay(addDays(weekEnd, 1)))
       const res  = await reservationsApi.getCalendar({ from, to })
       return res.data.data ?? []
     },
+    staleTime: staleTimes.calendar,
   })
 
   const { data: roomsData } = useQuery({
-    queryKey: ['rooms-list'],
+    queryKey: qk.rooms.list,
     queryFn: () => roomsApi.getAll({ pageSize: 100 }).then(r => r.data.data?.items ?? []),
+    staleTime: staleTimes.roomsList,
   })
   const rooms: RoomDto[] = roomsData ?? []
 
@@ -287,9 +293,9 @@ export default function CalendarPage() {
   // refresca el calendario sin que el usuario tenga que recargar la página.
   useRealtime(event => {
     if (event.type === 'reservation.changed') {
-      qc.invalidateQueries({ queryKey: ['calendar'] })
+      invalidate.reservations(qc)
     } else if (event.type === 'room.changed') {
-      qc.invalidateQueries({ queryKey: ['rooms-list'] })
+      invalidate.rooms(qc)
     }
   })
 
@@ -315,7 +321,7 @@ export default function CalendarPage() {
   const createMutation = useMutation({
     mutationFn: (data: CreateReservationRequest) => reservationsApi.create(data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['calendar'] })
+      invalidate.reservations(qc)
       toast.success('Reserva creada correctamente')
       setNewResModal(false)
     },
@@ -323,7 +329,7 @@ export default function CalendarPage() {
   })
 
   // ── New reservation form ─────────────────────────────────────────────────────
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<ReservationForm>({
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<ReservationFormInput, unknown, ReservationForm>({
     resolver: zodResolver(reservationSchema),
     defaultValues: { peopleCount: 1 },
   })

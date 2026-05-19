@@ -73,18 +73,30 @@ public class ReservationRepository : GenericRepository<Reservation>, IReservatio
         return (items, total);
     }
 
-    public async Task<IEnumerable<Reservation>> GetForCalendarAsync(DateTime from, DateTime to, Guid? roomId = null, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<CalendarReservationProjection>> GetForCalendarAsync(DateTime from, DateTime to, Guid? roomId = null, CancellationToken cancellationToken = default)
     {
+        // Proyección directa a DTO plano: el SQL devuelve sólo las 9 columnas que el frontend necesita.
+        // Antes traía Reservation+Room+User completos y hacía Include múltiple (cartesiano).
         var query = _dbSet
             .AsNoTracking()
-            .Include(r => r.Room)
-            .Include(r => r.User)
             .Where(r =>
                 (r.Status == ReservationStatus.Approved || r.Status == ReservationStatus.Pending) &&
                 r.StartDateTime < to && r.EndDateTime > from);
 
         if (roomId.HasValue) query = query.Where(r => r.RoomId == roomId.Value);
 
-        return await query.OrderBy(r => r.StartDateTime).ToListAsync(cancellationToken);
+        return await query
+            .OrderBy(r => r.StartDateTime)
+            .Select(r => new CalendarReservationProjection(
+                r.Id,
+                r.StartDateTime,
+                r.EndDateTime,
+                r.Status,
+                r.RoomId,
+                r.Room.Name,
+                r.Room.Color,
+                r.UserId,
+                r.User.FullName))
+            .ToListAsync(cancellationToken);
     }
 }

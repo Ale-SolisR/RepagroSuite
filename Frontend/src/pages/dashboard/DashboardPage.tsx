@@ -8,13 +8,14 @@ import { dashboardApi } from '@/api/dashboard'
 import { roomsApi } from '@/api/rooms'
 import { reservationsApi } from '@/api/reservations'
 import { useAuthStore } from '@/store/authStore'
+import { qk, staleTimes } from '@/lib/queryKeys'
 
 import KpiCard from '@/components/dashboard/KpiCard'
 import DashboardChart from '@/components/dashboard/DashboardChart'
 import StatusBreakdown from '@/components/dashboard/StatusBreakdown'
 import UpcomingList from '@/components/dashboard/UpcomingList'
 import TopRoomsList from '@/components/dashboard/TopRoomsList'
-import { KpiCardSkeleton, ChartSkeleton, ListSkeleton, BarListSkeleton } from '@/components/ui/Skeleton'
+import { KpiCardSkeleton, ChartSkeleton } from '@/components/ui/Skeleton'
 import type { UpcomingItem } from '@/components/dashboard/UpcomingList'
 import type { TopRoomItem } from '@/components/dashboard/TopRoomsList'
 import type { StatusItem } from '@/components/dashboard/StatusBreakdown'
@@ -23,15 +24,15 @@ import type { StatusItem } from '@/components/dashboard/StatusBreakdown'
 
 function useDashboardStats() {
   return useQuery({
-    queryKey: ['dashboard-stats'],
+    queryKey: qk.dashboard.stats,
     queryFn: () => dashboardApi.getStats().then(r => r.data.data!),
-    staleTime: 60_000,
+    staleTime: staleTimes.dashboard,
   })
 }
 
 function useRoomStatusBreakdown() {
   return useQuery({
-    queryKey: ['rooms-status-breakdown'],
+    queryKey: qk.dashboard.statusBreakdown,
     queryFn: async () => {
       const res = await roomsApi.getAll({ pageSize: 200 })
       const rooms = res.data.data?.items ?? []
@@ -49,11 +50,11 @@ function useUpcomingReservations() {
   const from = startOfDay(new Date()).toISOString()
   const to   = endOfDay(addDays(new Date(), 1)).toISOString()
   return useQuery({
-    queryKey: ['upcoming-reservations', from],
+    queryKey: qk.reservations.upcoming(from),
     queryFn: () =>
       reservationsApi.getAll({ from, to, pageSize: 5 })
         .then(r => r.data.data?.items ?? []),
-    staleTime: 60_000,
+    staleTime: staleTimes.dashboard,
   })
 }
 

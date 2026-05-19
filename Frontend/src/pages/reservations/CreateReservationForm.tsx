@@ -7,6 +7,7 @@ import { format } from 'date-fns'
 import { roomsApi } from '@/api/rooms'
 import { reservationsApi } from '@/api/reservations'
 import { extractApiError } from '@/utils'
+import { qk, staleTimes, invalidate } from '@/lib/queryKeys'
 import Input from '@/components/ui/Input'
 import Select from '@/components/ui/Select'
 import Textarea from '@/components/ui/Textarea'
@@ -38,18 +39,20 @@ export default function CreateReservationForm({ onClose }: { onClose: () => void
   const date = watch('date')
 
   const { data: rooms } = useQuery({
-    queryKey: ['rooms-list'],
+    queryKey: qk.rooms.list,
     queryFn: () => roomsApi.getAll({ pageSize: 100 }).then(r => r.data.data?.items ?? []),
+    staleTime: staleTimes.roomsList,
   })
 
   const { isLoading: loadingSlots } = useQuery({
-    queryKey: ['slots', roomId, date],
+    queryKey: qk.rooms.slots(roomId, date),
     queryFn: async () => {
       const res = await roomsApi.getSlots(roomId, { date })
       setSlots(res.data.data ?? [])
       return res.data.data
     },
     enabled: !!roomId && !!date,
+    staleTime: staleTimes.slots,
   })
 
   const mutation = useMutation({
@@ -62,7 +65,7 @@ export default function CreateReservationForm({ onClose }: { onClose: () => void
       notes: data.notes,
     }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['my-reservations'] })
+      invalidate.reservations(qc)
       toast.success('Reserva enviada — pendiente de aprobación')
       onClose()
     },

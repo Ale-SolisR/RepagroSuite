@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { roomsApi } from '@/api/rooms'
 import { extractApiError, DAYS_ES } from '@/utils'
+import { qk, staleTimes } from '@/lib/queryKeys'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Spinner from '@/components/ui/Spinner'
@@ -14,8 +15,9 @@ export default function RoomAvailabilityPanel({ roomId }: { roomId: string }) {
   const [editDay, setEditDay] = useState<RoomAvailabilityDto | null>(null)
 
   const { data: availability, isLoading } = useQuery({
-    queryKey: ['room-availability', roomId],
+    queryKey: qk.rooms.availability(roomId),
     queryFn: () => roomsApi.getAvailability(roomId).then(r => r.data.data ?? []),
+    staleTime: staleTimes.availability,
   })
 
   const mutation = useMutation({
@@ -29,7 +31,7 @@ export default function RoomAvailabilityPanel({ roomId }: { roomId: string }) {
       slotIntervalMinutes: data.slotIntervalMinutes,
     }]),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['room-availability', roomId] })
+      qc.invalidateQueries({ queryKey: qk.rooms.availability(roomId) })
       toast.success('Disponibilidad actualizada')
       setEditDay(null)
     },

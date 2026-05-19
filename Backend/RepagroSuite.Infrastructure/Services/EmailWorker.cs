@@ -46,8 +46,9 @@ public class EmailWorker : BackgroundService
         using var scope = _scopeFactory.CreateScope();
         var ctx = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var protector = scope.ServiceProvider.GetRequiredService<ISecretProtector>();
+        var cache = scope.ServiceProvider.GetRequiredService<IAppCache>();
 
-        var config = await EmailTemplates.GetSmtpConfigAsync(ctx, protector, ct);
+        var config = await EmailTemplates.GetSmtpConfigAsync(ctx, protector, cache, ct);
         if (!config.Enabled)
         {
             _logger.LogInformation("Email service disabled. Skipping send to {To}", msg.To);

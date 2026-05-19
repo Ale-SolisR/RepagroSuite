@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { reservationsApi } from '@/api/reservations'
 import { extractApiError } from '@/utils'
+import { invalidate } from '@/lib/queryKeys'
 import Modal from '@/components/ui/Modal'
 import Textarea from '@/components/ui/Textarea'
 import Button from '@/components/ui/Button'
@@ -25,8 +26,7 @@ export default function CancelReservationModal({ reservation, onClose }: {
   const mutation = useMutation({
     mutationFn: (data: FormData) => reservationsApi.cancel(reservation!.id, data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['my-reservations'] })
-      qc.invalidateQueries({ queryKey: ['admin-reservations'] })
+      invalidate.reservations(qc)
       toast.success('Reserva cancelada')
       reset(); onClose()
     },

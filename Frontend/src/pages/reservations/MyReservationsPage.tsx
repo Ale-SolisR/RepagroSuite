@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Plus, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { reservationsApi } from '@/api/reservations'
 import { formatDateTime } from '@/utils'
+import { qk, staleTimes } from '@/lib/queryKeys'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Spinner from '@/components/ui/Spinner'
@@ -17,8 +18,9 @@ export default function MyReservationsPage() {
   const [page, setPage] = useState(1)
 
   const { data, isLoading } = useQuery({
-    queryKey: ['my-reservations', page],
+    queryKey: qk.reservations.my(page),
     queryFn: () => reservationsApi.getMy({ page, pageSize: 15 }).then(r => r.data.data!),
+    staleTime: staleTimes.myReservations,
   })
 
   const total = data?.totalCount ?? 0

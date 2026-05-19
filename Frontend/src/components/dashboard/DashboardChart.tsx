@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
-import { format, parseISO, startOfWeek, addWeeks } from 'date-fns'
+import { format, parseISO, startOfWeek } from 'date-fns'
 import { es } from 'date-fns/locale'
 
 interface TrendPoint {

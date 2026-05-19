@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { settingsApi } from '@/api/settings'
+import { qk, staleTimes, invalidate } from '@/lib/queryKeys'
 import { extractApiError } from '@/utils'
 import Button from '@/components/ui/Button'
 import Spinner from '@/components/ui/Spinner'
@@ -402,8 +403,9 @@ export default function SettingsPage() {
   const originalValues = useRef<Record<string, string>>({})
 
   const { data: settings, isLoading } = useQuery({
-    queryKey: ['settings'],
+    queryKey: qk.settings.all,
     queryFn: () => settingsApi.getAll().then(r => r.data.data ?? []),
+    staleTime: staleTimes.settings,
   })
 
   useEffect(() => {
@@ -442,7 +444,7 @@ export default function SettingsPage() {
       return settingsApi.bulkUpdate({ settings: toSave })
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['settings'] })
+      invalidate.settings(qc)
       setModified(new Set())
       setEditMode(false)
       toast.success('Configuración guardada correctamente')
@@ -494,7 +496,7 @@ export default function SettingsPage() {
         const toSave: Record<string, string> = {}
         emailKeys.forEach(k => { toSave[k] = values[k] })
         await settingsApi.bulkUpdate({ settings: toSave })
-        qc.invalidateQueries({ queryKey: ['settings'] })
+        invalidate.settings(qc)
         setModified(m => {
           const next = new Set(m)
           emailKeys.forEach(k => next.delete(k))
@@ -563,7 +565,7 @@ export default function SettingsPage() {
           {editMode && (
             <Button
               size="sm"
-              onClick={() => saveMutation.mutate()}
+              onClick={() => saveMutation.mutate(undefined)}
               loading={saveMutation.isPending}
               disabled={modified.size === 0}
             >
