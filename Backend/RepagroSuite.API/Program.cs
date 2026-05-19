@@ -50,11 +50,24 @@ builder.Services.AddApiVersioning(options =>
 });
 
 // CORS
+//   - AllowedOrigins: lista exacta desde config (localhost en dev, dominio final cuando se conozca).
+//   - AllowedOriginPatterns: regex (case-insensitive). Se usa para aceptar subdominios Netlify
+//     mientras no haya un dominio fijo (cualquier preview/branch *.netlify.app).
+//   - AllowCredentials() es obligatorio para que el navegador envíe la cookie httpOnly del refresh.
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+var allowedOriginPatterns = builder.Configuration.GetSection("Cors:AllowedOriginPatterns").Get<string[]>() ?? [];
+var allowedRegexes = allowedOriginPatterns
+    .Select(p => new System.Text.RegularExpressions.Regex(p, System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+    .ToArray();
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("DefaultCors", policy =>
-        policy.WithOrigins(allowedOrigins)
+        policy.SetIsOriginAllowed(origin =>
+              {
+                  if (allowedOrigins.Contains(origin, StringComparer.OrdinalIgnoreCase)) return true;
+                  return allowedRegexes.Any(r => r.IsMatch(origin));
+              })
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials());

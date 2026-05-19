@@ -31,3 +31,9 @@ Backend/**/appsettings.Staging.json
 Backend/**/appsettings.Local.json
 Backend/**/secrets.json
 **/UserSecrets/
+
+# ── Artefactos de deploy / data export (NO comitear) ─────────────────
+publish-output/
+db-export/
+remote-logs/
+*.zip
