@@ -187,7 +187,7 @@ export default function AdminUsersPage() {
   })
 
   const approveMutation = useMutation({
-    mutationFn: (id: string) => usersApi.approve(id, { roleIds: [] }),
+    mutationFn: (id: string) => usersApi.approve(id),
     onSuccess: () => { invalidate.users(qc); toast.success('Usuario aprobado'); closeModal() },
     onError: (err) => toast.error(extractApiError(err)),
   })

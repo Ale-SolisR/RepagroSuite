@@ -9,6 +9,8 @@ namespace RepagroSuite.Application.Features.Users.Services;
 
 public class UserService : IUserService
 {
+    private static readonly Guid UserRoleId = new("22222222-2222-2222-2222-222222222222");
+
     private readonly IUnitOfWork _uow;
     private readonly IPasswordService _passwordService;
     private readonly IEmailService _emailService;
@@ -110,15 +112,10 @@ public class UserService : IUserService
         user.ApprovedByUserId = approvedBy;
         user.ApprovedAt = DateTime.UtcNow;
 
-        // Assign roles
-        if (dto.RoleIds.Count > 0)
-        {
-            foreach (var roleId in dto.RoleIds)
-            {
-                if (!user.UserRoles.Any(ur => ur.RoleId == roleId))
-                    user.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = roleId, AssignedAt = DateTime.UtcNow, AssignedBy = approvedBy });
-            }
-        }
+        // Aprobar siempre asigna el rol User. La promoción a Administrator es exclusiva del
+        // master vía PromoteToAdminAsync, por eso aquí no se aceptan roles arbitrarios.
+        if (!user.UserRoles.Any(ur => ur.RoleId == UserRoleId))
+            user.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = UserRoleId, AssignedAt = DateTime.UtcNow, AssignedBy = approvedBy });
 
         _uow.Users.Update(user);
         await _uow.SaveChangesAsync(cancellationToken);

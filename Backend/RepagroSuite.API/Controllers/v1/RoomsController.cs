@@ -60,6 +60,14 @@ public class RoomsController : ControllerBase
         return Ok(ApiResponse<IEnumerable<FeatureDto>>.Ok(result));
     }
 
+    [HttpGet("weekly-availability")]
+    [Authorize(Policy = "Rooms.View")]
+    public async Task<ActionResult<ApiResponse<IEnumerable<RoomScheduleDto>>>> GetWeeklyAvailability(CancellationToken ct)
+    {
+        var result = await _roomService.GetWeeklySchedulesAsync(ct);
+        return Ok(ApiResponse<IEnumerable<RoomScheduleDto>>.Ok(result));
+    }
+
     [HttpGet("{id:guid}/slots")]
     [Authorize(Policy = "Rooms.View")]
     public async Task<ActionResult<ApiResponse<IEnumerable<AvailableSlotDto>>>> GetSlots(

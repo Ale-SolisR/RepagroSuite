@@ -9,6 +9,22 @@ namespace RepagroSuite.Application.Features.Reservations.Services;
 
 public class ReservationService : IReservationService
 {
+    // Las horas se manejan como hora-de-pared de Costa Rica (UTC-6, sin DST) en todo el sistema.
+    // Comparar contra DateTime.UtcNow rechazaría horas válidas de hoy en un servidor UTC.
+    private static readonly TimeZoneInfo BusinessTimeZone = ResolveBusinessTimeZone();
+
+    private static TimeZoneInfo ResolveBusinessTimeZone()
+    {
+        foreach (var id in new[] { "America/Costa_Rica", "Central America Standard Time" })
+        {
+            try { return TimeZoneInfo.FindSystemTimeZoneById(id); }
+            catch { /* probar siguiente id */ }
+        }
+        return TimeZoneInfo.CreateCustomTimeZone("CR", TimeSpan.FromHours(-6), "Costa Rica", "Costa Rica");
+    }
+
+    private static DateTime BusinessNow => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, BusinessTimeZone);
+
     private readonly IUnitOfWork _uow;
     private readonly IAuditService _auditService;
     private readonly IEmailService _emailService;
@@ -27,11 +43,10 @@ public class ReservationService : IReservationService
         // Transacción + lock pesimista por sala para evitar doble booking bajo concurrencia.
         // Sin esto, dos requests simultáneos para el mismo slot pasarían ambos la validación
         // de HasConflictAsync e insertarían reservas duplicadas.
-        await _uow.BeginTransactionAsync(cancellationToken);
-        try
+        var reservationId = await _uow.ExecuteInTransactionAsync(async ct =>
         {
-            await _uow.AcquireRoomLockAsync(dto.RoomId, timeoutMs: 5000, cancellationToken);
-            await ValidateReservationAsync(dto.RoomId, dto.StartDateTime, dto.EndDateTime, dto.PeopleCount, null, cancellationToken);
+            await _uow.AcquireRoomLockAsync(dto.RoomId, timeoutMs: 5000, ct);
+            await ValidateReservationAsync(dto.RoomId, dto.StartDateTime, dto.EndDateTime, dto.PeopleCount, null, ct);
 
             var reservation = new Reservation
             {
@@ -45,28 +60,95 @@ public class ReservationService : IReservationService
                 Status = ReservationStatus.Pending
             };
 
-            await _uow.Reservations.AddAsync(reservation, cancellationToken);
-            await _uow.SaveChangesAsync(cancellationToken);
-            await _uow.CommitTransactionAsync(cancellationToken);
+            await _uow.Reservations.AddAsync(reservation, ct);
+            await _uow.SaveChangesAsync(ct);
+            return reservation.Id;
+        }, cancellationToken);
 
-            await _auditService.LogAsync(userId, "RESERVATION_CREATED", entityName: "Reservation", entityId: reservation.Id.ToString(), module: "Reservations");
-            await _realtime.ReservationChangedAsync(reservation.Id, reservation.RoomId, "created", cancellationToken);
-            return await GetByIdAsync(reservation.Id, cancellationToken);
-        }
-        catch
+        await _auditService.LogAsync(userId, "RESERVATION_CREATED", entityName: "Reservation", entityId: reservationId.ToString(), module: "Reservations");
+        await _realtime.ReservationChangedAsync(reservationId, dto.RoomId, "created", cancellationToken);
+        return await GetByIdAsync(reservationId, cancellationToken);
+    }
+
+    public async Task<RecurringReservationResultDto> CreateRecurringAsync(Guid userId, CreateRecurringReservationDto dto, CancellationToken cancellationToken = default)
+    {
+        if (!TimeOnly.TryParse(dto.StartTime, out var startTime) || !TimeOnly.TryParse(dto.EndTime, out var endTime))
+            throw new InvalidOperationException("Horario inválido. Use el formato HH:mm.");
+        if (startTime >= endTime)
+            throw new InvalidOperationException("La hora de inicio debe ser anterior a la hora de fin.");
+        if (dto.EndDate < dto.StartDate)
+            throw new InvalidOperationException("La fecha final debe ser posterior o igual a la fecha inicial.");
+
+        // Genera una ocurrencia por semana en el mismo día de la semana que StartDate.
+        const int maxOccurrences = 52;
+        var occurrences = new List<DateTime>();
+        for (var date = dto.StartDate; date <= dto.EndDate; date = date.AddDays(7))
         {
-            await _uow.RollbackTransactionAsync(cancellationToken);
-            throw;
+            occurrences.Add(date.ToDateTime(startTime));
+            if (occurrences.Count > maxOccurrences)
+                throw new InvalidOperationException($"La recurrencia genera demasiadas ocurrencias (máximo {maxOccurrences}). Acorte el rango de fechas.");
         }
+        if (occurrences.Count == 0)
+            throw new InvalidOperationException("El rango de fechas no genera ninguna ocurrencia.");
+
+        Guid? firstCreatedId = null;
+        var result = await _uow.ExecuteInTransactionAsync(async ct =>
+        {
+            var res = new RecurringReservationResultDto { TotalOccurrences = occurrences.Count };
+            await _uow.AcquireRoomLockAsync(dto.RoomId, timeoutMs: 10000, ct);
+
+            var created = new List<Reservation>();
+            foreach (var start in occurrences)
+            {
+                var end = start.Date.Add(endTime.ToTimeSpan());
+                try
+                {
+                    await ValidateReservationAsync(dto.RoomId, start, end, dto.PeopleCount, null, ct);
+                }
+                catch (Exception ex)
+                {
+                    res.Skipped.Add(new SkippedOccurrenceDto { Date = start, Reason = ex.Message });
+                    continue;
+                }
+
+                var reservation = new Reservation
+                {
+                    RoomId = dto.RoomId,
+                    UserId = userId,
+                    StartDateTime = start,
+                    EndDateTime = end,
+                    PeopleCount = dto.PeopleCount,
+                    Purpose = dto.Purpose.Trim(),
+                    Notes = dto.Notes?.Trim(),
+                    Status = ReservationStatus.Pending
+                };
+                await _uow.Reservations.AddAsync(reservation, ct);
+                created.Add(reservation);
+            }
+
+            if (created.Count > 0)
+                await _uow.SaveChangesAsync(ct);
+
+            res.CreatedCount = created.Count;
+            firstCreatedId = created.Count > 0 ? created[0].Id : null;
+            return res;
+        }, cancellationToken);
+
+        if (result.CreatedCount > 0 && firstCreatedId.HasValue)
+        {
+            await _auditService.LogAsync(userId, "RESERVATION_RECURRING_CREATED", entityName: "Reservation", entityId: firstCreatedId.Value.ToString(), module: "Reservations");
+            await _realtime.ReservationChangedAsync(firstCreatedId.Value, dto.RoomId, "created", cancellationToken);
+        }
+
+        return result;
     }
 
     public async Task<ReservationDto> AdminDirectCreateAsync(Guid adminId, AdminDirectReservationDto dto, CancellationToken cancellationToken = default)
     {
-        await _uow.BeginTransactionAsync(cancellationToken);
-        try
+        var reservationId = await _uow.ExecuteInTransactionAsync(async ct =>
         {
-            await _uow.AcquireRoomLockAsync(dto.RoomId, timeoutMs: 5000, cancellationToken);
-            await ValidateReservationAsync(dto.RoomId, dto.StartDateTime, dto.EndDateTime, dto.PeopleCount, null, cancellationToken);
+            await _uow.AcquireRoomLockAsync(dto.RoomId, timeoutMs: 5000, ct);
+            await ValidateReservationAsync(dto.RoomId, dto.StartDateTime, dto.EndDateTime, dto.PeopleCount, null, ct);
 
             var targetUserId = dto.UserId ?? adminId;
             var reservation = new Reservation
@@ -84,19 +166,14 @@ public class ReservationService : IReservationService
                 ApprovedAt = DateTime.UtcNow
             };
 
-            await _uow.Reservations.AddAsync(reservation, cancellationToken);
-            await _uow.SaveChangesAsync(cancellationToken);
-            await _uow.CommitTransactionAsync(cancellationToken);
+            await _uow.Reservations.AddAsync(reservation, ct);
+            await _uow.SaveChangesAsync(ct);
+            return reservation.Id;
+        }, cancellationToken);
 
-            await _auditService.LogAsync(adminId, "RESERVATION_DIRECT_CREATED", entityName: "Reservation", entityId: reservation.Id.ToString(), module: "Reservations");
-            await _realtime.ReservationChangedAsync(reservation.Id, reservation.RoomId, "created", cancellationToken);
-            return await GetByIdAsync(reservation.Id, cancellationToken);
-        }
-        catch
-        {
-            await _uow.RollbackTransactionAsync(cancellationToken);
-            throw;
-        }
+        await _auditService.LogAsync(adminId, "RESERVATION_DIRECT_CREATED", entityName: "Reservation", entityId: reservationId.ToString(), module: "Reservations");
+        await _realtime.ReservationChangedAsync(reservationId, dto.RoomId, "created", cancellationToken);
+        return await GetByIdAsync(reservationId, cancellationToken);
     }
 
     public async Task<ReservationDto> GetByIdAsync(Guid reservationId, CancellationToken cancellationToken = default)
@@ -120,20 +197,19 @@ public class ReservationService : IReservationService
 
     public async Task<ReservationDto> ApproveAsync(Guid reservationId, ApproveReservationDto dto, Guid approvedBy, CancellationToken cancellationToken = default)
     {
-        await _uow.BeginTransactionAsync(cancellationToken);
-        try
+        await _uow.ExecuteInTransactionAsync(async ct =>
         {
-            var reservation = await _uow.Reservations.GetWithDetailsAsync(reservationId, cancellationToken)
+            var reservation = await _uow.Reservations.GetWithDetailsAsync(reservationId, ct)
                 ?? throw new KeyNotFoundException("Reserva no encontrada.");
 
             if (reservation.Status != ReservationStatus.Pending)
                 throw new InvalidOperationException("Solo se pueden aprobar reservas en estado Pendiente.");
 
             // Lock por sala para evitar que otro admin apruebe una reserva conflictiva al mismo tiempo.
-            await _uow.AcquireRoomLockAsync(reservation.RoomId, timeoutMs: 5000, cancellationToken);
+            await _uow.AcquireRoomLockAsync(reservation.RoomId, timeoutMs: 5000, ct);
 
             // Re-validate conflict within transaction
-            if (await _uow.Reservations.HasConflictAsync(reservation.RoomId, reservation.StartDateTime, reservation.EndDateTime, reservationId, cancellationToken))
+            if (await _uow.Reservations.HasConflictAsync(reservation.RoomId, reservation.StartDateTime, reservation.EndDateTime, reservationId, ct))
                 throw new InvalidOperationException("La sala ya fue reservada en ese horario. Existe un conflicto de disponibilidad.");
 
             reservation.Status = ReservationStatus.Approved;
@@ -141,32 +217,29 @@ public class ReservationService : IReservationService
             reservation.ApprovedByUserId = approvedBy;
             reservation.ApprovedAt = DateTime.UtcNow;
             _uow.Reservations.Update(reservation);
-            await _uow.SaveChangesAsync(cancellationToken);
-            await _uow.CommitTransactionAsync(cancellationToken);
+            await _uow.SaveChangesAsync(ct);
+            return true;
+        }, cancellationToken);
 
-            await _auditService.LogAsync(approvedBy, "RESERVATION_APPROVED", entityName: "Reservation", entityId: reservationId.ToString(), module: "Reservations");
-            await _realtime.ReservationChangedAsync(reservation.Id, reservation.RoomId, "approved", cancellationToken);
+        var result = await GetByIdAsync(reservationId, cancellationToken);
 
-            try
-            {
-                await _emailService.SendTemplateAsync(reservation.User.Email, "reservation_approved", new Dictionary<string, string>
-                {
-                    ["roomName"] = reservation.Room.Name,
-                    ["date"] = reservation.StartDateTime.ToString("dd/MM/yyyy"),
-                    ["startTime"] = reservation.StartDateTime.ToString("HH:mm"),
-                    ["endTime"] = reservation.EndDateTime.ToString("HH:mm"),
-                    ["purpose"] = reservation.Purpose
-                }, cancellationToken);
-            }
-            catch { /* non-critical */ }
+        await _auditService.LogAsync(approvedBy, "RESERVATION_APPROVED", entityName: "Reservation", entityId: reservationId.ToString(), module: "Reservations");
+        await _realtime.ReservationChangedAsync(result.Id, result.RoomId, "approved", cancellationToken);
 
-            return MapToDto(reservation);
-        }
-        catch
+        try
         {
-            await _uow.RollbackTransactionAsync(cancellationToken);
-            throw;
+            await _emailService.SendTemplateAsync(result.UserEmail, "reservation_approved", new Dictionary<string, string>
+            {
+                ["roomName"] = result.RoomName,
+                ["date"] = result.StartDateTime.ToString("dd/MM/yyyy"),
+                ["startTime"] = result.StartDateTime.ToString("HH:mm"),
+                ["endTime"] = result.EndDateTime.ToString("HH:mm"),
+                ["purpose"] = result.Purpose
+            }, cancellationToken);
         }
+        catch { /* non-critical */ }
+
+        return result;
     }
 
     public async Task<ReservationDto> RejectAsync(Guid reservationId, RejectReservationDto dto, Guid rejectedBy, CancellationToken cancellationToken = default)
@@ -242,7 +315,7 @@ public class ReservationService : IReservationService
     private async Task ValidateReservationAsync(Guid roomId, DateTime start, DateTime end, int peopleCount, Guid? excludeId, CancellationToken ct)
     {
         if (start >= end) throw new InvalidOperationException("La hora de inicio debe ser anterior a la hora de fin.");
-        if (start < DateTime.UtcNow) throw new InvalidOperationException("No se pueden crear reservas en el pasado.");
+        if (start < BusinessNow) throw new InvalidOperationException("No se pueden crear reservas en el pasado. Seleccione una hora futura.");
 
         var room = await _uow.Rooms.GetWithDetailsAsync(roomId, ct)
             ?? throw new KeyNotFoundException("Sala no encontrada.");

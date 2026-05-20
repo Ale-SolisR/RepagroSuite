@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   startOfWeek, endOfWeek, addWeeks, subWeeks, addDays,
   format, isToday, parseISO, getHours, getMinutes,
@@ -8,22 +8,18 @@ import {
 } from 'date-fns'
 import { es } from 'date-fns/locale'
 import {
-  ChevronLeft, ChevronRight, Plus, Clock, MapPin, Users,
-  CalendarDays, Filter, CheckCircle2, AlertCircle,
-  Sparkles, FileText,
+  ChevronLeft, ChevronRight, Plus, Clock, MapPin,
+  CalendarDays, Filter, CheckCircle2, AlertCircle, Sparkles,
 } from 'lucide-react'
 import { reservationsApi } from '@/api/reservations'
 import { roomsApi } from '@/api/rooms'
-import { extractApiError, classNames } from '@/utils'
+import { classNames } from '@/utils'
 import { useRealtime } from '@/hooks/useRealtime'
 import { qk, staleTimes, invalidate } from '@/lib/queryKeys'
 import Modal from '@/components/ui/Modal'
 import Button from '@/components/ui/Button'
-import toast from 'react-hot-toast'
-import type { CalendarEventDto, RoomDto, CreateReservationRequest } from '@/types'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
+import CreateReservationForm from '@/pages/reservations/CreateReservationForm'
+import type { CalendarEventDto, RoomDto, RoomScheduleDto } from '@/types'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const DAY_START = 7   // 07:00
@@ -69,6 +65,42 @@ function eventPosition(start: Date, end: Date) {
   return { top, height }
 }
 
+const SLOT_MIN = 30 // granularidad de creación: 30 min
+
+function timeToMinutes(t: string): number {
+  const [h, m] = t.split(':').map(Number)
+  return h * 60 + m
+}
+
+function minutesToTime(min: number): string {
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+// Une intervalos solapados/contiguos. Cada intervalo en minutos desde medianoche.
+function mergeIntervals(intervals: { start: number; end: number }[]): { start: number; end: number }[] {
+  const sorted = [...intervals].sort((a, b) => a.start - b.start)
+  const out: { start: number; end: number }[] = []
+  for (const it of sorted) {
+    const last = out[out.length - 1]
+    if (last && it.start <= last.end) last.end = Math.max(last.end, it.end)
+    else out.push({ ...it })
+  }
+  return out
+}
+
+// Convierte minutos-desde-medianoche a posición/altura en el grid (clamp al rango visible).
+function bandRect(startMin: number, endMin: number) {
+  const gridStart = DAY_START * 60
+  const gridEnd = DAY_END * 60
+  const s = Math.max(startMin, gridStart)
+  const e = Math.min(endMin, gridEnd)
+  const top = ((s - gridStart) / 60) * HOUR_PX
+  const height = Math.max(0, ((e - s) / 60) * HOUR_PX)
+  return { top, height, visible: e > s }
+}
+
 function nowOffsetPx(): number | null {
   const now = new Date()
   const h = getHours(now)
@@ -80,23 +112,6 @@ function nowOffsetPx(): number | null {
 function isSameDayStr(a: Date, b: Date) {
   return format(a, 'yyyy-MM-dd') === format(b, 'yyyy-MM-dd')
 }
-
-// ─── New Reservation schema ───────────────────────────────────────────────────
-const reservationSchema = z.object({
-  roomId:      z.string().min(1, 'Seleccione una sala'),
-  startTime:   z.string().min(1, 'Hora de inicio requerida'),
-  endTime:     z.string().min(1, 'Hora de fin requerida'),
-  peopleCount: z.coerce.number().min(1, 'Mínimo 1 persona'),
-  purpose:     z.string().min(3, 'Ingrese el propósito'),
-  notes:       z.string().optional(),
-}).refine(d => d.endTime > d.startTime, {
-  message: 'La hora de fin debe ser posterior a la de inicio',
-  path: ['endTime'],
-})
-// El input puede ser string (lo que escribe el usuario en <input type="number">) y zod coerce
-// lo convierte a number en el output. Mantener ambos tipos separados evita un error TS en el resolver.
-type ReservationFormInput = z.input<typeof reservationSchema>
-type ReservationForm = z.output<typeof reservationSchema>
 
 // ─── EventBlock ───────────────────────────────────────────────────────────────
 function EventBlock({ event, onClick }: { event: CalendarEventDto; onClick: () => void }) {
@@ -262,7 +277,7 @@ export default function CalendarPage() {
   )
   const [selectedRooms, setSelectedRooms] = useState<string[]>([])
   const [detailEvent, setDetailEvent] = useState<CalendarEventDto | null>(null)
-  const [newResModal, setNewResModal] = useState(false)
+  const [newRes, setNewRes] = useState<{ date: string; startTime: string } | null>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 })
@@ -288,6 +303,35 @@ export default function CalendarPage() {
     staleTime: staleTimes.roomsList,
   })
   const rooms: RoomDto[] = roomsData ?? []
+
+  // Disponibilidad semanal: solo salas Available. Si una sala pasa a Mantenimiento/Inactiva,
+  // SignalR dispara room.changed → invalidate.rooms → este query se refresca y la franja desaparece.
+  const { data: schedules = [] } = useQuery({
+    queryKey: qk.rooms.weekly,
+    queryFn: () => roomsApi.getWeeklyAvailability().then(r => r.data.data ?? []),
+    staleTime: staleTimes.roomsList,
+  })
+
+  // Por cada día de la semana (0=Dom..6=Sáb): franjas disponibles (unión de todas las salas)
+  // y cuántas salas están disponibles ese día.
+  const availabilityByDow = useMemo(() => {
+    const map = new Map<number, { intervals: { start: number; end: number }[]; roomCount: number }>()
+    for (let dow = 0; dow < 7; dow++) {
+      const windows = (schedules as RoomScheduleDto[]).flatMap(r =>
+        r.days.filter(d => d.dayOfWeek === dow).map(d => ({ start: timeToMinutes(d.openTime), end: timeToMinutes(d.closeTime) })),
+      )
+      const roomCount = (schedules as RoomScheduleDto[]).filter(r => r.days.some(d => d.dayOfWeek === dow)).length
+      map.set(dow, { intervals: mergeIntervals(windows), roomCount })
+    }
+    return map
+  }, [schedules])
+
+  // ¿Cuántas salas hay disponibles a una hora concreta (minutos desde medianoche) de un día?
+  const roomsAvailableAt = useCallback((dow: number, startMin: number) => {
+    return (schedules as RoomScheduleDto[]).filter(r =>
+      r.days.some(d => d.dayOfWeek === dow && timeToMinutes(d.openTime) <= startMin && timeToMinutes(d.closeTime) >= startMin + SLOT_MIN),
+    ).length
+  }, [schedules])
 
   // Suscripción a eventos en tiempo real: cualquier cambio en reservas o salas
   // refresca el calendario sin que el usuario tenga que recargar la página.
@@ -317,48 +361,14 @@ export default function CalendarPage() {
     return s
   }, [visibleEvents])
 
-  // ── Mutations ────────────────────────────────────────────────────────────────
-  const createMutation = useMutation({
-    mutationFn: (data: CreateReservationRequest) => reservationsApi.create(data),
-    onSuccess: () => {
-      invalidate.reservations(qc)
-      toast.success('Reserva creada correctamente')
-      setNewResModal(false)
-    },
-    onError: (err) => toast.error(extractApiError(err)),
-  })
-
-  // ── New reservation form ─────────────────────────────────────────────────────
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<ReservationFormInput, unknown, ReservationForm>({
-    resolver: zodResolver(reservationSchema),
-    defaultValues: { peopleCount: 1 },
-  })
-
-  const openNewRes = useCallback((day?: Date, hour?: number) => {
+  // ── Nueva reserva (abre el formulario compartido) ─────────────────────────────
+  const openNewRes = useCallback((day?: Date, startTime?: string) => {
     const target = day ?? new Date()
-    const startHour = hour ?? 9
-    const endHour = Math.min(startHour + 1, DAY_END)
-    reset({
-      roomId: '',
-      startTime: `${format(target, 'yyyy-MM-dd')}T${String(startHour).padStart(2, '0')}:00`,
-      endTime:   `${format(target, 'yyyy-MM-dd')}T${String(endHour).padStart(2, '0')}:00`,
-      peopleCount: 1,
-      purpose: '',
-      notes: '',
+    setNewRes({
+      date: format(target, 'yyyy-MM-dd'),
+      startTime: startTime ?? '09:00',
     })
-    setNewResModal(true)
-  }, [reset])
-
-  function onSubmitReservation(data: ReservationForm) {
-    createMutation.mutate({
-      roomId: data.roomId,
-      startDateTime: data.startTime,
-      endDateTime: data.endTime,
-      peopleCount: data.peopleCount,
-      purpose: data.purpose,
-      notes: data.notes,
-    })
-  }
+  }, [])
 
   // ── Keyboard shortcuts ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -551,6 +561,8 @@ export default function CalendarPage() {
             <div className="h-14" />
             {days.map((day, i) => {
               const today = isToday(day)
+              const dayAvail = availabilityByDow.get(day.getDay())
+              const roomCount = dayAvail?.roomCount ?? 0
               return (
                 <div
                   key={i}
@@ -573,6 +585,16 @@ export default function CalendarPage() {
                       {format(day, 'd')}
                     </span>
                   </div>
+                  {roomCount > 0 ? (
+                    <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                      {roomCount} {roomCount === 1 ? 'sala' : 'salas'}
+                    </span>
+                  ) : (
+                    <span className="mt-1 inline-flex items-center rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-400">
+                      Cerrado
+                    </span>
+                  )}
                 </div>
               )
             })}
@@ -615,40 +637,90 @@ export default function CalendarPage() {
                 {days.map((day, di) => {
                   const today = isToday(day)
                   const dayEvents = visibleEvents.filter(e => isSameDayStr(parseISO(e.start), day))
+                  const dow = day.getDay()
+                  const intervals = availabilityByDow.get(dow)?.intervals ?? []
+                  const gridStartMin = DAY_START * 60
+                  const gridEndMin = DAY_END * 60
+                  const nowMinutesOfDay = getHours(new Date()) * 60 + getMinutes(new Date())
+                  const isPastDay = format(day, 'yyyy-MM-dd') < format(new Date(), 'yyyy-MM-dd')
 
                   return (
                     <div
                       key={di}
                       className={classNames(
                         'relative border-l border-gray-100',
-                        today && 'bg-green-50/30',
+                        today ? 'bg-green-50/20' : 'bg-gray-50/30',
                       )}
                       style={{ height: TOTAL_H }}
                     >
-                      {/* Celdas por hora — cada una hoverable y clickable */}
+                      {/* Gridlines horarias (solo visual) */}
                       {HOURS.map(h => (
-                        <button
+                        <div
                           key={h}
-                          type="button"
-                          onClick={() => openNewRes(day, h)}
-                          className="group/cell absolute left-0 right-0 border-b border-gray-200 cursor-pointer transition-colors hover:bg-green-100/50 focus:outline-none focus:bg-green-100/60 focus-visible:z-[5]"
+                          className="absolute left-0 right-0 border-b border-gray-100 pointer-events-none"
                           style={{ top: (h - DAY_START) * HOUR_PX, height: HOUR_PX }}
-                          aria-label={`Crear reserva el ${format(day, 'd MMM', { locale: es })} a las ${String(h).padStart(2, '0')}:00`}
                         >
-                          {/* Línea media (30 min) */}
-                          <span className="absolute left-0 right-0 top-1/2 border-t border-dashed border-gray-100 pointer-events-none" />
-                          {/* Etiqueta hover en esquina superior izquierda */}
-                          <span className="absolute top-1 left-1.5 opacity-0 group-hover/cell:opacity-100 transition-opacity inline-flex items-center gap-0.5 rounded-md bg-green-600 text-white text-[10px] font-semibold px-1.5 py-0.5 shadow-sm pointer-events-none">
-                            <Plus className="h-2.5 w-2.5" strokeWidth={3} />
-                            {String(h).padStart(2, '0')}:00
-                          </span>
-                        </button>
+                          <span className="absolute left-0 right-0 top-1/2 border-t border-dashed border-gray-100/70" />
+                        </div>
                       ))}
+
+                      {/* Franjas disponibles — verde, con slots de 30min clickeables */}
+                      {intervals.map((iv, idx) => {
+                        const rect = bandRect(iv.start, iv.end)
+                        if (!rect.visible) return null
+                        const bandStart = Math.max(iv.start, gridStartMin)
+                        const bandEnd = Math.min(iv.end, gridEndMin)
+                        const slots: number[] = []
+                        for (let m = bandStart; m + SLOT_MIN <= bandEnd; m += SLOT_MIN) slots.push(m)
+                        return (
+                          <div
+                            key={idx}
+                            className={classNames(
+                              'absolute left-0.5 right-0.5 rounded-lg ring-1 ring-inset overflow-hidden',
+                              isPastDay ? 'bg-gray-100/70 ring-gray-200' : 'bg-emerald-50/80 ring-emerald-200',
+                            )}
+                            style={{ top: rect.top, height: rect.height, zIndex: 1 }}
+                          >
+                            <span className={classNames('absolute left-0 top-0 bottom-0 w-0.5', isPastDay ? 'bg-gray-300' : 'bg-emerald-400')} />
+                            {slots.map(m => {
+                              const startTime = minutesToTime(m)
+                              const count = roomsAvailableAt(dow, m)
+                              // No reservable: días anteriores completos, u horas ya pasadas de hoy.
+                              const isPast = isPastDay || (today && m <= nowMinutesOfDay)
+                              if (isPast) {
+                                return (
+                                  <div
+                                    key={m}
+                                    className="absolute left-0 right-0 bg-gray-200/40 cursor-not-allowed"
+                                    style={{ top: ((m - bandStart) / 60) * HOUR_PX, height: (SLOT_MIN / 60) * HOUR_PX }}
+                                    aria-hidden="true"
+                                  />
+                                )
+                              }
+                              return (
+                                <button
+                                  key={m}
+                                  type="button"
+                                  onClick={() => openNewRes(day, startTime)}
+                                  className="group/slot absolute left-0 right-0 cursor-pointer transition-colors hover:bg-emerald-200/60 focus:outline-none focus:bg-emerald-200/70"
+                                  style={{ top: ((m - bandStart) / 60) * HOUR_PX, height: (SLOT_MIN / 60) * HOUR_PX }}
+                                  aria-label={`Crear reserva el ${format(day, 'd MMM', { locale: es })} a las ${startTime} (${count} salas disponibles)`}
+                                >
+                                  <span className="absolute top-0 left-1.5 opacity-0 group-hover/slot:opacity-100 transition-opacity inline-flex items-center gap-1 rounded-md bg-emerald-600 text-white text-[10px] font-semibold px-1.5 py-0.5 shadow-sm pointer-events-none whitespace-nowrap">
+                                    <Plus className="h-2.5 w-2.5" strokeWidth={3} />
+                                    {startTime} · {count} {count === 1 ? 'sala' : 'salas'}
+                                  </span>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )
+                      })}
 
                       {/* Now line */}
                       {today && <NowLine />}
 
-                      {/* Events — z-index los pone encima de las celdas */}
+                      {/* Events — z-index los pone encima de las franjas */}
                       {dayEvents.map(ev => (
                         <EventBlock
                           key={ev.id}
@@ -665,17 +737,11 @@ export default function CalendarPage() {
 
           {/* Empty state — solo aviso pequeño en footer, no bloquea grid */}
           {!isLoading && visibleEvents.length === 0 && (
-            <div className="border-t border-gray-100 px-6 py-3 flex items-center justify-between bg-gray-50/70 shrink-0">
+            <div className="border-t border-gray-100 px-6 py-3 bg-gray-50/70 shrink-0">
               <p className="text-[13px] text-gray-500">
                 No hay reservas en esta semana
                 {selectedRooms.length > 0 && ' con los filtros aplicados'}.
               </p>
-              <button
-                onClick={() => openNewRes()}
-                className="text-[13px] font-medium text-green-700 hover:underline"
-              >
-                + Crear reserva
-              </button>
             </div>
           )}
         </div>
@@ -745,107 +811,20 @@ export default function CalendarPage() {
         })()}
       </Modal>
 
-      {/* ── New reservation modal ── */}
+      {/* ── New reservation modal (formulario compartido) ── */}
       <Modal
-        open={newResModal}
-        onClose={() => setNewResModal(false)}
+        open={!!newRes}
+        onClose={() => setNewRes(null)}
         title="Nueva reserva"
-        size="md"
+        size="lg"
       >
-        <form onSubmit={handleSubmit(onSubmitReservation)} className="space-y-4">
-          {/* Sala */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[13px] font-medium text-gray-700 flex items-center gap-1.5">
-              <MapPin className="h-3.5 w-3.5 text-gray-400" /> Sala <span className="text-red-500">*</span>
-            </label>
-            <select
-              {...register('roomId')}
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/20 focus:border-green-500"
-            >
-              <option value="">Seleccione una sala</option>
-              {rooms.map(r => (
-                <option key={r.id} value={r.id}>
-                  {r.name} — capacidad {r.capacity}
-                </option>
-              ))}
-            </select>
-            {errors.roomId && <p className="text-[12px] text-red-600">{errors.roomId.message}</p>}
-          </div>
-
-          {/* Date/time row */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[13px] font-medium text-gray-700 flex items-center gap-1.5">
-                <Clock className="h-3.5 w-3.5 text-gray-400" /> Inicio <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="datetime-local"
-                {...register('startTime')}
-                className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/20 focus:border-green-500"
-              />
-              {errors.startTime && <p className="text-[12px] text-red-600">{errors.startTime.message}</p>}
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[13px] font-medium text-gray-700 flex items-center gap-1.5">
-                <Clock className="h-3.5 w-3.5 text-gray-400" /> Fin <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="datetime-local"
-                {...register('endTime')}
-                className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/20 focus:border-green-500"
-              />
-              {errors.endTime && <p className="text-[12px] text-red-600">{errors.endTime.message}</p>}
-            </div>
-          </div>
-
-          {/* People */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[13px] font-medium text-gray-700 flex items-center gap-1.5">
-              <Users className="h-3.5 w-3.5 text-gray-400" /> Personas <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="number"
-              min={1}
-              {...register('peopleCount')}
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/20 focus:border-green-500"
-            />
-            {errors.peopleCount && <p className="text-[12px] text-red-600">{errors.peopleCount.message}</p>}
-          </div>
-
-          {/* Purpose */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[13px] font-medium text-gray-700 flex items-center gap-1.5">
-              <FileText className="h-3.5 w-3.5 text-gray-400" /> Propósito <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              placeholder="Ej: Reunión de equipo"
-              {...register('purpose')}
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/20 focus:border-green-500"
-            />
-            {errors.purpose && <p className="text-[12px] text-red-600">{errors.purpose.message}</p>}
-          </div>
-
-          {/* Notes */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[13px] font-medium text-gray-700">
-              Notas <span className="text-gray-400 text-[11px] font-normal">(opcional)</span>
-            </label>
-            <textarea
-              rows={2}
-              placeholder="Información adicional..."
-              {...register('notes')}
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/20 focus:border-green-500 resize-none"
-            />
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
-            <Button type="button" variant="ghost" onClick={() => setNewResModal(false)}>Cancelar</Button>
-            <Button type="submit" loading={createMutation.isPending}>
-              <Plus className="h-4 w-4" /> Crear reserva
-            </Button>
-          </div>
-        </form>
+        {newRes && (
+          <CreateReservationForm
+            onClose={() => setNewRes(null)}
+            initialDate={newRes.date}
+            initialStartTime={newRes.startTime}
+          />
+        )}
       </Modal>
     </div>
   )

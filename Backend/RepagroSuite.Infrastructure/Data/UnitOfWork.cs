@@ -31,6 +31,28 @@ public class UnitOfWork : IUnitOfWork
     public async Task BeginTransactionAsync(CancellationToken cancellationToken = default)
         => _transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, cancellationToken);
 
+    public async Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken = default)
+    {
+        // La execution strategy reintenta TODO el bloque ante fallos transitorios (deadlocks,
+        // timeouts de red contra la BD remota). Cada reintento abre una transacción nueva.
+        var strategy = _context.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await BeginTransactionAsync(cancellationToken);
+            try
+            {
+                var result = await operation(cancellationToken);
+                await CommitTransactionAsync(cancellationToken);
+                return result;
+            }
+            catch
+            {
+                await RollbackTransactionAsync(cancellationToken);
+                throw;
+            }
+        });
+    }
+
     public async Task AcquireRoomLockAsync(Guid roomId, int timeoutMs = 5000, CancellationToken cancellationToken = default)
     {
         if (_transaction == null)

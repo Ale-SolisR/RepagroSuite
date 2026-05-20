@@ -45,6 +45,14 @@ public class RoomRepository : GenericRepository<Room>, IRoomRepository
         return await query.OrderBy(r => r.Name).ToListAsync(cancellationToken);
     }
 
+    public async Task<IEnumerable<Room>> GetAvailableRoomsWithSchedulesAsync(CancellationToken cancellationToken = default)
+        => await _dbSet
+            .AsNoTracking()
+            .Include(r => r.Availabilities)
+            .Where(r => r.Status == RoomStatus.Available)
+            .OrderBy(r => r.Name)
+            .ToListAsync(cancellationToken);
+
     public async Task<(IEnumerable<Room> Items, int Total)> GetPagedAsync(
         int page, int pageSize, string? search = null, RoomStatus? status = null, CancellationToken cancellationToken = default)
     {

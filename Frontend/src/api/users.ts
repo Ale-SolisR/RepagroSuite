@@ -11,8 +11,8 @@ export const usersApi = {
   register: (data: RegisterRequest) =>
     api.post<ApiResponse<UserDto>>('/users/register', data),
 
-  approve: (id: string, data: ApproveUserRequest) =>
-    api.post<ApiResponse<UserDto>>(`/users/${id}/approve`, data),
+  approve: (id: string, data?: ApproveUserRequest) =>
+    api.post<ApiResponse<UserDto>>(`/users/${id}/approve`, data ?? {}),
 
   reject: (id: string, data: RejectUserRequest) =>
     api.post<ApiResponse<UserDto>>(`/users/${id}/reject`, data),

@@ -58,7 +58,6 @@ public class UpdateUserDto
 public class ApproveUserDto
 {
     public string? Comment { get; set; }
-    public List<Guid> RoleIds { get; set; } = [];
 }
 
 public class RejectUserDto

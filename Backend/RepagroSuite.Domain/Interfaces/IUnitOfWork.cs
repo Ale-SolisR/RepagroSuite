@@ -12,6 +12,11 @@ public interface IUnitOfWork : IDisposable
     Task CommitTransactionAsync(CancellationToken cancellationToken = default);
     Task RollbackTransactionAsync(CancellationToken cancellationToken = default);
 
+    // Ejecuta 'operation' dentro de una transacción gestionada por la execution strategy de EF Core.
+    // Necesario porque EnableRetryOnFailure no permite transacciones iniciadas manualmente: toda la
+    // unidad (lock + validación + insert) debe ser reintentable como un bloque.
+    Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken = default);
+
     // Lock exclusivo por sala usando sp_getapplock (SQL Server).
     // Se libera automáticamente al hacer commit/rollback de la transacción actual.
     // Debe llamarse DENTRO de una transacción ya abierta.

@@ -2,7 +2,8 @@ import api from './client'
 import type {
   ApiResponse, PagedResult, ReservationDto, CalendarEventDto,
   CreateReservationRequest, ApproveReservationRequest,
-  RejectReservationRequest, CancelReservationRequest
+  RejectReservationRequest, CancelReservationRequest,
+  CreateRecurringReservationRequest, RecurringReservationResult
 } from '@/types'
 
 export const reservationsApi = {
@@ -20,6 +21,9 @@ export const reservationsApi = {
 
   create: (data: CreateReservationRequest) =>
     api.post<ApiResponse<ReservationDto>>('/reservations', data),
+
+  createRecurring: (data: CreateRecurringReservationRequest) =>
+    api.post<ApiResponse<RecurringReservationResult>>('/reservations/recurring', data),
 
   approve: (id: string, data: ApproveReservationRequest) =>
     api.post<ApiResponse<ReservationDto>>(`/reservations/${id}/approve`, data),

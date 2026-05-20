@@ -49,6 +49,33 @@ public class AdminDirectReservationDto
     public string? Notes { get; set; }
 }
 
+// Reserva fija/recurrente semanal: misma franja horaria, mismo día de la semana
+// (derivado de StartDate), repetida cada semana hasta EndDate inclusive.
+public class CreateRecurringReservationDto
+{
+    public Guid RoomId { get; set; }
+    public DateOnly StartDate { get; set; }
+    public DateOnly EndDate { get; set; }
+    public string StartTime { get; set; } = string.Empty; // "HH:mm"
+    public string EndTime { get; set; } = string.Empty;   // "HH:mm"
+    public int PeopleCount { get; set; }
+    public string Purpose { get; set; } = string.Empty;
+    public string? Notes { get; set; }
+}
+
+public class RecurringReservationResultDto
+{
+    public int CreatedCount { get; set; }
+    public int TotalOccurrences { get; set; }
+    public List<SkippedOccurrenceDto> Skipped { get; set; } = [];
+}
+
+public class SkippedOccurrenceDto
+{
+    public DateTime Date { get; set; }
+    public string Reason { get; set; } = string.Empty;
+}
+
 public class ApproveReservationDto
 {
     public string? AdminComment { get; set; }

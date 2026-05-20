@@ -14,6 +14,7 @@ public interface IRoomService
     Task DeleteAsync(Guid roomId, Guid deletedBy, CancellationToken cancellationToken = default);
     Task<IEnumerable<RoomDto>> GetAvailableAsync(DateTime start, DateTime end, int? minCapacity = null, CancellationToken cancellationToken = default);
     Task<IEnumerable<RoomAvailabilityDto>> GetAvailabilitiesAsync(Guid roomId, CancellationToken cancellationToken = default);
+    Task<IEnumerable<RoomScheduleDto>> GetWeeklySchedulesAsync(CancellationToken cancellationToken = default);
     Task UpsertAvailabilityAsync(Guid roomId, List<UpsertRoomAvailabilityDto> dtos, Guid updatedBy, CancellationToken cancellationToken = default);
     Task<RoomBlockDto> CreateBlockAsync(CreateRoomBlockDto dto, Guid createdBy, CancellationToken cancellationToken = default);
     Task DeleteBlockAsync(Guid blockId, Guid deletedBy, CancellationToken cancellationToken = default);

@@ -302,6 +302,27 @@ public class RoomService : IRoomService
         return slots;
     }
 
+    public async Task<IEnumerable<RoomScheduleDto>> GetWeeklySchedulesAsync(CancellationToken cancellationToken = default)
+    {
+        var rooms = await _uow.Rooms.GetAvailableRoomsWithSchedulesAsync(cancellationToken);
+        return rooms.Select(r => new RoomScheduleDto
+        {
+            RoomId = r.Id,
+            RoomName = r.Name,
+            Color = r.Color,
+            Days = r.Availabilities
+                .Where(a => a.IsAvailable)
+                .OrderBy(a => a.DayOfWeek)
+                .Select(a => new DayWindowDto
+                {
+                    DayOfWeek = (int)a.DayOfWeek,
+                    OpenTime = a.OpenTime.ToString("HH:mm"),
+                    CloseTime = a.CloseTime.ToString("HH:mm"),
+                })
+                .ToList()
+        }).ToList();
+    }
+
     public async Task<IEnumerable<FeatureDto>> GetActiveFeaturesAsync(CancellationToken cancellationToken = default)
     {
         // Features cambian raras veces: cache 1 hora. Si en el futuro hay un endpoint

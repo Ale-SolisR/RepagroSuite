@@ -94,8 +94,7 @@ export interface RegisterRequest {
 }
 
 export interface ApproveUserRequest {
-  roleIds: string[]
-  notes?: string
+  comment?: string
 }
 
 export interface RejectUserRequest {
@@ -169,9 +168,22 @@ export interface UpsertRoomAvailabilityRequest {
 }
 
 export interface RoomSlotDto {
-  startTime: string
-  endTime: string
+  start: string  // ISO datetime, ej. "2026-05-19T08:00:00"
+  end: string
   isAvailable: boolean
+}
+
+export interface DayWindow {
+  dayOfWeek: number // 0=Domingo .. 6=Sábado
+  openTime: string  // HH:mm
+  closeTime: string // HH:mm
+}
+
+export interface RoomScheduleDto {
+  roomId: string
+  roomName: string
+  color?: string
+  days: DayWindow[]
 }
 
 export interface RoomBlockDto {
@@ -247,6 +259,28 @@ export interface CreateReservationRequest {
   peopleCount: number
   purpose: string
   notes?: string
+}
+
+export interface CreateRecurringReservationRequest {
+  roomId: string
+  startDate: string // yyyy-MM-dd
+  endDate: string   // yyyy-MM-dd
+  startTime: string // HH:mm
+  endTime: string   // HH:mm
+  peopleCount: number
+  purpose: string
+  notes?: string
+}
+
+export interface SkippedOccurrence {
+  date: string
+  reason: string
+}
+
+export interface RecurringReservationResult {
+  createdCount: number
+  totalOccurrences: number
+  skipped: SkippedOccurrence[]
 }
 
 export interface ApproveReservationRequest {

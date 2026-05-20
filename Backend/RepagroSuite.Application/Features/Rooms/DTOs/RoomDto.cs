@@ -127,3 +127,20 @@ public class AvailableSlotDto
     public DateTime End { get; set; }
     public bool IsAvailable { get; set; }
 }
+
+// Disponibilidad semanal agregada para pintar el calendario: solo salas Available,
+// con sus franjas (día de la semana + apertura/cierre). El calendario calcula la unión.
+public class RoomScheduleDto
+{
+    public Guid RoomId { get; set; }
+    public string RoomName { get; set; } = string.Empty;
+    public string? Color { get; set; }
+    public List<DayWindowDto> Days { get; set; } = [];
+}
+
+public class DayWindowDto
+{
+    public int DayOfWeek { get; set; }   // 0=Domingo .. 6=Sábado (igual que JS Date.getDay)
+    public string OpenTime { get; set; } = string.Empty;   // "HH:mm"
+    public string CloseTime { get; set; } = string.Empty;  // "HH:mm"
+}

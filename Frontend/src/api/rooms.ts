@@ -2,7 +2,7 @@ import api from './client'
 import type {
   ApiResponse, PagedResult, RoomDto, CreateRoomRequest, UpdateRoomRequest,
   RoomAvailabilityDto, UpsertRoomAvailabilityRequest, RoomSlotDto,
-  RoomBlockDto, CreateRoomBlockRequest, FeatureDto
+  RoomBlockDto, CreateRoomBlockRequest, FeatureDto, RoomScheduleDto
 } from '@/types'
 
 export const roomsApi = {
@@ -47,4 +47,7 @@ export const roomsApi = {
 
   getFeatures: () =>
     api.get<ApiResponse<FeatureDto[]>>('/rooms/features'),
+
+  getWeeklyAvailability: () =>
+    api.get<ApiResponse<RoomScheduleDto[]>>('/rooms/weekly-availability'),
 }

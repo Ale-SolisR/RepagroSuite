@@ -520,7 +520,7 @@ export default function RoomsPage() {
         title={`Disponibilidad — ${availRoom?.name}`}
         size="xl"
       >
-        {availRoom && <RoomAvailabilityPanel roomId={availRoom.id} />}
+        {availRoom && <RoomAvailabilityPanel roomId={availRoom.id} onClose={() => setAvailRoom(null)} />}
       </Modal>
     </div>
   )

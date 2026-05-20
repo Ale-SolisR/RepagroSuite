@@ -72,6 +72,18 @@ public class ReservationsController : ControllerBase
         return Created(string.Empty, ApiResponse<ReservationDto>.Ok(result, "Solicitud de reserva enviada. Pendiente de aprobación."));
     }
 
+    [HttpPost("recurring")]
+    [Authorize(Policy = "Reservations.Create")]
+    public async Task<ActionResult<ApiResponse<RecurringReservationResultDto>>> CreateRecurring(
+        [FromBody] CreateRecurringReservationDto dto, CancellationToken ct)
+    {
+        var result = await _reservationService.CreateRecurringAsync(_currentUser.UserId!.Value, dto, ct);
+        var message = result.CreatedCount > 0
+            ? $"{result.CreatedCount} de {result.TotalOccurrences} reservas recurrentes enviadas. Pendientes de aprobación."
+            : "No se pudo crear ninguna ocurrencia. Revise los conflictos de horario.";
+        return Created(string.Empty, ApiResponse<RecurringReservationResultDto>.Ok(result, message));
+    }
+
     [HttpPost("direct")]
     [Authorize(Policy = "Reservations.DirectCreate")]
     public async Task<ActionResult<ApiResponse<ReservationDto>>> DirectCreate(

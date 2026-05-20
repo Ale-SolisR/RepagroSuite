@@ -13,6 +13,7 @@ export const qk = {
     list: ['rooms', 'list'] as const,             // selector pageSize=100 (calendar, reservar)
     availability: (roomId: string) => ['rooms', 'availability', roomId] as const,
     slots: (roomId: string, date: string) => ['rooms', 'slots', roomId, date] as const,
+    weekly: ['rooms', 'weekly-availability'] as const,  // disponibilidad semanal agregada (calendario)
     features: ['rooms', 'features'] as const,    // amenidades (casi inmutables)
   },
   reservations: {

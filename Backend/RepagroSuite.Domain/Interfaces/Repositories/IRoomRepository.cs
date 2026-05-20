@@ -9,6 +9,7 @@ public interface IRoomRepository : IGenericRepository<Room>
     Task<Room?> GetWithDetailsAsync(Guid roomId, CancellationToken cancellationToken = default);
     Task<bool> CodeExistsAsync(string code, Guid? excludeRoomId = null, CancellationToken cancellationToken = default);
     Task<IEnumerable<Room>> GetAvailableRoomsAsync(DateTime start, DateTime end, int? minCapacity = null, CancellationToken cancellationToken = default);
+    Task<IEnumerable<Room>> GetAvailableRoomsWithSchedulesAsync(CancellationToken cancellationToken = default);
     Task<(IEnumerable<Room> Items, int Total)> GetPagedAsync(int page, int pageSize, string? search = null, RoomStatus? status = null, CancellationToken cancellationToken = default);
     Task<IEnumerable<RoomAvailability>> GetAvailabilitiesAsync(Guid roomId, CancellationToken cancellationToken = default);
     Task ReplaceAvailabilitiesAsync(Guid roomId, IEnumerable<RoomAvailability> newAvailabilities, CancellationToken cancellationToken = default);
