@@ -1,6 +1,7 @@
 using RepagroSuite.Application.Common.Interfaces;
 using RepagroSuite.Application.Common.Models;
 using RepagroSuite.Application.Features.Rooms.DTOs;
+using RepagroSuite.Domain.Common;
 using RepagroSuite.Domain.Entities;
 using RepagroSuite.Domain.Enums;
 using RepagroSuite.Domain.Interfaces;
@@ -256,7 +257,7 @@ public class RoomService : IRoomService
 
         block.IsActive = false;
         block.IsDeleted = true;
-        block.DeletedAt = DateTime.UtcNow;
+        block.DeletedAt = BusinessClock.Now;
         block.DeletedBy = deletedBy;
         await _uow.SaveChangesAsync(cancellationToken);
         await _auditService.LogAsync(deletedBy, "ROOM_BLOCK_DELETED", entityName: "RoomBlock", entityId: blockId.ToString(), module: "Rooms");

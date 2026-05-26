@@ -1,4 +1,5 @@
 using RepagroSuite.Application.Features.Dashboard.DTOs;
+using RepagroSuite.Domain.Common;
 using RepagroSuite.Domain.Enums;
 using RepagroSuite.Domain.Interfaces;
 
@@ -15,7 +16,7 @@ public class DashboardService : IDashboardService
 
     public async Task<DashboardStatsDto> GetStatsAsync(CancellationToken cancellationToken = default)
     {
-        var today = DateTime.UtcNow.Date;
+        var today = BusinessClock.Today;
         var firstOfMonth = new DateTime(today.Year, today.Month, 1);
 
         var totalRooms = await _uow.Rooms.CountAsync(cancellationToken: cancellationToken);

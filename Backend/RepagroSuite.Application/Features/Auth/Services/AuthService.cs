@@ -1,5 +1,6 @@
 using RepagroSuite.Application.Common.Interfaces;
 using RepagroSuite.Application.Features.Auth.DTOs;
+using RepagroSuite.Domain.Common;
 using RepagroSuite.Domain.Enums;
 using RepagroSuite.Domain.Interfaces;
 
@@ -38,7 +39,7 @@ public class AuthService : IAuthService
             throw new UnauthorizedAccessException("Credenciales inválidas.");
         }
 
-        if (user.LockoutEndAt.HasValue && user.LockoutEndAt > DateTime.UtcNow)
+        if (user.LockoutEndAt.HasValue && user.LockoutEndAt > BusinessClock.Now)
             throw new UnauthorizedAccessException("Su usuario está temporalmente bloqueado. Intente más tarde.");
 
         if (!_passwordService.VerifyPassword(dto.Password, user.PasswordHash))
@@ -46,10 +47,10 @@ public class AuthService : IAuthService
             user.FailedLoginAttempts++;
             if (user.FailedLoginAttempts >= 5)
             {
-                user.LockoutEndAt = DateTime.UtcNow.AddMinutes(15);
+                user.LockoutEndAt = BusinessClock.Now.AddMinutes(15);
                 user.FailedLoginAttempts = 0;
             }
-            user.UpdatedAt = DateTime.UtcNow;
+            user.UpdatedAt = BusinessClock.Now;
             await _uow.SaveChangesAsync(cancellationToken);
             await _auditService.LogAsync(user.Id, "LOGIN_FAILED", module: "Auth", success: false, errorMessage: "Contraseña incorrecta", ipAddress: ipAddress);
             throw new UnauthorizedAccessException("Credenciales inválidas.");
@@ -63,8 +64,8 @@ public class AuthService : IAuthService
 
         user.FailedLoginAttempts = 0;
         user.LockoutEndAt = null;
-        user.LastLoginAt = DateTime.UtcNow;
-        user.UpdatedAt = DateTime.UtcNow;
+        user.LastLoginAt = BusinessClock.Now;
+        user.UpdatedAt = BusinessClock.Now;
 
         var roles = user.UserRoles.Select(ur => ur.Role.NormalizedName).ToList();
         var permissions = user.UserRoles
@@ -85,6 +86,7 @@ public class AuthService : IAuthService
         {
             AccessToken = accessToken,
             RefreshToken = refreshToken.Token,
+            // El access token JWT expira en UTC (la validación del token compara contra UTC).
             AccessTokenExpiresAt = DateTime.UtcNow.AddMinutes(60),
             MustChangePassword = user.MustChangePassword,
             User = new UserSessionDto
@@ -112,7 +114,7 @@ public class AuthService : IAuthService
 
         var newRefreshToken = _tokenService.GenerateRefreshToken(user.Id, ipAddress, userAgent);
         existingToken.IsRevoked = true;
-        existingToken.RevokedAt = DateTime.UtcNow;
+        existingToken.RevokedAt = BusinessClock.Now;
         existingToken.RevokedReason = "Rotado";
         existingToken.ReplacedByToken = newRefreshToken.Token;
 
@@ -132,6 +134,7 @@ public class AuthService : IAuthService
         {
             AccessToken = accessToken,
             RefreshToken = newRefreshToken.Token,
+            // El access token JWT expira en UTC (la validación del token compara contra UTC).
             AccessTokenExpiresAt = DateTime.UtcNow.AddMinutes(60),
             MustChangePassword = user.MustChangePassword,
             User = new UserSessionDto
@@ -156,7 +159,7 @@ public class AuthService : IAuthService
         if (token != null && token.IsActive)
         {
             token.IsRevoked = true;
-            token.RevokedAt = DateTime.UtcNow;
+            token.RevokedAt = BusinessClock.Now;
             token.RevokedReason = "Logout";
             await _uow.SaveChangesAsync(cancellationToken);
         }
@@ -179,9 +182,9 @@ public class AuthService : IAuthService
             throw new InvalidOperationException(string.Join(", ", violations));
 
         user.PasswordHash = _passwordService.HashPassword(dto.NewPassword);
-        user.LastPasswordChangedAt = DateTime.UtcNow;
+        user.LastPasswordChangedAt = BusinessClock.Now;
         user.MustChangePassword = false;
-        user.UpdatedAt = DateTime.UtcNow;
+        user.UpdatedAt = BusinessClock.Now;
         await _uow.SaveChangesAsync(cancellationToken);
 
         await _auditService.LogAsync(userId, "PASSWORD_CHANGED", module: "Auth");
@@ -191,7 +194,7 @@ public class AuthService : IAuthService
             await _emailService.SendTemplateAsync(user.Email, "password_changed", new Dictionary<string, string>
             {
                 ["fullName"] = user.FullName,
-                ["date"] = DateTime.Now.ToString("dd/MM/yyyy HH:mm")
+                ["date"] = BusinessClock.Now.ToString("dd/MM/yyyy HH:mm")
             }, cancellationToken);
         }
         catch { /* non-critical */ }
@@ -205,7 +208,7 @@ public class AuthService : IAuthService
         if (!user.MustChangePassword)
             throw new InvalidOperationException("No se requiere cambio de contraseña obligatorio.");
 
-        if (user.TemporaryPasswordExpiresAt.HasValue && user.TemporaryPasswordExpiresAt < DateTime.UtcNow)
+        if (user.TemporaryPasswordExpiresAt.HasValue && user.TemporaryPasswordExpiresAt < BusinessClock.Now)
             throw new InvalidOperationException("La contraseña temporal ha expirado. Solicite al administrador una nueva.");
 
         if (!_passwordService.IsPasswordPolicyCompliant(dto.NewPassword, out var violations))
@@ -213,9 +216,9 @@ public class AuthService : IAuthService
 
         user.PasswordHash = _passwordService.HashPassword(dto.NewPassword);
         user.MustChangePassword = false;
-        user.LastPasswordChangedAt = DateTime.UtcNow;
+        user.LastPasswordChangedAt = BusinessClock.Now;
         user.TemporaryPasswordExpiresAt = null;
-        user.UpdatedAt = DateTime.UtcNow;
+        user.UpdatedAt = BusinessClock.Now;
         await _uow.SaveChangesAsync(cancellationToken);
 
         await _auditService.LogAsync(userId, "FORCED_PASSWORD_CHANGED", module: "Auth");
@@ -225,7 +228,7 @@ public class AuthService : IAuthService
             await _emailService.SendTemplateAsync(user.Email, "password_changed", new Dictionary<string, string>
             {
                 ["fullName"] = user.FullName,
-                ["date"] = DateTime.Now.ToString("dd/MM/yyyy HH:mm")
+                ["date"] = BusinessClock.Now.ToString("dd/MM/yyyy HH:mm")
             }, cancellationToken);
         }
         catch { /* non-critical */ }
@@ -242,8 +245,8 @@ public class AuthService : IAuthService
         var bytes = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
         var token = Convert.ToBase64String(bytes).Replace('+', '-').Replace('/', '_').TrimEnd('=');
         user.PasswordResetToken = token;
-        user.PasswordResetTokenExpiresAt = DateTime.UtcNow.AddHours(24);
-        user.UpdatedAt = DateTime.UtcNow;
+        user.PasswordResetTokenExpiresAt = BusinessClock.Now.AddHours(24);
+        user.UpdatedAt = BusinessClock.Now;
         await _uow.SaveChangesAsync(cancellationToken);
 
         await _auditService.LogAsync(user.Id, "PASSWORD_RESET_REQUESTED", module: "Auth");
@@ -268,7 +271,7 @@ public class AuthService : IAuthService
         if (user == null || user.PasswordResetToken != dto.Token)
             throw new InvalidOperationException("Token de recuperación inválido o expirado.");
 
-        if (user.PasswordResetTokenExpiresAt < DateTime.UtcNow)
+        if (user.PasswordResetTokenExpiresAt < BusinessClock.Now)
             throw new InvalidOperationException("El enlace de recuperación ha expirado. Solicite uno nuevo.");
 
         if (!_passwordService.IsPasswordPolicyCompliant(dto.NewPassword, out var violations))
@@ -277,9 +280,9 @@ public class AuthService : IAuthService
         user.PasswordHash = _passwordService.HashPassword(dto.NewPassword);
         user.PasswordResetToken = null;
         user.PasswordResetTokenExpiresAt = null;
-        user.LastPasswordChangedAt = DateTime.UtcNow;
+        user.LastPasswordChangedAt = BusinessClock.Now;
         user.MustChangePassword = false;
-        user.UpdatedAt = DateTime.UtcNow;
+        user.UpdatedAt = BusinessClock.Now;
         await _uow.SaveChangesAsync(cancellationToken);
 
         await _auditService.LogAsync(user.Id, "PASSWORD_RESET_COMPLETED", module: "Auth");
@@ -289,7 +292,7 @@ public class AuthService : IAuthService
             await _emailService.SendTemplateAsync(user.Email, "password_changed", new Dictionary<string, string>
             {
                 ["fullName"] = user.FullName,
-                ["date"] = DateTime.Now.ToString("dd/MM/yyyy HH:mm")
+                ["date"] = BusinessClock.Now.ToString("dd/MM/yyyy HH:mm")
             }, cancellationToken);
         }
         catch { /* non-critical */ }

@@ -24,4 +24,8 @@ public class Reservation : BaseEntity
     public DateTime? CancelledAt { get; set; }
     public string? CancellationReason { get; set; }
     public bool IsDirectAdminReservation { get; set; } = false;
+
+    // Enlaza todas las ocurrencias de una misma reserva periódica (mismo Guid para toda la serie).
+    // null = reserva individual (no periódica).
+    public Guid? RecurrenceGroupId { get; set; }
 }

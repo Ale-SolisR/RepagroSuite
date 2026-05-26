@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using RepagroSuite.Application.Common.Interfaces;
 using RepagroSuite.Application.Features.Settings.DTOs;
 using RepagroSuite.Application.Features.Settings.Services;
+using RepagroSuite.Domain.Common;
 using RepagroSuite.Domain.Entities;
 using RepagroSuite.Infrastructure.Data;
 
@@ -55,7 +56,7 @@ public class SettingsService : SettingsServiceBase
         setting.Value = setting.IsEncrypted && !string.IsNullOrEmpty(newValue)
             ? _protector.Protect(newValue)
             : newValue;
-        setting.UpdatedAt = DateTime.UtcNow;
+        setting.UpdatedAt = BusinessClock.Now;
         setting.UpdatedBy = updatedBy;
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -79,7 +80,7 @@ public class SettingsService : SettingsServiceBase
             setting.Value = setting.IsEncrypted && !string.IsNullOrEmpty(trimmed)
                 ? _protector.Protect(trimmed)
                 : trimmed;
-            setting.UpdatedAt = DateTime.UtcNow;
+            setting.UpdatedAt = BusinessClock.Now;
             setting.UpdatedBy = updatedBy;
             if (!string.IsNullOrEmpty(setting.Module)) modulesTouched.Add(setting.Module);
         }

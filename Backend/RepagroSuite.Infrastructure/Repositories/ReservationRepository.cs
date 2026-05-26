@@ -19,6 +19,68 @@ public class ReservationRepository : GenericRepository<Reservation>, IReservatio
             r.StartDateTime < end && r.EndDateTime > start,
             cancellationToken);
 
+    public async Task<bool> HasApprovedConflictAsync(Guid roomId, DateTime start, DateTime end, Guid? excludeReservationId = null, CancellationToken cancellationToken = default)
+        => await _dbSet.AsNoTracking().AnyAsync(r =>
+            !r.IsDeleted &&
+            r.RoomId == roomId &&
+            r.Status == ReservationStatus.Approved &&
+            (excludeReservationId == null || r.Id != excludeReservationId) &&
+            r.StartDateTime < end && r.EndDateTime > start,
+            cancellationToken);
+
+    public async Task<IEnumerable<Reservation>> GetPendingDueAsync(DateTime startThreshold, CancellationToken cancellationToken = default)
+        => await _dbSet.AsNoTracking()
+            .Where(r => !r.IsDeleted && r.Status == ReservationStatus.Pending && r.StartDateTime <= startThreshold)
+            .OrderBy(r => r.StartDateTime)
+            .ToListAsync(cancellationToken);
+
+    public async Task<(IReadOnlyList<Guid> Keys, int Total)> GetAuditGroupKeysAsync(Guid? userId, Guid? roomId, ReservationStatus? status, bool sortDescending, int page, int pageSize, CancellationToken cancellationToken = default)
+    {
+        var q = _dbSet.AsNoTracking().AsQueryable();
+        if (userId.HasValue) q = q.Where(r => r.UserId == userId.Value);
+        if (roomId.HasValue) q = q.Where(r => r.RoomId == roomId.Value);
+        if (status.HasValue) q = q.Where(r => r.Status == status.Value);
+
+        // Clave de grupo = RecurrenceGroupId (serie) o el propio Id (reserva individual).
+        var groups = q
+            .GroupBy(r => r.RecurrenceGroupId ?? r.Id)
+            .Select(g => new { Key = g.Key, MinStart = g.Min(x => x.StartDateTime), MaxStart = g.Max(x => x.StartDateTime) });
+
+        var total = await groups.CountAsync(cancellationToken);
+
+        var ordered = sortDescending
+            ? groups.OrderByDescending(g => g.MaxStart)
+            : groups.OrderBy(g => g.MinStart);
+
+        var keys = await ordered
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(g => g.Key)
+            .ToListAsync(cancellationToken);
+
+        return (keys, total);
+    }
+
+    public async Task<IEnumerable<Reservation>> GetByGroupKeysAsync(IReadOnlyList<Guid> keys, CancellationToken cancellationToken = default)
+    {
+        if (keys.Count == 0) return new List<Reservation>();
+        var keyList = keys.ToList();
+        return await _dbSet.AsNoTracking()
+            .Include(r => r.Room)
+            .Include(r => r.User)
+            .Where(r => (r.RecurrenceGroupId != null && keyList.Contains(r.RecurrenceGroupId.Value))
+                     || (r.RecurrenceGroupId == null && keyList.Contains(r.Id)))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IEnumerable<Reservation>> GetByRecurrenceGroupAsync(Guid recurrenceGroupId, CancellationToken cancellationToken = default)
+        => await _dbSet.AsNoTracking()
+            .Include(r => r.Room)
+            .Include(r => r.User)
+            .Where(r => r.RecurrenceGroupId == recurrenceGroupId)
+            .OrderBy(r => r.StartDateTime)
+            .ToListAsync(cancellationToken);
+
     public async Task<IEnumerable<Reservation>> GetByRoomAsync(Guid roomId, DateTime? from = null, DateTime? to = null, CancellationToken cancellationToken = default)
     {
         var query = _dbSet
@@ -49,7 +111,7 @@ public class ReservationRepository : GenericRepository<Reservation>, IReservatio
     public async Task<(IEnumerable<Reservation> Items, int Total)> GetPagedAsync(
         int page, int pageSize, Guid? userId = null, Guid? roomId = null,
         ReservationStatus? status = null, DateTime? from = null, DateTime? to = null,
-        CancellationToken cancellationToken = default)
+        bool sortDescending = true, CancellationToken cancellationToken = default)
     {
         var query = _dbSet
             .AsNoTracking()
@@ -63,9 +125,13 @@ public class ReservationRepository : GenericRepository<Reservation>, IReservatio
         if (from.HasValue) query = query.Where(r => r.StartDateTime >= from.Value);
         if (to.HasValue) query = query.Where(r => r.EndDateTime <= to.Value);
 
+        // Orden por fecha de inicio: descendente = más nuevas primero; ascendente = más viejas primero.
+        query = sortDescending
+            ? query.OrderByDescending(r => r.StartDateTime)
+            : query.OrderBy(r => r.StartDateTime);
+
         var total = await query.CountAsync(cancellationToken);
         var items = await query
-            .OrderByDescending(r => r.StartDateTime)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);

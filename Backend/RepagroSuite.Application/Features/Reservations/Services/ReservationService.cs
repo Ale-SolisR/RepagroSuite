@@ -1,6 +1,7 @@
 using RepagroSuite.Application.Common.Interfaces;
 using RepagroSuite.Application.Common.Models;
 using RepagroSuite.Application.Features.Reservations.DTOs;
+using RepagroSuite.Domain.Common;
 using RepagroSuite.Domain.Entities;
 using RepagroSuite.Domain.Enums;
 using RepagroSuite.Domain.Interfaces;
@@ -9,21 +10,11 @@ namespace RepagroSuite.Application.Features.Reservations.Services;
 
 public class ReservationService : IReservationService
 {
-    // Las horas se manejan como hora-de-pared de Costa Rica (UTC-6, sin DST) en todo el sistema.
-    // Comparar contra DateTime.UtcNow rechazaría horas válidas de hoy en un servidor UTC.
-    private static readonly TimeZoneInfo BusinessTimeZone = ResolveBusinessTimeZone();
+    // Las horas se manejan como hora-de-pared de Costa Rica (UTC-6) en todo el sistema vía
+    // BusinessClock. Comparar contra UTC rechazaría horas válidas de hoy en un servidor UTC.
 
-    private static TimeZoneInfo ResolveBusinessTimeZone()
-    {
-        foreach (var id in new[] { "America/Costa_Rica", "Central America Standard Time" })
-        {
-            try { return TimeZoneInfo.FindSystemTimeZoneById(id); }
-            catch { /* probar siguiente id */ }
-        }
-        return TimeZoneInfo.CreateCustomTimeZone("CR", TimeSpan.FromHours(-6), "Costa Rica", "Costa Rica");
-    }
-
-    private static DateTime BusinessNow => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, BusinessTimeZone);
+    // Ventana de auto-aprobación: una solicitud cuyo inicio está a 30 min o menos se aprueba sola.
+    private const int AutoApproveWindowMinutes = 30;
 
     private readonly IUnitOfWork _uow;
     private readonly IAuditService _auditService;
@@ -38,8 +29,12 @@ public class ReservationService : IReservationService
         _realtime = realtime;
     }
 
-    public async Task<ReservationDto> CreateAsync(Guid userId, CreateReservationDto dto, CancellationToken cancellationToken = default)
+    public async Task<ReservationDto> CreateAsync(Guid userId, CreateReservationDto dto, bool callerCanApprove = false, CancellationToken cancellationToken = default)
     {
+        // Admin/master → aprobada directa. Usuario normal → aprobada directa solo si el inicio
+        // cae dentro de la ventana de 30 min; de lo contrario queda Pendiente.
+        var autoApprove = callerCanApprove || dto.StartDateTime <= BusinessClock.Now.AddMinutes(AutoApproveWindowMinutes);
+
         // Transacción + lock pesimista por sala para evitar doble booking bajo concurrencia.
         // Sin esto, dos requests simultáneos para el mismo slot pasarían ambos la validación
         // de HasConflictAsync e insertarían reservas duplicadas.
@@ -57,7 +52,9 @@ public class ReservationService : IReservationService
                 PeopleCount = dto.PeopleCount,
                 Purpose = dto.Purpose.Trim(),
                 Notes = dto.Notes?.Trim(),
-                Status = ReservationStatus.Pending
+                Status = autoApprove ? ReservationStatus.Approved : ReservationStatus.Pending,
+                ApprovedByUserId = callerCanApprove ? userId : null,
+                ApprovedAt = autoApprove ? BusinessClock.Now : null,
             };
 
             await _uow.Reservations.AddAsync(reservation, ct);
@@ -65,12 +62,13 @@ public class ReservationService : IReservationService
             return reservation.Id;
         }, cancellationToken);
 
-        await _auditService.LogAsync(userId, "RESERVATION_CREATED", entityName: "Reservation", entityId: reservationId.ToString(), module: "Reservations");
+        var action = autoApprove ? "RESERVATION_CREATED_APPROVED" : "RESERVATION_CREATED";
+        await _auditService.LogAsync(userId, action, entityName: "Reservation", entityId: reservationId.ToString(), module: "Reservations");
         await _realtime.ReservationChangedAsync(reservationId, dto.RoomId, "created", cancellationToken);
         return await GetByIdAsync(reservationId, cancellationToken);
     }
 
-    public async Task<RecurringReservationResultDto> CreateRecurringAsync(Guid userId, CreateRecurringReservationDto dto, CancellationToken cancellationToken = default)
+    public async Task<RecurringReservationResultDto> CreateRecurringAsync(Guid userId, CreateRecurringReservationDto dto, bool callerCanApprove = false, CancellationToken cancellationToken = default)
     {
         if (!TimeOnly.TryParse(dto.StartTime, out var startTime) || !TimeOnly.TryParse(dto.EndTime, out var endTime))
             throw new InvalidOperationException("Horario inválido. Use el formato HH:mm.");
@@ -91,6 +89,8 @@ public class ReservationService : IReservationService
         if (occurrences.Count == 0)
             throw new InvalidOperationException("El rango de fechas no genera ninguna ocurrencia.");
 
+        // Mismo identificador para toda la serie: permite agruparla en la auditoría.
+        var recurrenceGroupId = Guid.NewGuid();
         Guid? firstCreatedId = null;
         var result = await _uow.ExecuteInTransactionAsync(async ct =>
         {
@@ -111,6 +111,7 @@ public class ReservationService : IReservationService
                     continue;
                 }
 
+                var autoApprove = callerCanApprove || start <= BusinessClock.Now.AddMinutes(AutoApproveWindowMinutes);
                 var reservation = new Reservation
                 {
                     RoomId = dto.RoomId,
@@ -120,7 +121,10 @@ public class ReservationService : IReservationService
                     PeopleCount = dto.PeopleCount,
                     Purpose = dto.Purpose.Trim(),
                     Notes = dto.Notes?.Trim(),
-                    Status = ReservationStatus.Pending
+                    Status = autoApprove ? ReservationStatus.Approved : ReservationStatus.Pending,
+                    ApprovedByUserId = callerCanApprove ? userId : null,
+                    ApprovedAt = autoApprove ? BusinessClock.Now : null,
+                    RecurrenceGroupId = recurrenceGroupId,
                 };
                 await _uow.Reservations.AddAsync(reservation, ct);
                 created.Add(reservation);
@@ -163,7 +167,7 @@ public class ReservationService : IReservationService
                 Status = ReservationStatus.Approved,
                 IsDirectAdminReservation = true,
                 ApprovedByUserId = adminId,
-                ApprovedAt = DateTime.UtcNow
+                ApprovedAt = BusinessClock.Now
             };
 
             await _uow.Reservations.AddAsync(reservation, ct);
@@ -183,9 +187,9 @@ public class ReservationService : IReservationService
         return MapToDto(reservation);
     }
 
-    public async Task<PagedResult<ReservationDto>> GetPagedAsync(int page, int pageSize, Guid? userId = null, Guid? roomId = null, ReservationStatus? status = null, DateTime? from = null, DateTime? to = null, CancellationToken cancellationToken = default)
+    public async Task<PagedResult<ReservationDto>> GetPagedAsync(int page, int pageSize, Guid? userId = null, Guid? roomId = null, ReservationStatus? status = null, DateTime? from = null, DateTime? to = null, bool sortDescending = true, CancellationToken cancellationToken = default)
     {
-        var (items, total) = await _uow.Reservations.GetPagedAsync(page, pageSize, userId, roomId, status, from, to, cancellationToken);
+        var (items, total) = await _uow.Reservations.GetPagedAsync(page, pageSize, userId, roomId, status, from, to, sortDescending, cancellationToken);
         return new PagedResult<ReservationDto>
         {
             Items = items.Select(MapToDto),
@@ -215,7 +219,7 @@ public class ReservationService : IReservationService
             reservation.Status = ReservationStatus.Approved;
             reservation.AdminComment = dto.AdminComment?.Trim();
             reservation.ApprovedByUserId = approvedBy;
-            reservation.ApprovedAt = DateTime.UtcNow;
+            reservation.ApprovedAt = BusinessClock.Now;
             _uow.Reservations.Update(reservation);
             await _uow.SaveChangesAsync(ct);
             return true;
@@ -253,7 +257,7 @@ public class ReservationService : IReservationService
         reservation.Status = ReservationStatus.Rejected;
         reservation.AdminComment = dto.AdminComment.Trim();
         reservation.RejectedByUserId = rejectedBy;
-        reservation.RejectedAt = DateTime.UtcNow;
+        reservation.RejectedAt = BusinessClock.Now;
         _uow.Reservations.Update(reservation);
         await _uow.SaveChangesAsync(cancellationToken);
 
@@ -273,25 +277,111 @@ public class ReservationService : IReservationService
         return MapToDto(reservation);
     }
 
-    public async Task<ReservationDto> CancelAsync(Guid reservationId, CancelReservationDto dto, Guid cancelledBy, CancellationToken cancellationToken = default)
+    public async Task<ReservationDto> CancelAsync(Guid reservationId, CancelReservationDto dto, Guid cancelledBy, bool canManageAny = false, CancellationToken cancellationToken = default)
     {
         var reservation = await _uow.Reservations.GetWithDetailsAsync(reservationId, cancellationToken)
             ?? throw new KeyNotFoundException("Reserva no encontrada.");
 
+        // Un usuario normal solo puede cancelar sus propias reservas; admin/master, las de cualquiera.
+        if (!canManageAny && reservation.UserId != cancelledBy)
+            throw new InvalidOperationException("No tiene permiso para cancelar esta reserva.");
+
         if (reservation.Status == ReservationStatus.Cancelled || reservation.Status == ReservationStatus.Finished)
             throw new InvalidOperationException("La reserva ya fue cancelada o finalizada.");
+
+        // Las reservas que ya iniciaron no se cancelan: se conservan en el calendario como historial.
+        if (reservation.StartDateTime <= BusinessClock.Now)
+            throw new InvalidOperationException("No se puede cancelar una reserva que ya inició. Se conserva como historial.");
+
+        // Una reserva ya aprobada era una cita confirmada: al cancelarla se notifica por correo al usuario.
+        var wasApproved = reservation.Status == ReservationStatus.Approved;
 
         reservation.Status = ReservationStatus.Cancelled;
         reservation.CancellationReason = dto.Reason.Trim();
         reservation.CancelledByUserId = cancelledBy;
-        reservation.CancelledAt = DateTime.UtcNow;
+        reservation.CancelledAt = BusinessClock.Now;
         _uow.Reservations.Update(reservation);
         await _uow.SaveChangesAsync(cancellationToken);
 
         await _auditService.LogAsync(cancelledBy, "RESERVATION_CANCELLED", entityName: "Reservation", entityId: reservationId.ToString(), module: "Reservations");
         await _realtime.ReservationChangedAsync(reservation.Id, reservation.RoomId, "cancelled", cancellationToken);
 
+        if (wasApproved)
+        {
+            try
+            {
+                await _emailService.SendTemplateAsync(reservation.User.Email, "reservation_cancelled", new Dictionary<string, string>
+                {
+                    ["fullName"] = reservation.User.FullName,
+                    ["roomName"] = reservation.Room.Name,
+                    ["date"] = reservation.StartDateTime.ToString("dd/MM/yyyy"),
+                    ["startTime"] = reservation.StartDateTime.ToString("HH:mm"),
+                    ["endTime"] = reservation.EndDateTime.ToString("HH:mm"),
+                    ["reason"] = dto.Reason.Trim()
+                }, cancellationToken);
+            }
+            catch { /* non-critical */ }
+        }
+
         return MapToDto(reservation);
+    }
+
+    public async Task<int> AutoApproveDueAsync(CancellationToken cancellationToken = default)
+    {
+        // Pendientes cuyo inicio está a 30 min o menos (incluye las ya vencidas).
+        var threshold = BusinessClock.Now.AddMinutes(AutoApproveWindowMinutes);
+        var due = (await _uow.Reservations.GetPendingDueAsync(threshold, cancellationToken)).ToList();
+        if (due.Count == 0) return 0;
+
+        var processed = 0;
+        foreach (var pending in due)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                // Cada pendiente se resuelve en su propia transacción con lock por sala.
+                var outcome = await _uow.ExecuteInTransactionAsync<ReservationStatus?>(async ct =>
+                {
+                    await _uow.AcquireRoomLockAsync(pending.RoomId, timeoutMs: 5000, ct);
+
+                    var res = await _uow.Reservations.GetWithDetailsAsync(pending.Id, ct);
+                    if (res == null || res.Status != ReservationStatus.Pending)
+                        return null;
+
+                    // Choca con una YA aprobada → rechazo automático; si no, aprobación automática.
+                    var conflict = await _uow.Reservations.HasApprovedConflictAsync(res.RoomId, res.StartDateTime, res.EndDateTime, res.Id, ct);
+                    if (conflict)
+                    {
+                        res.Status = ReservationStatus.Rejected;
+                        res.AdminComment = "Rechazada automáticamente: la sala ya tenía una reserva aprobada en ese horario.";
+                        res.RejectedAt = BusinessClock.Now;
+                    }
+                    else
+                    {
+                        res.Status = ReservationStatus.Approved;
+                        res.ApprovedAt = BusinessClock.Now;
+                    }
+                    _uow.Reservations.Update(res);
+                    await _uow.SaveChangesAsync(ct);
+                    return res.Status;
+                }, cancellationToken);
+
+                if (outcome.HasValue)
+                {
+                    processed++;
+                    var approved = outcome.Value == ReservationStatus.Approved;
+                    await _auditService.LogAsync(null,
+                        approved ? "RESERVATION_AUTO_APPROVED" : "RESERVATION_AUTO_REJECTED",
+                        entityName: "Reservation", entityId: pending.Id.ToString(), module: "Reservations");
+                    await _realtime.ReservationChangedAsync(pending.Id, pending.RoomId, approved ? "approved" : "rejected", cancellationToken);
+                }
+            }
+            catch
+            {
+                // Si una falla (lock/concurrencia), se reintenta en el siguiente ciclo del servicio.
+            }
+        }
+        return processed;
     }
 
     public async Task<IEnumerable<CalendarEventDto>> GetCalendarEventsAsync(DateTime from, DateTime to, Guid? roomId = null, CancellationToken cancellationToken = default)
@@ -315,7 +405,7 @@ public class ReservationService : IReservationService
     private async Task ValidateReservationAsync(Guid roomId, DateTime start, DateTime end, int peopleCount, Guid? excludeId, CancellationToken ct)
     {
         if (start >= end) throw new InvalidOperationException("La hora de inicio debe ser anterior a la hora de fin.");
-        if (start < BusinessNow) throw new InvalidOperationException("No se pueden crear reservas en el pasado. Seleccione una hora futura.");
+        if (start < BusinessClock.Now) throw new InvalidOperationException("No se pueden crear reservas en el pasado. Seleccione una hora futura.");
 
         var room = await _uow.Rooms.GetWithDetailsAsync(roomId, ct)
             ?? throw new KeyNotFoundException("Sala no encontrada.");
@@ -366,6 +456,129 @@ public class ReservationService : IReservationService
             throw new InvalidOperationException("La sala ya está reservada en ese horario. Seleccione otro horario o sala.");
     }
 
+    public async Task<PagedResult<ReservationGroupDto>> GetAuditGroupsAsync(int page, int pageSize, Guid? userId, Guid? roomId, ReservationStatus? status, bool sortDescending, CancellationToken cancellationToken = default)
+    {
+        var (keys, total) = await _uow.Reservations.GetAuditGroupKeysAsync(userId, roomId, status, sortDescending, page, pageSize, cancellationToken);
+        var rows = (await _uow.Reservations.GetByGroupKeysAsync(keys, cancellationToken)).ToList();
+
+        var byKey = rows
+            .GroupBy(r => r.RecurrenceGroupId ?? r.Id)
+            .ToDictionary(g => g.Key, g => BuildGroupDto(g.ToList()));
+
+        // Conserva el orden de página devuelto por la consulta de claves.
+        var items = keys.Where(byKey.ContainsKey).Select(k => byKey[k]).ToList();
+
+        return new PagedResult<ReservationGroupDto>
+        {
+            Items = items,
+            TotalCount = total,
+            Page = page,
+            PageSize = pageSize
+        };
+    }
+
+    public async Task<IEnumerable<ReservationDto>> GetGroupOccurrencesAsync(Guid recurrenceGroupId, CancellationToken cancellationToken = default)
+    {
+        var occurrences = await _uow.Reservations.GetByRecurrenceGroupAsync(recurrenceGroupId, cancellationToken);
+        return occurrences.Select(MapToDto);
+    }
+
+    public async Task<BulkActionResultDto> ApproveGroupAsync(Guid recurrenceGroupId, Guid approvedBy, CancellationToken cancellationToken = default)
+    {
+        var pending = (await _uow.Reservations.GetByRecurrenceGroupAsync(recurrenceGroupId, cancellationToken))
+            .Where(r => r.Status == ReservationStatus.Pending)
+            .ToList();
+
+        int affected = 0, skipped = 0;
+        foreach (var occ in pending)
+        {
+            try
+            {
+                var approved = await _uow.ExecuteInTransactionAsync(async ct =>
+                {
+                    await _uow.AcquireRoomLockAsync(occ.RoomId, timeoutMs: 5000, ct);
+                    var res = await _uow.Reservations.GetWithDetailsAsync(occ.Id, ct);
+                    if (res == null || res.Status != ReservationStatus.Pending) return false;
+                    // Solo se omite si choca con una YA aprobada (no entre pendientes de la misma serie).
+                    if (await _uow.Reservations.HasApprovedConflictAsync(res.RoomId, res.StartDateTime, res.EndDateTime, res.Id, ct))
+                        return false;
+                    res.Status = ReservationStatus.Approved;
+                    res.ApprovedByUserId = approvedBy;
+                    res.ApprovedAt = BusinessClock.Now;
+                    _uow.Reservations.Update(res);
+                    await _uow.SaveChangesAsync(ct);
+                    return true;
+                }, cancellationToken);
+
+                if (approved) { affected++; await _realtime.ReservationChangedAsync(occ.Id, occ.RoomId, "approved", cancellationToken); }
+                else skipped++;
+            }
+            catch { skipped++; }
+        }
+
+        if (affected > 0)
+            await _auditService.LogAsync(approvedBy, "RESERVATION_GROUP_APPROVED", entityName: "Reservation", entityId: recurrenceGroupId.ToString(), module: "Reservations");
+
+        return new BulkActionResultDto { Affected = affected, Skipped = skipped };
+    }
+
+    public async Task<BulkActionResultDto> RejectGroupAsync(Guid recurrenceGroupId, RejectReservationDto dto, Guid rejectedBy, CancellationToken cancellationToken = default)
+    {
+        var pending = (await _uow.Reservations.GetByRecurrenceGroupAsync(recurrenceGroupId, cancellationToken))
+            .Where(r => r.Status == ReservationStatus.Pending)
+            .ToList();
+
+        int affected = 0;
+        foreach (var occ in pending)
+        {
+            try
+            {
+                var res = await _uow.Reservations.GetWithDetailsAsync(occ.Id, cancellationToken);
+                if (res == null || res.Status != ReservationStatus.Pending) continue;
+                res.Status = ReservationStatus.Rejected;
+                res.AdminComment = dto.AdminComment.Trim();
+                res.RejectedByUserId = rejectedBy;
+                res.RejectedAt = BusinessClock.Now;
+                _uow.Reservations.Update(res);
+                await _uow.SaveChangesAsync(cancellationToken);
+                affected++;
+                await _realtime.ReservationChangedAsync(occ.Id, occ.RoomId, "rejected", cancellationToken);
+            }
+            catch { /* continúa con la siguiente */ }
+        }
+
+        if (affected > 0)
+            await _auditService.LogAsync(rejectedBy, "RESERVATION_GROUP_REJECTED", entityName: "Reservation", entityId: recurrenceGroupId.ToString(), module: "Reservations");
+
+        return new BulkActionResultDto { Affected = affected };
+    }
+
+    private static ReservationGroupDto BuildGroupDto(List<Reservation> list)
+    {
+        var ordered = list.OrderBy(r => r.StartDateTime).ToList();
+        var first = ordered[0];
+        var isRecurring = first.RecurrenceGroupId != null;
+        return new ReservationGroupDto
+        {
+            GroupKey = (first.RecurrenceGroupId ?? first.Id).ToString(),
+            IsRecurring = isRecurring,
+            RecurrenceGroupId = first.RecurrenceGroupId,
+            RoomId = first.RoomId,
+            RoomName = first.Room?.Name ?? string.Empty,
+            UserId = first.UserId,
+            UserFullName = first.User?.FullName ?? string.Empty,
+            Purpose = first.Purpose,
+            FirstStart = ordered.Min(r => r.StartDateTime),
+            LastStart = ordered.Max(r => r.StartDateTime),
+            OccurrenceCount = ordered.Count,
+            PendingCount = ordered.Count(r => r.Status == ReservationStatus.Pending),
+            ApprovedCount = ordered.Count(r => r.Status == ReservationStatus.Approved),
+            RejectedCount = ordered.Count(r => r.Status == ReservationStatus.Rejected),
+            CancelledCount = ordered.Count(r => r.Status == ReservationStatus.Cancelled),
+            Single = isRecurring ? null : MapToDto(first)
+        };
+    }
+
     private static ReservationDto MapToDto(Reservation r) => new()
     {
         Id = r.Id,
@@ -397,6 +610,7 @@ public class ReservationService : IReservationService
         CancellationReason = r.CancellationReason,
         CancelledAt = r.CancelledAt,
         IsDirectAdminReservation = r.IsDirectAdminReservation,
+        RecurrenceGroupId = r.RecurrenceGroupId,
         CreatedAt = r.CreatedAt
     };
 }

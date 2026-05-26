@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using RepagroSuite.Application.Common.Interfaces;
+using RepagroSuite.Domain.Common;
 using RepagroSuite.Domain.Entities;
 using RepagroSuite.Infrastructure.Data;
 
@@ -35,7 +36,7 @@ public class AuditService : IAuditService
             ErrorMessage = errorMessage,
             IpAddress = ipAddress,
             UserAgent = userAgent,
-            Timestamp = DateTime.UtcNow
+            Timestamp = BusinessClock.Now
         };
 
         _context.AuditLogs.Add(audit);

@@ -16,5 +16,5 @@ public class AuditLog : BaseEntity
     public string? Module { get; set; }
     public bool Success { get; set; } = true;
     public string? ErrorMessage { get; set; }
-    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+    public DateTime Timestamp { get; set; } = BusinessClock.Now;
 }

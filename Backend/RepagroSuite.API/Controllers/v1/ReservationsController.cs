@@ -31,18 +31,61 @@ public class ReservationsController : ControllerBase
         [FromQuery] Guid? userId = null, [FromQuery] Guid? roomId = null,
         [FromQuery] ReservationStatus? status = null,
         [FromQuery] DateTime? from = null, [FromQuery] DateTime? to = null,
+        [FromQuery] bool sortDescending = true,
         CancellationToken ct = default)
     {
-        var result = await _reservationService.GetPagedAsync(page, pageSize, userId, roomId, status, from, to, ct);
+        var result = await _reservationService.GetPagedAsync(page, pageSize, userId, roomId, status, from, to, sortDescending, ct);
         return Ok(ApiResponse<PagedResult<ReservationDto>>.Ok(result));
+    }
+
+    // Auditoría agrupada: cada entrada es una reserva individual o el resumen de una serie periódica.
+    [HttpGet("audit")]
+    [Authorize(Policy = "Reservations.View")]
+    public async Task<ActionResult<ApiResponse<PagedResult<ReservationGroupDto>>>> GetAudit(
+        [FromQuery] int page = 1, [FromQuery] int pageSize = 20,
+        [FromQuery] Guid? userId = null, [FromQuery] Guid? roomId = null,
+        [FromQuery] ReservationStatus? status = null,
+        [FromQuery] bool sortDescending = true,
+        CancellationToken ct = default)
+    {
+        var result = await _reservationService.GetAuditGroupsAsync(page, pageSize, userId, roomId, status, sortDescending, ct);
+        return Ok(ApiResponse<PagedResult<ReservationGroupDto>>.Ok(result));
+    }
+
+    [HttpGet("recurring/{groupId:guid}/occurrences")]
+    [Authorize(Policy = "Reservations.View")]
+    public async Task<ActionResult<ApiResponse<IEnumerable<ReservationDto>>>> GetGroupOccurrences(Guid groupId, CancellationToken ct)
+    {
+        var result = await _reservationService.GetGroupOccurrencesAsync(groupId, ct);
+        return Ok(ApiResponse<IEnumerable<ReservationDto>>.Ok(result));
+    }
+
+    [HttpPost("recurring/{groupId:guid}/approve")]
+    [Authorize(Policy = "Reservations.Approve")]
+    public async Task<ActionResult<ApiResponse<BulkActionResultDto>>> ApproveGroup(Guid groupId, CancellationToken ct)
+    {
+        var result = await _reservationService.ApproveGroupAsync(groupId, _currentUser.UserId!.Value, ct);
+        var message = result.Skipped > 0
+            ? $"{result.Affected} reserva(s) aprobada(s), {result.Skipped} omitida(s) por conflicto."
+            : $"{result.Affected} reserva(s) aprobada(s).";
+        return Ok(ApiResponse<BulkActionResultDto>.Ok(result, message));
+    }
+
+    [HttpPost("recurring/{groupId:guid}/reject")]
+    [Authorize(Policy = "Reservations.Reject")]
+    public async Task<ActionResult<ApiResponse<BulkActionResultDto>>> RejectGroup(Guid groupId, [FromBody] RejectReservationDto dto, CancellationToken ct)
+    {
+        var result = await _reservationService.RejectGroupAsync(groupId, dto, _currentUser.UserId!.Value, ct);
+        return Ok(ApiResponse<BulkActionResultDto>.Ok(result, $"{result.Affected} reserva(s) rechazada(s)."));
     }
 
     [HttpGet("my")]
     public async Task<ActionResult<ApiResponse<PagedResult<ReservationDto>>>> GetMy(
         [FromQuery] int page = 1, [FromQuery] int pageSize = 20,
-        [FromQuery] ReservationStatus? status = null, CancellationToken ct = default)
+        [FromQuery] ReservationStatus? status = null,
+        [FromQuery] bool sortDescending = true, CancellationToken ct = default)
     {
-        var result = await _reservationService.GetPagedAsync(page, pageSize, userId: _currentUser.UserId, status: status, cancellationToken: ct);
+        var result = await _reservationService.GetPagedAsync(page, pageSize, userId: _currentUser.UserId, status: status, sortDescending: sortDescending, cancellationToken: ct);
         return Ok(ApiResponse<PagedResult<ReservationDto>>.Ok(result));
     }
 
@@ -68,8 +111,12 @@ public class ReservationsController : ControllerBase
     public async Task<ActionResult<ApiResponse<ReservationDto>>> Create(
         [FromBody] CreateReservationDto dto, CancellationToken ct)
     {
-        var result = await _reservationService.CreateAsync(_currentUser.UserId!.Value, dto, ct);
-        return Created(string.Empty, ApiResponse<ReservationDto>.Ok(result, "Solicitud de reserva enviada. Pendiente de aprobación."));
+        var callerCanApprove = _currentUser.Permissions.Contains("Reservations.Approve");
+        var result = await _reservationService.CreateAsync(_currentUser.UserId!.Value, dto, callerCanApprove, ct);
+        var message = result.Status == ReservationStatus.Approved
+            ? "Reserva creada y aprobada."
+            : "Solicitud de reserva enviada. Pendiente de aprobación.";
+        return Created(string.Empty, ApiResponse<ReservationDto>.Ok(result, message));
     }
 
     [HttpPost("recurring")]
@@ -77,7 +124,8 @@ public class ReservationsController : ControllerBase
     public async Task<ActionResult<ApiResponse<RecurringReservationResultDto>>> CreateRecurring(
         [FromBody] CreateRecurringReservationDto dto, CancellationToken ct)
     {
-        var result = await _reservationService.CreateRecurringAsync(_currentUser.UserId!.Value, dto, ct);
+        var callerCanApprove = _currentUser.Permissions.Contains("Reservations.Approve");
+        var result = await _reservationService.CreateRecurringAsync(_currentUser.UserId!.Value, dto, callerCanApprove, ct);
         var message = result.CreatedCount > 0
             ? $"{result.CreatedCount} de {result.TotalOccurrences} reservas recurrentes enviadas. Pendientes de aprobación."
             : "No se pudo crear ninguna ocurrencia. Revise los conflictos de horario.";
@@ -116,7 +164,8 @@ public class ReservationsController : ControllerBase
     public async Task<ActionResult<ApiResponse<ReservationDto>>> Cancel(
         Guid id, [FromBody] CancelReservationDto dto, CancellationToken ct)
     {
-        var result = await _reservationService.CancelAsync(id, dto, _currentUser.UserId!.Value, ct);
+        var canManageAny = _currentUser.Permissions.Contains("Reservations.Approve");
+        var result = await _reservationService.CancelAsync(id, dto, _currentUser.UserId!.Value, canManageAny, ct);
         return Ok(ApiResponse<ReservationDto>.Ok(result, "Reserva cancelada."));
     }
 }

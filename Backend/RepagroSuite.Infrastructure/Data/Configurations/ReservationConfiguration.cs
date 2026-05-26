@@ -24,6 +24,8 @@ public class ReservationConfiguration : IEntityTypeConfiguration<Reservation>
         builder.Property(x => x.AdminComment).HasColumnName("ComentarioAdmin").HasMaxLength(1000);
         builder.Property(x => x.CancellationReason).HasColumnName("MotivoCancelacion").HasMaxLength(500);
         builder.Property(x => x.IsDirectAdminReservation).HasColumnName("EsReservaDirectaAdmin");
+        builder.Property(x => x.RecurrenceGroupId).HasColumnName("GrupoRecurrenciaId");
+        builder.HasIndex(x => x.RecurrenceGroupId);
 
         builder.Property(x => x.ApprovedByUserId).HasColumnName("AprobadoPorId");
         builder.Property(x => x.ApprovedAt).HasColumnName("AprobadoEn");

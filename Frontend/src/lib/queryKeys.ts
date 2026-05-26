@@ -18,13 +18,19 @@ export const qk = {
   },
   reservations: {
     all: ['reservations'] as const,
-    my: (page: number) => ['reservations', 'my', page] as const,
-    admin: (page: number, tab: string) => ['reservations', 'admin', page, tab] as const,
+    my: (page: number, status: string, sortDesc: boolean) => ['reservations', 'my', page, status, sortDesc] as const,
+    myCount: (status: string) => ['reservations', 'my', 'count', status] as const,
+    admin: (page: number, tab: string, userId: string, roomId: string, sortDesc: boolean) =>
+      ['reservations', 'admin', page, tab, userId, roomId, sortDesc] as const,
+    audit: (page: number, tab: string, userId: string, roomId: string, sortDesc: boolean) =>
+      ['reservations', 'audit', page, tab, userId, roomId, sortDesc] as const,
+    groupOccurrences: (groupId: string) => ['reservations', 'group', groupId] as const,
     calendar: (weekKey: string) => ['reservations', 'calendar', weekKey] as const,
     upcoming: (from: string) => ['reservations', 'upcoming', from] as const,
   },
   users: {
     all: ['users'] as const,
+    list: ['users', 'list'] as const,             // selector pageSize=100 (filtros de auditoría)
     admin: (page: number, tab: string, search: string) => ['users', 'admin', page, tab, search] as const,
   },
   dashboard: {

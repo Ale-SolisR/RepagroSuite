@@ -25,7 +25,36 @@ public class ReservationDto
     public string? CancellationReason { get; set; }
     public DateTime? CancelledAt { get; set; }
     public bool IsDirectAdminReservation { get; set; }
+    public Guid? RecurrenceGroupId { get; set; }
     public DateTime CreatedAt { get; set; }
+}
+
+// Entrada de auditoría: una reserva individual O el resumen de una serie periódica completa.
+public class ReservationGroupDto
+{
+    public string GroupKey { get; set; } = string.Empty;   // RecurrenceGroupId o el Id de la reserva individual
+    public bool IsRecurring { get; set; }
+    public Guid? RecurrenceGroupId { get; set; }
+    public Guid RoomId { get; set; }
+    public string RoomName { get; set; } = string.Empty;
+    public Guid UserId { get; set; }
+    public string UserFullName { get; set; } = string.Empty;
+    public string Purpose { get; set; } = string.Empty;
+    public DateTime FirstStart { get; set; }
+    public DateTime LastStart { get; set; }
+    public int OccurrenceCount { get; set; }
+    public int PendingCount { get; set; }
+    public int ApprovedCount { get; set; }
+    public int RejectedCount { get; set; }
+    public int CancelledCount { get; set; }
+    // Solo para entradas individuales (no recurrentes): la reserva completa, para acciones en línea.
+    public ReservationDto? Single { get; set; }
+}
+
+public class BulkActionResultDto
+{
+    public int Affected { get; set; }
+    public int Skipped { get; set; }
 }
 
 public class CreateReservationDto

@@ -15,12 +15,7 @@ import Input from '@/components/ui/Input'
 import Textarea from '@/components/ui/Textarea'
 import Button from '@/components/ui/Button'
 import toast from 'react-hot-toast'
-import type { RoomSlotDto, RoomStatus, RoomScheduleDto } from '@/types'
-
-const DURATIONS = [
-  { value: 30, label: 'Media hora', sub: '30 min' },
-  { value: 60, label: 'Una hora', sub: '60 min' },
-] as const
+import type { RoomSlotDto, RoomStatus, RoomScheduleDto, RoomAvailabilityDto } from '@/types'
 
 const ROOM_STATUS_META: Record<RoomStatus, { label: string; badge: string; icon: typeof DoorOpen }> = {
   Available:   { label: 'Disponible',    badge: 'bg-emerald-50 text-emerald-700 ring-emerald-200', icon: DoorOpen },
@@ -54,6 +49,35 @@ function addMinutesToTime(time: string, minutes: number): string {
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`
 }
 
+function timeToMin(t: string): number {
+  const [h, m] = t.split(':').map(Number)
+  return h * 60 + m
+}
+
+// Etiqueta legible de duración: "30 min", "1 h", "1 h 30 min".
+function durationLabel(min: number): string {
+  const h = Math.floor(min / 60), m = min % 60
+  if (h === 0) return `${m} min`
+  if (m === 0) return `${h} h`
+  return `${h} h ${m} min`
+}
+
+// Minutos contiguos disponibles desde una hora de inicio (une slots libres adyacentes).
+// Determina hasta dónde puede extenderse una reserva sin chocar con otra ni cerrar la sala.
+function maxContiguousMinutes(slots: RoomSlotDto[], startHHmm: string): number {
+  const avail = slots.filter(s => s.isAvailable && s.start).slice().sort((a, b) => a.start.localeCompare(b.start))
+  const idx = avail.findIndex(s => s.start.substring(11, 16) === startHHmm)
+  if (idx === -1) return 0
+  const startMs = new Date(avail[idx].start).getTime()
+  let coveredEnd = new Date(avail[idx].end).getTime()
+  for (let i = idx + 1; i < avail.length; i++) {
+    const sMs = new Date(avail[i].start).getTime()
+    if (sMs <= coveredEnd) coveredEnd = Math.max(coveredEnd, new Date(avail[i].end).getTime())
+    else break
+  }
+  return Math.round((coveredEnd - startMs) / 60000)
+}
+
 function parseLocalDate(s: string): Date {
   const [y, m, d] = s.split('-').map(Number)
   return new Date(y, m - 1, d)
@@ -63,10 +87,18 @@ interface Props {
   onClose: () => void
   initialDate?: string       // yyyy-MM-dd
   initialStartTime?: string  // HH:mm
+  initialEndTime?: string    // HH:mm (rango seleccionado por arrastre en el calendario)
 }
 
-export default function CreateReservationForm({ onClose, initialDate, initialStartTime }: Props) {
+export default function CreateReservationForm({ onClose, initialDate, initialStartTime, initialEndTime }: Props) {
   const qc = useQueryClient()
+
+  // Duración pre-seleccionada cuando se llega desde un arrastre en el calendario.
+  const desiredDuration = useMemo(() => {
+    if (!initialStartTime || !initialEndTime) return undefined
+    const d = timeToMin(initialEndTime) - timeToMin(initialStartTime)
+    return d > 0 ? d : undefined
+  }, [initialStartTime, initialEndTime])
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormInput, unknown, FormData>({
     resolver: zodResolver(schema),
@@ -74,7 +106,7 @@ export default function CreateReservationForm({ onClose, initialDate, initialSta
       roomId: '',
       date: initialDate ?? format(new Date(), 'yyyy-MM-dd'),
       startTime: initialStartTime ?? '',
-      duration: 60,
+      duration: desiredDuration ?? 60,
       peopleCount: 1,
       purpose: '',
       notes: '',
@@ -109,6 +141,14 @@ export default function CreateReservationForm({ onClose, initialDate, initialSta
     staleTime: staleTimes.slots,
   })
 
+  // Config de disponibilidad de la sala: nos da el intervalo (granularidad), y la duración mín/máx.
+  const { data: availability = [] } = useQuery({
+    queryKey: qk.rooms.availability(roomId),
+    queryFn: () => roomsApi.getAvailability(roomId).then(r => r.data.data ?? []),
+    enabled: !!roomId,
+    staleTime: staleTimes.availability,
+  })
+
   // Salas que tienen horario configurado para el día de la semana de la fecha elegida.
   const dow = date ? parseLocalDate(date).getDay() : -1
   const availableRoomIds = useMemo(() => {
@@ -118,6 +158,12 @@ export default function CreateReservationForm({ onClose, initialDate, initialSta
     }
     return set
   }, [schedules, dow])
+
+  // Config del día elegido para la sala seleccionada (intervalo / duración mínima y máxima).
+  const dayConfig = useMemo(
+    () => (availability as RoomAvailabilityDto[]).find(a => a.dayOfWeek === dow),
+    [availability, dow],
+  )
 
   // Si cambia la fecha y la sala seleccionada ya no está disponible ese día, la deseleccionamos.
   useEffect(() => {
@@ -138,11 +184,41 @@ export default function CreateReservationForm({ onClose, initialDate, initialSta
   const selectedRoom = rooms.find(r => r.id === roomId)
   const weekdayLabel = date ? DAYS_ES[parseLocalDate(date).getDay()] : ''
 
+  // Si la hora de inicio pre-rellenada (p. ej. desde el calendario) no aplica a esta sala, la limpiamos.
+  useEffect(() => {
+    if (loadingSlots || !roomId || !startTime) return
+    if (!startTimeOptions.includes(startTime)) setValue('startTime', '', { shouldValidate: false })
+  }, [loadingSlots, roomId, startTime, startTimeOptions, setValue])
+
+  // Duraciones válidas en pasos de 30 min (o el intervalo de la sala): desde la duración mínima
+  // hasta donde alcance el tiempo libre contiguo, sin pasar de la duración máxima de la sala.
+  const durationOptions = useMemo(() => {
+    if (!startTime) return [] as number[]
+    const step = dayConfig?.slotIntervalMinutes && dayConfig.slotIntervalMinutes > 0 ? dayConfig.slotIntervalMinutes : 30
+    const minDur = dayConfig?.minReservationMinutes && dayConfig.minReservationMinutes > 0 ? dayConfig.minReservationMinutes : 30
+    const hardMax = dayConfig?.maxReservationMinutes && dayConfig.maxReservationMinutes > 0 ? dayConfig.maxReservationMinutes : 480
+    const max = Math.min(hardMax, maxContiguousMinutes(slots as RoomSlotDto[], startTime))
+    const out: number[] = []
+    for (let d = minDur; d <= max; d += step) out.push(d)
+    return out
+  }, [startTime, slots, dayConfig])
+
+  // Mantener la duración elegida dentro de las opciones válidas (preferir la del arrastre, luego 1 h).
+  useEffect(() => {
+    if (durationOptions.length === 0) return
+    if (!durationOptions.includes(duration)) {
+      const pick = desiredDuration && durationOptions.includes(desiredDuration) ? desiredDuration
+        : durationOptions.includes(60) ? 60
+        : durationOptions[0]
+      setValue('duration', pick)
+    }
+  }, [durationOptions, duration, desiredDuration, setValue])
+
   const mutation = useMutation({
-    mutationFn: (data: FormData) => {
+    mutationFn: async (data: FormData) => {
       const endTime = addMinutesToTime(data.startTime, data.duration)
       if (data.isRecurring) {
-        return reservationsApi.createRecurring({
+        const r = await reservationsApi.createRecurring({
           roomId: data.roomId,
           startDate: data.date,
           endDate: data.repeatUntil!,
@@ -151,30 +227,34 @@ export default function CreateReservationForm({ onClose, initialDate, initialSta
           peopleCount: data.peopleCount,
           purpose: data.purpose,
           notes: data.notes,
-        }).then(r => ({ recurring: true as const, result: r.data.data! }))
+        })
+        return { recurring: true as const, result: r.data.data! }
       }
-      return reservationsApi.create({
+      const r = await reservationsApi.create({
         roomId: data.roomId,
         startDateTime: `${data.date}T${data.startTime}:00`,
         endDateTime: `${data.date}T${endTime}:00`,
         peopleCount: data.peopleCount,
         purpose: data.purpose,
         notes: data.notes,
-      }).then(() => ({ recurring: false as const }))
+      })
+      return { recurring: false as const, status: r.data.data?.status }
     },
     onSuccess: (res) => {
       invalidate.reservations(qc)
       if (res.recurring) {
         const { createdCount, totalOccurrences, skipped } = res.result
         if (createdCount > 0) {
-          toast.success(`${createdCount} de ${totalOccurrences} reservas enviadas — pendientes de aprobación`)
+          toast.success(`${createdCount} de ${totalOccurrences} reservas creadas`)
           if (skipped.length > 0) toast(`${skipped.length} fecha(s) omitidas por conflicto u horario`, { icon: '⚠️' })
           onClose()
         } else {
           toast.error('No se pudo crear ninguna ocurrencia. Revise conflictos de horario.')
         }
       } else {
-        toast.success('Reserva enviada — pendiente de aprobación')
+        toast.success(res.status === 'Approved'
+          ? 'Reserva creada y aprobada'
+          : 'Reserva enviada — pendiente de aprobación')
         onClose()
       }
     },
@@ -295,28 +375,38 @@ export default function CreateReservationForm({ onClose, initialDate, initialSta
       {/* ─── Duración ─── */}
       <div>
         <label className="text-[13px] font-medium text-gray-700 mb-2 block">Duración</label>
-        <div className="grid grid-cols-2 gap-2">
-          {DURATIONS.map(d => {
-            const active = duration === d.value
-            const endPreview = startTime ? addMinutesToTime(startTime, d.value) : null
-            return (
-              <button
-                key={d.value}
-                type="button"
-                onClick={() => setValue('duration', d.value)}
-                className={classNames(
-                  'rounded-xl border p-3 text-left transition-all',
-                  active ? 'border-green-500 ring-2 ring-green-500/20 bg-green-50/40' : 'border-gray-200 hover:border-green-300',
-                )}
-              >
-                <p className="text-sm font-semibold text-gray-900">{d.label}</p>
-                <p className="text-[12px] text-gray-500">
-                  {d.sub}{startTime && endPreview ? ` · ${startTime}–${endPreview}` : ''}
-                </p>
-              </button>
-            )
-          })}
-        </div>
+        {!startTime ? (
+          <p className="text-[13px] text-gray-400">Seleccione la hora de inicio para elegir la duración.</p>
+        ) : durationOptions.length === 0 ? (
+          <p className="text-[13px] text-amber-600">No hay tiempo disponible suficiente desde esa hora.</p>
+        ) : (
+          <>
+            <div className="flex flex-wrap gap-1.5">
+              {durationOptions.map(d => {
+                const active = duration === d
+                return (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => setValue('duration', d)}
+                    className={classNames(
+                      'rounded-lg px-3 py-1.5 text-[13px] font-medium tabular-nums transition-colors border',
+                      active
+                        ? 'bg-green-600 text-white border-green-600'
+                        : 'bg-white text-gray-700 border-gray-200 hover:border-green-300',
+                    )}
+                  >
+                    {durationLabel(d)}
+                  </button>
+                )
+              })}
+            </div>
+            <p className="mt-2 text-[12px] text-gray-500">
+              {weekdayLabel ? `${weekdayLabel}, ` : ''}{startTime}–{addMinutesToTime(startTime, duration)}
+              <span className="text-gray-400"> · {durationLabel(duration)}</span>
+            </p>
+          </>
+        )}
       </div>
 
       {/* ─── Reserva periódica ─── */}

@@ -45,7 +45,7 @@ public class GenericRepository<T> : IGenericRepository<T> where T : BaseEntity
 
     public void Update(T entity)
     {
-        entity.UpdatedAt = DateTime.UtcNow;
+        entity.UpdatedAt = BusinessClock.Now;
         _dbSet.Update(entity);
     }
 
@@ -54,7 +54,7 @@ public class GenericRepository<T> : IGenericRepository<T> where T : BaseEntity
     public void SoftDelete(T entity, Guid? deletedBy = null)
     {
         entity.IsDeleted = true;
-        entity.DeletedAt = DateTime.UtcNow;
+        entity.DeletedAt = BusinessClock.Now;
         entity.DeletedBy = deletedBy;
         _dbSet.Update(entity);
     }

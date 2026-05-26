@@ -238,7 +238,33 @@ export interface ReservationDto {
   rejectedAt?: string
   cancelledByName?: string
   cancelledAt?: string
+  recurrenceGroupId?: string | null
   createdAt: string
+}
+
+// Entrada de auditoría: reserva individual o resumen de una serie periódica.
+export interface ReservationGroupDto {
+  groupKey: string
+  isRecurring: boolean
+  recurrenceGroupId?: string | null
+  roomId: string
+  roomName: string
+  userId: string
+  userFullName: string
+  purpose: string
+  firstStart: string
+  lastStart: string
+  occurrenceCount: number
+  pendingCount: number
+  approvedCount: number
+  rejectedCount: number
+  cancelledCount: number
+  single?: ReservationDto | null
+}
+
+export interface BulkActionResult {
+  affected: number
+  skipped: number
 }
 
 export interface CalendarEventDto {
@@ -248,6 +274,8 @@ export interface CalendarEventDto {
   end: string
   roomId: string
   roomName: string
+  userId: string
+  userName: string
   status: ReservationStatus
   color: string
 }

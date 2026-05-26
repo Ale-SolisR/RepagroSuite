@@ -1,6 +1,7 @@
 using RepagroSuite.Application.Common.Interfaces;
 using RepagroSuite.Application.Common.Models;
 using RepagroSuite.Application.Features.Users.DTOs;
+using RepagroSuite.Domain.Common;
 using RepagroSuite.Domain.Entities;
 using RepagroSuite.Domain.Enums;
 using RepagroSuite.Domain.Interfaces;
@@ -59,7 +60,7 @@ public class UserService : IUserService
             LastName2 = idData.LastName2,
             LegalName = idData.LegalName,
             IdentificationValidated = true,
-            IdentificationValidatedAt = DateTime.UtcNow,
+            IdentificationValidatedAt = BusinessClock.Now,
             IdentificationValidationSource = idData.Source,
             Email = dto.Email.Trim(),
             NormalizedEmail = normalizedEmail,
@@ -108,14 +109,14 @@ public class UserService : IUserService
         user.PasswordHash = _passwordService.HashPassword(tempPassword);
         user.Status = UserStatus.Active;
         user.MustChangePassword = true;
-        user.TemporaryPasswordExpiresAt = DateTime.UtcNow.AddHours(72);
+        user.TemporaryPasswordExpiresAt = BusinessClock.Now.AddHours(72);
         user.ApprovedByUserId = approvedBy;
-        user.ApprovedAt = DateTime.UtcNow;
+        user.ApprovedAt = BusinessClock.Now;
 
         // Aprobar siempre asigna el rol User. La promoción a Administrator es exclusiva del
         // master vía PromoteToAdminAsync, por eso aquí no se aceptan roles arbitrarios.
         if (!user.UserRoles.Any(ur => ur.RoleId == UserRoleId))
-            user.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = UserRoleId, AssignedAt = DateTime.UtcNow, AssignedBy = approvedBy });
+            user.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = UserRoleId, AssignedAt = BusinessClock.Now, AssignedBy = approvedBy });
 
         _uow.Users.Update(user);
         await _uow.SaveChangesAsync(cancellationToken);
@@ -148,7 +149,7 @@ public class UserService : IUserService
         user.Status = UserStatus.Rejected;
         user.RejectionReason = dto.Reason.Trim();
         user.RejectedByUserId = rejectedBy;
-        user.RejectedAt = DateTime.UtcNow;
+        user.RejectedAt = BusinessClock.Now;
         _uow.Users.Update(user);
         await _uow.SaveChangesAsync(cancellationToken);
 
@@ -220,7 +221,7 @@ public class UserService : IUserService
         var tempPassword = _passwordService.GenerateTemporaryPassword();
         user.PasswordHash = _passwordService.HashPassword(tempPassword);
         user.MustChangePassword = true;
-        user.TemporaryPasswordExpiresAt = DateTime.UtcNow.AddHours(72);
+        user.TemporaryPasswordExpiresAt = BusinessClock.Now.AddHours(72);
         _uow.Users.Update(user);
         await _uow.SaveChangesAsync(cancellationToken);
 
@@ -290,7 +291,7 @@ public class UserService : IUserService
         if (user.UserRoles.Any(ur => ur.RoleId == adminRoleId))
             throw new InvalidOperationException("El usuario ya tiene el rol de Administrador.");
 
-        user.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = adminRoleId, AssignedAt = DateTime.UtcNow, AssignedBy = promotedBy });
+        user.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = adminRoleId, AssignedAt = BusinessClock.Now, AssignedBy = promotedBy });
         await _uow.SaveChangesAsync(cancellationToken);
         await _auditService.LogAsync(promotedBy, "USER_PROMOTED_ADMIN", entityName: "User", entityId: userId.ToString(), module: "Users");
         return MapToDto(user);
@@ -335,8 +336,8 @@ public class UserService : IUserService
 
         user.PasswordHash = _passwordService.HashPassword(dto.NewPassword);
         user.MustChangePassword = true;
-        user.TemporaryPasswordExpiresAt = DateTime.UtcNow.AddHours(72);
-        user.LastPasswordChangedAt = DateTime.UtcNow;
+        user.TemporaryPasswordExpiresAt = BusinessClock.Now.AddHours(72);
+        user.LastPasswordChangedAt = BusinessClock.Now;
         _uow.Users.Update(user);
         await _uow.SaveChangesAsync(cancellationToken);
 

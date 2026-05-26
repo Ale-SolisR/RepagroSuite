@@ -147,6 +147,7 @@ internal static class EmailTemplates
         "password_changed" => "Su contraseña fue actualizada - RepagroSuite",
         "reservation_approved" => "Reserva aprobada - RepagroSuite",
         "reservation_rejected" => "Reserva rechazada - RepagroSuite",
+        "reservation_cancelled" => "Reserva cancelada - RepagroSuite",
         _ => "Notificación de RepagroSuite"
     };
 
@@ -196,6 +197,16 @@ internal static class EmailTemplates
                 <h2>Reserva rechazada</h2>
                 <p>Su solicitud de reserva para <strong>{Get("roomName")}</strong> no pudo ser aprobada.</p>
                 <p><strong>Motivo:</strong> {Get("adminComment")}</p>",
+
+            "reservation_cancelled" => $@"
+                <h2>Reserva cancelada</h2>
+                <p>Estimado/a {Get("fullName")},</p>
+                <p>Su reserva para <strong>{Get("roomName")}</strong> fue cancelada.</p>
+                <ul>
+                    <li><strong>Fecha:</strong> {Get("date")}</li>
+                    <li><strong>Hora:</strong> {Get("startTime")} - {Get("endTime")}</li>
+                </ul>
+                <p><strong>Motivo de la cancelación:</strong> {Get("reason")}</p>",
 
             _ => "<p>Notificación del sistema RepagroSuite.</p>"
         };

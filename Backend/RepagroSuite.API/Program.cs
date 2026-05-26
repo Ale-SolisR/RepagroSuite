@@ -258,6 +258,9 @@ builder.Services.AddScoped<RepagroSuite.Application.Common.Interfaces.IRealtimeN
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
+// Auto-aprobación de reservas pendientes dentro de la ventana de 30 min (proceso en segundo plano).
+builder.Services.AddHostedService<RepagroSuite.API.BackgroundServices.ReservationAutoApprovalService>();
+
 // FluentValidation
 builder.Services.AddValidatorsFromAssembly(typeof(RepagroSuite.Application.Extensions.ApplicationExtensions).Assembly);
 
