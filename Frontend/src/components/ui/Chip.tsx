@@ -15,7 +15,7 @@ const config: Record<ChipVariant, {
   ok:     { bg: '#ECFDF5', text: '#065F46', border: '#A7F3D0', icon: CheckCircle2, defaultLabel: 'OK' },
   warn:   { bg: '#FFFBEB', text: '#92400E', border: '#FDE68A', icon: Clock,        defaultLabel: 'Pendiente' },
   danger: { bg: '#FEF2F2', text: '#991B1B', border: '#FECACA', icon: XCircle,      defaultLabel: 'Cancelado' },
-  brand:  { bg: '#E6F3EF', text: '#005947', border: '#9FCABB', icon: Circle,       defaultLabel: 'Activo' },
+  brand:  { bg: '#DCEEE5', text: '#0A5037', border: '#8AC3A9', icon: Circle,       defaultLabel: 'Activo' },
   gray:   { bg: '#F9FAFB', text: '#4B5563', border: '#E5E7EB', icon: Circle,       defaultLabel: 'Inactivo' },
 }
 

@@ -72,9 +72,9 @@ export default function RoomForm({ room, onClose }: { room?: RoomDto; onClose: (
   const isEdit = !!room
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [imageLoading, setImageLoading] = useState(false)
-  // Estado local del status para reflejar cambios al instante (optimistic).
-  // No depende del prop `room` que queda congelado mientras el modal está abierto.
-  const [currentStatus, setCurrentStatus] = useState<string>(room?.status ?? 'Available')
+  // Estado del status seleccionado en el modal. NO se persiste hasta dar "Guardar cambios"
+  // (junto con el resto del form, en un único submit).
+  const [pendingStatus, setPendingStatus] = useState<string>(room?.status ?? 'Available')
   // Modo URL: si la sala ya tiene una URL pública (no base64), arrancamos en modo URL
   const [urlMode, setUrlMode] = useState(() => {
     const u = room?.imageUrl ?? ''
@@ -119,11 +119,19 @@ export default function RoomForm({ room, onClose }: { room?: RoomDto; onClose: (
   }, [nameValue, isEdit, setValue])
 
   const mutation = useMutation({
-    mutationFn: (data: FormData) =>
-      // Al editar adjuntamos rowVersion para optimistic locking: si otro admin modificó
-      // la sala entre nuestro GET y este PUT, el backend devuelve 409 y el extractApiError
-      // mostrará "Otro usuario modificó este registro mientras lo editabas".
-      isEdit ? roomsApi.update(room.id, { ...data, rowVersion: room.rowVersion }) : roomsApi.create(data),
+    // Submit unificado: si el status cambió, primero lo persistimos (devuelve nueva rowVersion)
+    // y luego hacemos el PUT con esa versión fresca para no chocar con el optimistic locking.
+    // Si no cambió el status, solo el PUT.
+    mutationFn: async (data: FormData) => {
+      if (!isEdit || !room) return roomsApi.create(data)
+
+      let rowVersion = room.rowVersion
+      if (pendingStatus !== room.status) {
+        const res = await roomsApi.changeStatus(room.id, pendingStatus)
+        rowVersion = res.data.data?.rowVersion ?? rowVersion
+      }
+      return roomsApi.update(room.id, { ...data, rowVersion })
+    },
     onSuccess: () => {
       invalidate.rooms(qc)
       toast.success(isEdit ? 'Sala actualizada correctamente' : 'Sala creada correctamente')
@@ -132,28 +140,8 @@ export default function RoomForm({ room, onClose }: { room?: RoomDto; onClose: (
     onError: (err) => toast.error(extractApiError(err)),
   })
 
-  const statusMutation = useMutation({
-    mutationFn: (status: string) => roomsApi.changeStatus(room!.id, status),
-    // Optimistic update: el usuario ve el cambio al instante, se revierte si falla.
-    onMutate: (newStatus) => {
-      const prev = currentStatus
-      setCurrentStatus(newStatus)
-      return { prev }
-    },
-    onSuccess: (res, newStatus) => {
-      invalidate.rooms(qc)
-      const confirmedStatus = res.data.data?.status ?? newStatus
-      setCurrentStatus(confirmedStatus)
-      const label = STATUS_OPTIONS.find(o => o.value === confirmedStatus)?.label ?? confirmedStatus
-      toast.success(`Estado actualizado a "${label}"`)
-    },
-    onError: (err, _vars, context) => {
-      if (context?.prev) setCurrentStatus(context.prev)
-      toast.error(extractApiError(err))
-    },
-  })
-
   function onSubmit(data: FormData) { mutation.mutate(data) }
+  const statusDirty = isEdit && !!room && pendingStatus !== room.status
 
   function handleFile(file: File) {
     if (!file.type.startsWith('image/')) {
@@ -365,28 +353,27 @@ export default function RoomForm({ room, onClose }: { room?: RoomDto; onClose: (
               <Activity className="h-3.5 w-3.5 text-gray-400" strokeWidth={1.75} />
               <p className="text-[12px] font-medium text-gray-700">Estado operativo</p>
             </div>
-            {statusMutation.isPending && (
-              <span className="inline-flex items-center gap-1 text-[11px] text-gray-500">
-                <Loader2 className="h-3 w-3 animate-spin" /> Guardando...
+            {statusDirty && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10.5px] font-medium text-amber-700 ring-1 ring-amber-200">
+                Sin guardar
               </span>
             )}
           </div>
           <div className="grid grid-cols-3 gap-2">
             {STATUS_OPTIONS.map(opt => {
               const Icon = opt.icon
-              const active = currentStatus === opt.value
+              const active = pendingStatus === opt.value
               return (
                 <button
                   key={opt.value}
                   type="button"
-                  disabled={statusMutation.isPending || active}
-                  onClick={() => statusMutation.mutate(opt.value)}
+                  disabled={active || mutation.isPending}
+                  onClick={() => setPendingStatus(opt.value)}
                   className={classNames(
                     'flex flex-col items-start gap-1 rounded-lg border px-2.5 py-2 text-left transition-all ring-1 ring-inset',
                     active
                       ? `${opt.activeCls} border-transparent cursor-default`
                       : 'bg-white text-gray-700 border-gray-200 ring-transparent hover:bg-gray-50 hover:border-gray-300',
-                    statusMutation.isPending && !active && 'opacity-50 cursor-wait',
                   )}
                 >
                   <div className="flex items-center gap-1.5 w-full">
@@ -506,7 +493,7 @@ export default function RoomForm({ room, onClose }: { room?: RoomDto; onClose: (
       {/* ─── Footer ─── */}
       <div className="flex justify-end gap-2 pt-3 border-t border-gray-100 -mx-6 px-6 -mb-6 pb-4">
         <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
-        <Button type="submit" loading={isSubmitting}>
+        <Button type="submit" loading={isSubmitting || mutation.isPending}>
           {isEdit ? 'Guardar cambios' : 'Crear sala'}
         </Button>
       </div>

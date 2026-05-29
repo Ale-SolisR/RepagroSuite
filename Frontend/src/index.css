@@ -8,29 +8,32 @@
 @import "@fontsource/jetbrains-mono/600.css";
 
 @theme {
-  /* Brand palette */
-  --color-brand-50:  #F0F7F4;
-  --color-brand-100: #E6F3EF;
-  --color-brand-200: #CCE3DB;
-  --color-brand-300: #9FCABB;
-  --color-brand-400: #4D9D85;
-  --color-brand-500: #006F55;
-  --color-brand-600: #006F55;
-  --color-brand-700: #005947;
-  --color-brand-800: #003E2D;
-  --color-brand-900: #002A1F;
+  /* Brand palette — paleta oficial Repagro
+     Verde Repagro:  #0E6B4B   Verde profundo: #073D31
+     Dorado:         #C9B26B   Fondo claro:    #F6F7F4
+     Texto oscuro:   #13211C   Blanco:         #FFFFFF                            */
+  --color-brand-50:  #F0F7F3;
+  --color-brand-100: #DCEEE5;
+  --color-brand-200: #B7DCC8;
+  --color-brand-300: #8AC3A9;
+  --color-brand-400: #4D9D80;
+  --color-brand-500: #0E6B4B;
+  --color-brand-600: #0E6B4B;
+  --color-brand-700: #0A5037;
+  --color-brand-800: #073D31;
+  --color-brand-900: #052B22;
 
   /* Gold accent */
-  --color-gold:      #F5C518;
-  --color-gold-light: #FFD84D;
-  --color-gold-pale: #FFEFA8;
-  --color-gold-deep: #D9A800;
+  --color-gold:       #C9B26B;
+  --color-gold-light: #D9C58A;
+  --color-gold-pale:  #EFE5C2;
+  --color-gold-deep:  #A89248;
 
   /* Neutral tones */
-  --color-ink:  #1F2933;
-  --color-ink2: #5F6B7A;
+  --color-ink:  #13211C;
+  --color-ink2: #4A5750;
   --color-line: #D9DEE5;
-  --color-bg:   #F5F7FA;
+  --color-bg:   #F6F7F4;
   --color-paper: #FFFFFF;
 
   /* Status */
@@ -57,8 +60,8 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #F5F7FA;
-  color: #1F2933;
+  background-color: #F6F7F4;
+  color: #13211C;
 }
 
 #root {
@@ -66,14 +69,14 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid #006F55;
+  outline: 2px solid #0E6B4B;
   outline-offset: 2px;
 }
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #D9DEE5; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #9FCABB; }
+::-webkit-scrollbar-thumb:hover { background: #8AC3A9; }
 
 /* Login form field — use aria-invalid for error state */
 .form-input {
@@ -83,15 +86,15 @@ body {
   border-radius: 6px;
   padding: 0 14px;
   font-size: 14px;
-  color: #1F2933;
+  color: #13211C;
   background: #fff;
   transition: border-color 150ms, box-shadow 150ms;
   outline: none;
 }
-.form-input::placeholder { color: rgba(95, 107, 122, .45); }
+.form-input::placeholder { color: rgba(74, 87, 80, .45); }
 .form-input:focus {
-  border-color: #006F55;
-  box-shadow: 0 0 0 3px rgba(0, 111, 85, .18);
+  border-color: #0E6B4B;
+  box-shadow: 0 0 0 3px rgba(14, 107, 75, .18);
 }
 .form-input[aria-invalid="true"] { border-color: #B42318; }
 .form-input[aria-invalid="true"]:focus { border-color: #B42318; box-shadow: none; }

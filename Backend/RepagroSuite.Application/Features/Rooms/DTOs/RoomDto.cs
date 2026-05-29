@@ -83,7 +83,10 @@ public class UpdateRoomDto
     public string? ImageUrl { get; set; }
     public string? Color { get; set; }
     public List<Guid> FeatureIds { get; set; } = [];
-    public List<UpsertRoomAvailabilityDto> Availabilities { get; set; } = [];
+    // Nullable: si llega null, las disponibilidades existentes NO se tocan (el form de edición
+    // no las maneja; se editan en un panel aparte vía UpsertAvailability). Si llega una lista
+    // (incluso vacía), reemplaza todo el set actual.
+    public List<UpsertRoomAvailabilityDto>? Availabilities { get; set; }
     // Si llega null, no se valida concurrencia (compatible con clientes que no lo envían aún).
     // Si llega valor, EF Core compara contra la versión en BD y lanza DbUpdateConcurrencyException si difiere.
     public string? RowVersion { get; set; }

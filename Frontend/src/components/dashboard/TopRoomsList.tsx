@@ -44,7 +44,7 @@ export default function TopRoomsList({ items, isLoading }: TopRoomsListProps) {
               </div>
               <div
                 className="h-1.5 w-full overflow-hidden rounded-full"
-                style={{ background: '#F0F7F4' }}
+                style={{ background: '#F0F7F3' }}
                 role="meter"
                 aria-valuenow={percentage}
                 aria-valuemin={0}
@@ -53,7 +53,7 @@ export default function TopRoomsList({ items, isLoading }: TopRoomsListProps) {
               >
                 <div
                   className="h-full rounded-full transition-all duration-500"
-                  style={{ width: `${percentage}%`, background: '#006F55' }}
+                  style={{ width: `${percentage}%`, background: '#0E6B4B' }}
                 />
               </div>
             </li>

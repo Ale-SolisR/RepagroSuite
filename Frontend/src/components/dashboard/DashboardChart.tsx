@@ -38,7 +38,7 @@ function buildChartData(raw: TrendPoint[], mode: ViewMode) {
   }))
 }
 
-const BRAND = '#006F55'
+const BRAND = '#0E6B4B'
 
 function CustomTooltip({ active, payload, label }: {
   active?: boolean; payload?: { value: number }[]; label?: string
@@ -69,7 +69,7 @@ export default function DashboardChart({ data, isLoading }: DashboardChartProps)
         </h2>
         <div
           className="flex items-center rounded-full p-0.5 shrink-0"
-          style={{ background: '#F5F7FA', border: '1px solid #D9DEE5' }}
+          style={{ background: '#F6F7F4', border: '1px solid #D9DEE5' }}
           role="group"
           aria-label="Vista del gráfico"
         >
@@ -80,8 +80,8 @@ export default function DashboardChart({ data, isLoading }: DashboardChartProps)
               className="rounded-full px-3 py-1 text-[11px] font-medium transition-colors"
               style={
                 mode === v
-                  ? { background: '#fff', color: '#1F2933', boxShadow: '0 1px 2px rgba(15,23,42,.08)' }
-                  : { color: '#5F6B7A' }
+                  ? { background: '#fff', color: '#13211C', boxShadow: '0 1px 2px rgba(15,23,42,.08)' }
+                  : { color: '#4A5750' }
               }
               aria-pressed={mode === v}
             >

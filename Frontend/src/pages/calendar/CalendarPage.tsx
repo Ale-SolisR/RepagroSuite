@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo, type PointerEvent as ReactPointerEvent } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   startOfWeek, endOfWeek, addWeeks, subWeeks, addDays,
   format, isToday, parseISO, getHours, getMinutes,
@@ -10,17 +10,26 @@ import { es } from 'date-fns/locale'
 import {
   ChevronLeft, ChevronRight, Plus, Clock,
   CalendarDays, CalendarRange, Filter, CheckCircle2, AlertCircle,
-  Sparkles, Users, DoorOpen, User,
+  Sparkles, Users, DoorOpen, User, Check, X,
 } from 'lucide-react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import toast from 'react-hot-toast'
 import { reservationsApi } from '@/api/reservations'
 import { roomsApi } from '@/api/rooms'
-import { classNames } from '@/utils'
+import { classNames, extractApiError } from '@/utils'
 import { useRealtime } from '@/hooks/useRealtime'
+import { useAuthStore } from '@/store/authStore'
 import { qk, staleTimes, invalidate } from '@/lib/queryKeys'
 import Modal from '@/components/ui/Modal'
 import Button from '@/components/ui/Button'
+import Textarea from '@/components/ui/Textarea'
 import CreateReservationForm from '@/pages/reservations/CreateReservationForm'
 import type { CalendarEventDto, RoomDto, RoomScheduleDto } from '@/types'
+
+const approveSchema = z.object({ comment: z.string().optional() })
+const rejectSchema = z.object({ reason: z.string().min(5, 'Motivo requerido (mín. 5 caracteres)') })
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const DAY_START = 7   // 07:00
@@ -380,8 +389,37 @@ export default function CalendarPage() {
   const [view, setView] = useState<ViewMode>('week')
   const [selectedRooms, setSelectedRooms] = useState<string[]>([])
   const [detailEvent, setDetailEvent] = useState<CalendarEventDto | null>(null)
+  const [approveTarget, setApproveTarget] = useState<CalendarEventDto | null>(null)
+  const [rejectTarget, setRejectTarget] = useState<CalendarEventDto | null>(null)
   const [newRes, setNewRes] = useState<{ date: string; startTime: string; endTime?: string } | null>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const { hasPermission } = useAuthStore()
+  const canApprove = hasPermission('Reservations.Approve')
+  const canReject = hasPermission('Reservations.Reject')
+
+  const approveMutation = useMutation({
+    mutationFn: ({ id, comment }: { id: string; comment?: string }) =>
+      reservationsApi.approve(id, { comment }),
+    onSuccess: () => {
+      invalidate.reservations(qc)
+      toast.success('Reserva aprobada')
+      setApproveTarget(null)
+      setDetailEvent(null)
+    },
+    onError: (err) => toast.error(extractApiError(err)),
+  })
+
+  const rejectMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      reservationsApi.reject(id, { reason }),
+    onSuccess: () => {
+      invalidate.reservations(qc)
+      toast.success('Reserva rechazada')
+      setRejectTarget(null)
+      setDetailEvent(null)
+    },
+    onError: (err) => toast.error(extractApiError(err)),
+  })
 
   // Selección por arrastre: dragRef guarda el gesto en curso; dragSel/hover son para pintar.
   const dragRef = useRef<DragRef | null>(null)
@@ -1032,7 +1070,26 @@ export default function CalendarPage() {
                 </div>
               </div>
 
-              <div className="flex justify-end">
+              <div className="flex flex-wrap justify-end gap-2">
+                {detailEvent.status === 'Pending' && canReject && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setRejectTarget(detailEvent)}
+                    className="cursor-pointer text-danger border-danger/30 hover:bg-danger/5"
+                  >
+                    <X className="h-3.5 w-3.5 mr-1" /> Rechazar
+                  </Button>
+                )}
+                {detailEvent.status === 'Pending' && canApprove && (
+                  <Button
+                    size="sm"
+                    onClick={() => setApproveTarget(detailEvent)}
+                    className="cursor-pointer"
+                  >
+                    <Check className="h-3.5 w-3.5 mr-1" /> Aprobar
+                  </Button>
+                )}
                 <Button variant="secondary" size="sm" onClick={() => setDetailEvent(null)} className="cursor-pointer">
                   Cerrar
                 </Button>
@@ -1040,6 +1097,30 @@ export default function CalendarPage() {
             </div>
           )
         })()}
+      </Modal>
+
+      {/* ── Approve modal (desde calendario) ── */}
+      <Modal open={!!approveTarget} onClose={() => setApproveTarget(null)} title="Aprobar reserva" size="sm">
+        {approveTarget && (
+          <ApproveForm
+            target={approveTarget}
+            loading={approveMutation.isPending}
+            onCancel={() => setApproveTarget(null)}
+            onSubmit={(comment) => approveMutation.mutate({ id: approveTarget.id, comment })}
+          />
+        )}
+      </Modal>
+
+      {/* ── Reject modal (desde calendario) ── */}
+      <Modal open={!!rejectTarget} onClose={() => setRejectTarget(null)} title="Rechazar reserva" size="sm">
+        {rejectTarget && (
+          <RejectForm
+            target={rejectTarget}
+            loading={rejectMutation.isPending}
+            onCancel={() => setRejectTarget(null)}
+            onSubmit={(reason) => rejectMutation.mutate({ id: rejectTarget.id, reason })}
+          />
+        )}
       </Modal>
 
       {/* ── New reservation modal (formulario compartido) ── */}
@@ -1059,6 +1140,51 @@ export default function CalendarPage() {
         )}
       </Modal>
     </div>
+  )
+}
+
+// ─── Approve / Reject forms (modales del calendario) ──────────────────────────
+function ApproveForm({ target, loading, onCancel, onSubmit }: {
+  target: CalendarEventDto
+  loading: boolean
+  onCancel: () => void
+  onSubmit: (comment?: string) => void
+}) {
+  const { register, handleSubmit } = useForm<{ comment?: string }>({ resolver: zodResolver(approveSchema) })
+  return (
+    <form onSubmit={handleSubmit(d => onSubmit(d.comment))} className="space-y-4">
+      <p className="text-sm text-ink2">
+        Aprobando la reserva de <strong className="text-ink">{target.userName || 'usuario'}</strong> en{' '}
+        <strong className="text-ink">{target.roomName}</strong>.
+      </p>
+      <Textarea label="Comentario (opcional)" rows={2} {...register('comment')} />
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="secondary" onClick={onCancel}>Cancelar</Button>
+        <Button type="submit" loading={loading}>Aprobar</Button>
+      </div>
+    </form>
+  )
+}
+
+function RejectForm({ target, loading, onCancel, onSubmit }: {
+  target: CalendarEventDto
+  loading: boolean
+  onCancel: () => void
+  onSubmit: (reason: string) => void
+}) {
+  const { register, handleSubmit, formState: { errors } } = useForm<{ reason: string }>({ resolver: zodResolver(rejectSchema) })
+  return (
+    <form onSubmit={handleSubmit(d => onSubmit(d.reason))} className="space-y-4">
+      <p className="text-sm text-ink2">
+        Rechazando la reserva de <strong className="text-ink">{target.userName || 'usuario'}</strong> en{' '}
+        <strong className="text-ink">{target.roomName}</strong>.
+      </p>
+      <Textarea label="Motivo de rechazo" required rows={3} error={errors.reason?.message} {...register('reason')} />
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="secondary" onClick={onCancel}>Cancelar</Button>
+        <Button type="submit" variant="danger" loading={loading}>Rechazar</Button>
+      </div>
+    </form>
   )
 }
 

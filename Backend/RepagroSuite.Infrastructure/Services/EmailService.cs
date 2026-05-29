@@ -191,12 +191,14 @@ internal static class EmailTemplates
                     <li><strong>Fecha:</strong> {Get("date")}</li>
                     <li><strong>Hora:</strong> {Get("startTime")} - {Get("endTime")}</li>
                     <li><strong>Motivo:</strong> {Get("purpose")}</li>
-                </ul>",
+                </ul>
+                {(string.IsNullOrEmpty(Get("adminName")) ? "" : $"<p><strong>Aprobada por:</strong> {Get("adminName")}</p>")}",
 
             "reservation_rejected" => $@"
                 <h2>Reserva rechazada</h2>
                 <p>Su solicitud de reserva para <strong>{Get("roomName")}</strong> no pudo ser aprobada.</p>
-                <p><strong>Motivo:</strong> {Get("adminComment")}</p>",
+                <p><strong>Motivo:</strong> {Get("adminComment")}</p>
+                {(string.IsNullOrEmpty(Get("adminName")) ? "" : $"<p><strong>Rechazada por:</strong> {Get("adminName")}</p>")}",
 
             "reservation_cancelled" => $@"
                 <h2>Reserva cancelada</h2>
@@ -206,7 +208,8 @@ internal static class EmailTemplates
                     <li><strong>Fecha:</strong> {Get("date")}</li>
                     <li><strong>Hora:</strong> {Get("startTime")} - {Get("endTime")}</li>
                 </ul>
-                <p><strong>Motivo de la cancelación:</strong> {Get("reason")}</p>",
+                <p><strong>Motivo de la cancelación:</strong> {Get("reason")}</p>
+                {(string.IsNullOrEmpty(Get("adminName")) ? "" : $"<p><strong>Cancelada por:</strong> {Get("adminName")}</p>")}",
 
             _ => "<p>Notificación del sistema RepagroSuite.</p>"
         };

@@ -3,20 +3,42 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, DoorOpen, CalendarDays, Users,
   LogOut, Menu, X, BarChart3, ShieldCheck, Calendar, UserCircle,
-  ChevronsLeft, Crown, ChevronUp,
+  ChevronsLeft, Crown, ChevronUp, UsersRound, Cpu,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { authApi } from '@/api/auth'
 import { classNames } from '@/utils'
 
-const navGroups = [
+type NavItem = {
+  to: string
+  label: string
+  icon: React.ElementType
+  permission: string | null
+  role: string | null
+  // Módulo aún no desarrollado: se muestra deshabilitado con badge "Próximamente".
+  comingSoon?: boolean
+}
+
+const navGroups: { label: string; items: NavItem[] }[] = [
   {
-    label: 'Principal',
+    label: 'Salas',
     items: [
       { to: '/dashboard',    label: 'Dashboard',     icon: LayoutDashboard, permission: null,                role: 'ADMINISTRATOR' },
       { to: '/rooms',        label: 'Salas',         icon: DoorOpen,        permission: null,                role: null },
       { to: '/reservations', label: 'Mis reservas',  icon: CalendarDays,    permission: null,                role: null },
       { to: '/calendar',     label: 'Calendario',    icon: Calendar,        permission: null,                role: null },
+    ],
+  },
+  {
+    label: 'RRHH',
+    items: [
+      { to: '#', label: 'Próximamente', icon: UsersRound, permission: null, role: null, comingSoon: true },
+    ],
+  },
+  {
+    label: 'TI',
+    items: [
+      { to: '#', label: 'Próximamente', icon: Cpu, permission: null, role: null, comingSoon: true },
     ],
   },
   {
@@ -86,7 +108,7 @@ function SidebarContent({
         collapsed ? 'w-[68px]' : 'w-[248px]',
       )}
       style={{
-        background: 'linear-gradient(180deg, #00382A 0%, #005947 60%, #006F55 100%)',
+        background: 'linear-gradient(180deg, #073D31 0%, #0A5037 60%, #0E6B4B 100%)',
       }}
     >
       {/* Adorno superior dorado sutil */}
@@ -104,7 +126,7 @@ function SidebarContent({
           className="flex h-8 w-8 items-center justify-center rounded-lg shrink-0 shadow-sm ring-1 ring-white/20"
           style={{ background: '#fff' }}
         >
-          <span className="text-[15px] font-bold" style={{ color: '#005947' }}>R</span>
+          <span className="text-[15px] font-bold" style={{ color: '#0A5037' }}>R</span>
         </div>
         {!collapsed && (
           <div className="flex-1 min-w-0">
@@ -162,48 +184,81 @@ function SidebarContent({
                 <div className="mx-auto h-px w-6 bg-white/10 mb-2" />
               )}
               <ul className="space-y-0.5">
-                {visibleItems.map(({ to, label, icon: Icon }) => (
-                  <li key={to}>
-                    <NavLink
-                      to={to}
-                      onClick={onClose}
-                      title={collapsed ? label : undefined}
-                      className={({ isActive }) =>
-                        classNames(
-                          'group relative flex items-center rounded-lg font-medium transition-all duration-150',
+                {visibleItems.map(({ to, label, icon: Icon, comingSoon }) => (
+                  <li key={`${group.label}-${to}-${label}`}>
+                    {comingSoon ? (
+                      <div
+                        title={collapsed ? `${label} (próximamente)` : undefined}
+                        aria-disabled="true"
+                        className={classNames(
+                          'group relative flex items-center rounded-lg font-medium cursor-not-allowed opacity-55',
                           collapsed ? 'h-10 w-full justify-center' : 'gap-3 px-2.5 py-2 text-[13.5px]',
-                          isActive
-                            ? 'bg-white/[.14] text-white shadow-sm'
-                            : 'text-white/70 hover:bg-white/[.07] hover:text-white',
-                        )
-                      }
-                    >
-                      {({ isActive }: { isActive: boolean }) => (
-                        <>
-                          {/* Indicador activo lateral dorado */}
-                          {isActive && !collapsed && (
-                            <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-amber-400" />
+                          'text-white/50',
+                        )}
+                      >
+                        <Icon
+                          className={classNames(
+                            'shrink-0',
+                            collapsed ? 'h-[18px] w-[18px]' : 'h-[17px] w-[17px]',
                           )}
-                          <Icon
-                            className={classNames(
-                              'shrink-0 transition-colors',
-                              collapsed ? 'h-[18px] w-[18px]' : 'h-[17px] w-[17px]',
-                            )}
-                            strokeWidth={isActive ? 2 : 1.75}
-                            style={isActive ? { color: '#F5C518' } : undefined}
-                          />
-                          {!collapsed && (
+                          strokeWidth={1.75}
+                        />
+                        {!collapsed && (
+                          <>
                             <span className="truncate flex-1 leading-none">{label}</span>
-                          )}
-                          {/* Tooltip cuando está colapsado */}
-                          {collapsed && (
-                            <span className="absolute left-full ml-3 z-50 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[11px] font-medium text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg">
-                              {label}
+                            <span className="ml-auto inline-flex items-center rounded-full bg-white/10 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider uppercase text-white/60 ring-1 ring-white/10">
+                              Próx.
                             </span>
-                          )}
-                        </>
-                      )}
-                    </NavLink>
+                          </>
+                        )}
+                        {collapsed && (
+                          <span className="absolute left-full ml-3 z-50 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[11px] font-medium text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg">
+                            {label} (próximamente)
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <NavLink
+                        to={to}
+                        onClick={onClose}
+                        title={collapsed ? label : undefined}
+                        className={({ isActive }) =>
+                          classNames(
+                            'group relative flex items-center rounded-lg font-medium transition-all duration-150',
+                            collapsed ? 'h-10 w-full justify-center' : 'gap-3 px-2.5 py-2 text-[13.5px]',
+                            isActive
+                              ? 'bg-white/[.14] text-white shadow-sm'
+                              : 'text-white/70 hover:bg-white/[.07] hover:text-white',
+                          )
+                        }
+                      >
+                        {({ isActive }: { isActive: boolean }) => (
+                          <>
+                            {/* Indicador activo lateral dorado */}
+                            {isActive && !collapsed && (
+                              <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-amber-400" />
+                            )}
+                            <Icon
+                              className={classNames(
+                                'shrink-0 transition-colors',
+                                collapsed ? 'h-[18px] w-[18px]' : 'h-[17px] w-[17px]',
+                              )}
+                              strokeWidth={isActive ? 2 : 1.75}
+                              style={isActive ? { color: '#C9B26B' } : undefined}
+                            />
+                            {!collapsed && (
+                              <span className="truncate flex-1 leading-none">{label}</span>
+                            )}
+                            {/* Tooltip cuando está colapsado */}
+                            {collapsed && (
+                              <span className="absolute left-full ml-3 z-50 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[11px] font-medium text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg">
+                                {label}
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </NavLink>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -225,7 +280,7 @@ function SidebarContent({
           >
             <div
               className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold ring-2 ring-white/10"
-              style={{ background: isMaster ? '#F5C518' : '#E5E7EB', color: '#003E2D' }}
+              style={{ background: isMaster ? '#C9B26B' : '#E5E7EB', color: '#073D31' }}
             >
               {getInitials(user?.fullName ?? 'U')}
             </div>
@@ -242,13 +297,13 @@ function SidebarContent({
               <div className="relative shrink-0">
                 <div
                   className="flex h-9 w-9 items-center justify-center rounded-full text-[12px] font-bold ring-2 ring-white/10"
-                  style={{ background: isMaster ? '#F5C518' : '#E5E7EB', color: '#003E2D' }}
+                  style={{ background: isMaster ? '#C9B26B' : '#E5E7EB', color: '#073D31' }}
                 >
                   {getInitials(user?.fullName ?? 'U')}
                 </div>
                 {isMaster && (
                   <div className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-400 ring-2"
-                    style={{ background: '#F5C518', ['--tw-ring-color' as any]: '#005947' }}>
+                    style={{ background: '#C9B26B', ['--tw-ring-color' as any]: '#0A5037' }}>
                     <Crown className="h-2.5 w-2.5 text-white" strokeWidth={2.5} />
                   </div>
                 )}
@@ -259,7 +314,7 @@ function SidebarContent({
                 </p>
                 <p
                   className="truncate text-[10.5px] mt-0.5"
-                  style={{ color: isMaster ? '#F5C518' : 'rgba(255,255,255,.55)' }}
+                  style={{ color: isMaster ? '#C9B26B' : 'rgba(255,255,255,.55)' }}
                 >
                   {getRoleLabel(user?.roles ?? [], isMaster)}
                 </p>
@@ -335,7 +390,7 @@ export default function AppLayout() {
           <div className="flex items-center gap-2">
             <div
               className="flex h-6 w-6 items-center justify-center rounded text-xs font-bold"
-              style={{ background: '#005947', color: '#fff' }}
+              style={{ background: '#0A5037', color: '#fff' }}
             >
               R
             </div>

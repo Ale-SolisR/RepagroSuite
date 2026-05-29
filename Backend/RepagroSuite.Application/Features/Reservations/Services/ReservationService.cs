@@ -238,7 +238,8 @@ public class ReservationService : IReservationService
                 ["date"] = result.StartDateTime.ToString("dd/MM/yyyy"),
                 ["startTime"] = result.StartDateTime.ToString("HH:mm"),
                 ["endTime"] = result.EndDateTime.ToString("HH:mm"),
-                ["purpose"] = result.Purpose
+                ["purpose"] = result.Purpose,
+                ["adminName"] = await GetUserFullNameAsync(approvedBy, cancellationToken)
             }, cancellationToken);
         }
         catch { /* non-critical */ }
@@ -269,7 +270,8 @@ public class ReservationService : IReservationService
             await _emailService.SendTemplateAsync(reservation.User.Email, "reservation_rejected", new Dictionary<string, string>
             {
                 ["roomName"] = reservation.Room.Name,
-                ["adminComment"] = dto.AdminComment
+                ["adminComment"] = dto.AdminComment,
+                ["adminName"] = await GetUserFullNameAsync(rejectedBy, cancellationToken)
             }, cancellationToken);
         }
         catch { /* non-critical */ }
@@ -317,7 +319,8 @@ public class ReservationService : IReservationService
                     ["date"] = reservation.StartDateTime.ToString("dd/MM/yyyy"),
                     ["startTime"] = reservation.StartDateTime.ToString("HH:mm"),
                     ["endTime"] = reservation.EndDateTime.ToString("HH:mm"),
-                    ["reason"] = dto.Reason.Trim()
+                    ["reason"] = dto.Reason.Trim(),
+                    ["adminName"] = await GetUserFullNameAsync(cancelledBy, cancellationToken)
                 }, cancellationToken);
             }
             catch { /* non-critical */ }
@@ -461,9 +464,12 @@ public class ReservationService : IReservationService
         var (keys, total) = await _uow.Reservations.GetAuditGroupKeysAsync(userId, roomId, status, sortDescending, page, pageSize, cancellationToken);
         var rows = (await _uow.Reservations.GetByGroupKeysAsync(keys, cancellationToken)).ToList();
 
+        // Lookup en lote de los admins que tomaron acción (aprobar/rechazar/cancelar).
+        var actionNames = await GetActionUserNamesAsync(rows, cancellationToken);
+
         var byKey = rows
             .GroupBy(r => r.RecurrenceGroupId ?? r.Id)
-            .ToDictionary(g => g.Key, g => BuildGroupDto(g.ToList()));
+            .ToDictionary(g => g.Key, g => BuildGroupDto(g.ToList(), actionNames));
 
         // Conserva el orden de página devuelto por la consulta de claves.
         var items = keys.Where(byKey.ContainsKey).Select(k => byKey[k]).ToList();
@@ -479,8 +485,14 @@ public class ReservationService : IReservationService
 
     public async Task<IEnumerable<ReservationDto>> GetGroupOccurrencesAsync(Guid recurrenceGroupId, CancellationToken cancellationToken = default)
     {
-        var occurrences = await _uow.Reservations.GetByRecurrenceGroupAsync(recurrenceGroupId, cancellationToken);
-        return occurrences.Select(MapToDto);
+        var occurrences = (await _uow.Reservations.GetByRecurrenceGroupAsync(recurrenceGroupId, cancellationToken)).ToList();
+        var actionNames = await GetActionUserNamesAsync(occurrences, cancellationToken);
+        return occurrences.Select(r =>
+        {
+            var dto = MapToDto(r);
+            ApplyActionNames(dto, r, actionNames);
+            return dto;
+        });
     }
 
     public async Task<BulkActionResultDto> ApproveGroupAsync(Guid recurrenceGroupId, Guid approvedBy, CancellationToken cancellationToken = default)
@@ -553,11 +565,17 @@ public class ReservationService : IReservationService
         return new BulkActionResultDto { Affected = affected };
     }
 
-    private static ReservationGroupDto BuildGroupDto(List<Reservation> list)
+    private static ReservationGroupDto BuildGroupDto(List<Reservation> list, Dictionary<Guid, string> actionNames)
     {
         var ordered = list.OrderBy(r => r.StartDateTime).ToList();
         var first = ordered[0];
         var isRecurring = first.RecurrenceGroupId != null;
+        ReservationDto? singleDto = null;
+        if (!isRecurring)
+        {
+            singleDto = MapToDto(first);
+            ApplyActionNames(singleDto, first, actionNames);
+        }
         return new ReservationGroupDto
         {
             GroupKey = (first.RecurrenceGroupId ?? first.Id).ToString(),
@@ -575,7 +593,7 @@ public class ReservationService : IReservationService
             ApprovedCount = ordered.Count(r => r.Status == ReservationStatus.Approved),
             RejectedCount = ordered.Count(r => r.Status == ReservationStatus.Rejected),
             CancelledCount = ordered.Count(r => r.Status == ReservationStatus.Cancelled),
-            Single = isRecurring ? null : MapToDto(first)
+            Single = singleDto
         };
     }
 
@@ -607,10 +625,44 @@ public class ReservationService : IReservationService
         AdminComment = r.AdminComment,
         ApprovedByUserId = r.ApprovedByUserId,
         ApprovedAt = r.ApprovedAt,
+        RejectedByUserId = r.RejectedByUserId,
+        RejectedAt = r.RejectedAt,
+        CancelledByUserId = r.CancelledByUserId,
         CancellationReason = r.CancellationReason,
         CancelledAt = r.CancelledAt,
         IsDirectAdminReservation = r.IsDirectAdminReservation,
         RecurrenceGroupId = r.RecurrenceGroupId,
         CreatedAt = r.CreatedAt
     };
+
+    // Lookup puntual del nombre completo de un usuario (admin que ejecutó una acción).
+    // Devuelve string.Empty si no se encuentra (fallback seguro para emails).
+    private async Task<string> GetUserFullNameAsync(Guid userId, CancellationToken ct)
+    {
+        var users = await _uow.Users.FindAsync(u => u.Id == userId, ct);
+        return users.FirstOrDefault()?.FullName ?? string.Empty;
+    }
+
+    // Lookup en lote de nombres de admin que aprobaron/rechazaron/cancelaron, evitando N+1.
+    private async Task<Dictionary<Guid, string>> GetActionUserNamesAsync(IEnumerable<Reservation> reservations, CancellationToken ct)
+    {
+        var ids = reservations
+            .SelectMany(r => new[] { r.ApprovedByUserId, r.RejectedByUserId, r.CancelledByUserId })
+            .Where(g => g.HasValue)
+            .Select(g => g!.Value)
+            .Distinct()
+            .ToList();
+
+        if (ids.Count == 0) return new Dictionary<Guid, string>();
+
+        var users = await _uow.Users.FindAsync(u => ids.Contains(u.Id), ct);
+        return users.ToDictionary(u => u.Id, u => u.FullName);
+    }
+
+    private static void ApplyActionNames(ReservationDto dto, Reservation r, Dictionary<Guid, string> names)
+    {
+        if (r.ApprovedByUserId.HasValue && names.TryGetValue(r.ApprovedByUserId.Value, out var an)) dto.ApprovedByName = an;
+        if (r.RejectedByUserId.HasValue && names.TryGetValue(r.RejectedByUserId.Value, out var rn)) dto.RejectedByName = rn;
+        if (r.CancelledByUserId.HasValue && names.TryGetValue(r.CancelledByUserId.Value, out var cn)) dto.CancelledByName = cn;
+    }
 }

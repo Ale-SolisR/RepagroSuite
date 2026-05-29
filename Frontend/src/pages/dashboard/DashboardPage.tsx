@@ -71,7 +71,7 @@ function buildStatusItems(
     { label: 'Disponible', color: '#10B981', count: available,    total },
     { label: 'Ocupada',    color: '#B42318', count: occupied,     total },
     { label: 'Mantención', color: '#F59E0B', count: maintenance,  total },
-    { label: 'Inactiva',   color: '#5F6B7A', count: inactive,     total },
+    { label: 'Inactiva',   color: '#4A5750', count: inactive,     total },
   ]
 }
 
@@ -158,7 +158,7 @@ export default function DashboardPage() {
           <Link
             to="/reservations"
             className="inline-flex items-center gap-1.5 rounded-[8px] px-3.5 py-2 text-sm font-medium text-white transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
-            style={{ background: '#006F55' }}
+            style={{ background: '#0E6B4B' }}
           >
             <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
             Nueva reserva

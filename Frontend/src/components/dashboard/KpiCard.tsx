@@ -13,7 +13,7 @@ interface KpiCardProps {
 const toneStyles: Record<DeltaTone, { color: string; Icon: React.ElementType }> = {
   ok:      { color: '#10B981', Icon: TrendingUp },
   danger:  { color: '#B42318', Icon: TrendingDown },
-  neutral: { color: '#5F6B7A', Icon: Minus },
+  neutral: { color: '#4A5750', Icon: Minus },
 }
 
 export default function KpiCard({ label, value, delta, deltaTone = 'neutral', sub }: KpiCardProps) {

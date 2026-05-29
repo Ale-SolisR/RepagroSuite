@@ -71,11 +71,11 @@ function LoginForm({ onSwitchMode }: { onSwitchMode: (mode: Mode) => void }) {
       <div className="mb-8">
         <h2
           className="text-[32px] font-semibold tracking-tight leading-tight"
-          style={{ color: '#1F2933' }}
+          style={{ color: '#13211C' }}
         >
           Iniciar sesión
         </h2>
-        <p className="mt-2 text-[15px]" style={{ color: '#5F6B7A' }}>
+        <p className="mt-2 text-[15px]" style={{ color: '#4A5750' }}>
           Ingresa con tu cuenta corporativa.
         </p>
       </div>
@@ -96,7 +96,7 @@ function LoginForm({ onSwitchMode }: { onSwitchMode: (mode: Mode) => void }) {
 
         {/* Campo correo */}
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="email" className="text-[13px] font-medium" style={{ color: '#1F2933' }}>
+          <label htmlFor="email" className="text-[13px] font-medium" style={{ color: '#13211C' }}>
             Correo
           </label>
           <input
@@ -119,13 +119,13 @@ function LoginForm({ onSwitchMode }: { onSwitchMode: (mode: Mode) => void }) {
         {/* Campo contraseña */}
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between">
-            <label htmlFor="password" className="text-[13px] font-medium" style={{ color: '#1F2933' }}>
+            <label htmlFor="password" className="text-[13px] font-medium" style={{ color: '#13211C' }}>
               Contraseña
             </label>
             <Link
               to="/forgot-password"
               className="text-[13px] font-medium transition-colors hover:underline"
-              style={{ color: '#005947' }}
+              style={{ color: '#0A5037' }}
             >
               ¿Olvidaste tu contraseña?
             </Link>
@@ -167,9 +167,9 @@ function LoginForm({ onSwitchMode }: { onSwitchMode: (mode: Mode) => void }) {
           type="submit"
           disabled={isSubmitting}
           className="flex h-12 w-full items-center justify-center gap-2 rounded-[6px] text-[15px] font-medium text-white transition disabled:opacity-60"
-          style={{ background: '#006F55' }}
-          onMouseEnter={e => { if (!isSubmitting) e.currentTarget.style.background = '#005947' }}
-          onMouseLeave={e => { if (!isSubmitting) e.currentTarget.style.background = '#006F55' }}
+          style={{ background: '#0E6B4B' }}
+          onMouseEnter={e => { if (!isSubmitting) e.currentTarget.style.background = '#0A5037' }}
+          onMouseLeave={e => { if (!isSubmitting) e.currentTarget.style.background = '#0E6B4B' }}
         >
           {isSubmitting ? (
             <>
@@ -186,13 +186,13 @@ function LoginForm({ onSwitchMode }: { onSwitchMode: (mode: Mode) => void }) {
       </form>
 
       {/* Pie de formulario */}
-      <p className="mt-8 text-center text-[14px]" style={{ color: '#5F6B7A' }}>
+      <p className="mt-8 text-center text-[14px]" style={{ color: '#4A5750' }}>
         ¿No tienes cuenta?{' '}
         <button
           type="button"
           onClick={() => onSwitchMode('register')}
           className="font-medium transition-colors hover:underline"
-          style={{ color: '#006F55' }}
+          style={{ color: '#0E6B4B' }}
         >
           Solicita acceso
         </button>
@@ -263,18 +263,18 @@ function RegisterForm({ onSwitchMode }: { onSwitchMode: (mode: Mode) => void }) 
           type="button"
           onClick={() => onSwitchMode('login')}
           className="mb-3 inline-flex items-center gap-1.5 text-[13px] font-medium transition-colors hover:underline"
-          style={{ color: '#005947' }}
+          style={{ color: '#0A5037' }}
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           Volver a iniciar sesión
         </button>
         <h2
           className="text-[32px] font-semibold tracking-tight leading-tight"
-          style={{ color: '#1F2933' }}
+          style={{ color: '#13211C' }}
         >
           Solicitar acceso
         </h2>
-        <p className="mt-2 text-[15px]" style={{ color: '#5F6B7A' }}>
+        <p className="mt-2 text-[15px]" style={{ color: '#4A5750' }}>
           Completa el formulario y un administrador revisará tu solicitud.
         </p>
       </div>
@@ -283,7 +283,7 @@ function RegisterForm({ onSwitchMode }: { onSwitchMode: (mode: Mode) => void }) 
 
         {/* Número de identificación con auto-lookup */}
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="id-number" className="text-[13px] font-medium" style={{ color: '#1F2933' }}>
+          <label htmlFor="id-number" className="text-[13px] font-medium" style={{ color: '#13211C' }}>
             Número de Identificación <span style={{ color: '#B42318' }}>*</span>
           </label>
           <div className="relative">
@@ -362,9 +362,9 @@ function RegisterForm({ onSwitchMode }: { onSwitchMode: (mode: Mode) => void }) 
           type="submit"
           disabled={isSubmitting}
           className="flex h-12 w-full items-center justify-center gap-2 rounded-[6px] text-[15px] font-medium text-white transition disabled:opacity-60"
-          style={{ background: '#006F55' }}
-          onMouseEnter={e => { if (!isSubmitting) e.currentTarget.style.background = '#005947' }}
-          onMouseLeave={e => { if (!isSubmitting) e.currentTarget.style.background = '#006F55' }}
+          style={{ background: '#0E6B4B' }}
+          onMouseEnter={e => { if (!isSubmitting) e.currentTarget.style.background = '#0A5037' }}
+          onMouseLeave={e => { if (!isSubmitting) e.currentTarget.style.background = '#0E6B4B' }}
         >
           {isSubmitting ? (
             <>

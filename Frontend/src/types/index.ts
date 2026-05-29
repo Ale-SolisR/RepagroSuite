@@ -232,10 +232,13 @@ export interface ReservationDto {
   adminComment?: string
   cancellationReason?: string
   isDirectAdminReservation: boolean
+  approvedByUserId?: string | null
   approvedByName?: string
   approvedAt?: string
+  rejectedByUserId?: string | null
   rejectedByName?: string
   rejectedAt?: string
+  cancelledByUserId?: string | null
   cancelledByName?: string
   cancelledAt?: string
   recurrenceGroupId?: string | null

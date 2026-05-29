@@ -37,7 +37,7 @@ interface PasswordFieldProps {
 function PasswordField({ id, label, helperText, error, show, onToggle, registration }: PasswordFieldProps) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-[13px] font-medium" style={{ color: '#1F2933' }}>
+      <label htmlFor={id} className="text-[13px] font-medium" style={{ color: '#13211C' }}>
         {label} <span style={{ color: '#B42318' }}>*</span>
       </label>
       <div className="relative">
@@ -107,11 +107,11 @@ export default function ForcedChangePasswordPage() {
             <div>
               <h2
                 className="text-[26px] font-semibold tracking-tight leading-tight"
-                style={{ color: '#1F2933' }}
+                style={{ color: '#13211C' }}
               >
                 Cambio de contraseña requerido
               </h2>
-              <p className="mt-1 text-[14px]" style={{ color: '#5F6B7A' }}>
+              <p className="mt-1 text-[14px]" style={{ color: '#4A5750' }}>
                 Por seguridad debe establecer una nueva contraseña.
               </p>
             </div>
@@ -146,7 +146,7 @@ export default function ForcedChangePasswordPage() {
 
             {/* Confirmar contraseña con indicador */}
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="confirm-password" className="text-[13px] font-medium" style={{ color: '#1F2933' }}>
+              <label htmlFor="confirm-password" className="text-[13px] font-medium" style={{ color: '#13211C' }}>
                 Confirmar nueva contraseña <span style={{ color: '#B42318' }}>*</span>
               </label>
               <div className="relative">
@@ -204,9 +204,9 @@ export default function ForcedChangePasswordPage() {
               type="submit"
               disabled={isSubmitting}
               className="flex h-12 w-full items-center justify-center gap-2 rounded-[6px] text-[15px] font-medium text-white transition disabled:opacity-60 mt-2"
-              style={{ background: '#006F55' }}
-              onMouseEnter={e => { if (!isSubmitting) e.currentTarget.style.background = '#005947' }}
-              onMouseLeave={e => { if (!isSubmitting) e.currentTarget.style.background = '#006F55' }}
+              style={{ background: '#0E6B4B' }}
+              onMouseEnter={e => { if (!isSubmitting) e.currentTarget.style.background = '#0A5037' }}
+              onMouseLeave={e => { if (!isSubmitting) e.currentTarget.style.background = '#0E6B4B' }}
             >
               {isSubmitting ? (
                 <>

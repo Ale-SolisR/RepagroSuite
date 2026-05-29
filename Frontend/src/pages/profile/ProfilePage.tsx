@@ -50,7 +50,7 @@ export default function ProfilePage() {
         <div className="flex items-center gap-4">
           <div
             className="h-14 w-14 rounded-full flex items-center justify-center text-white text-xl font-bold shrink-0"
-            style={{ background: '#005947' }}
+            style={{ background: '#0A5037' }}
           >
             <User className="h-7 w-7" />
           </div>

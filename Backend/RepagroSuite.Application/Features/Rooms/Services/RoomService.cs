@@ -103,21 +103,26 @@ public class RoomService : IRoomService
         foreach (var featureId in dto.FeatureIds.Distinct())
             room.RoomFeatures.Add(new RoomFeature { RoomId = roomId, FeatureId = featureId });
 
-        // Update availabilities
-        room.Availabilities.Clear();
-        foreach (var avail in dto.Availabilities)
+        // Update availabilities: solo reemplaza si el DTO realmente las trae.
+        // El form de edición no las gestiona (van por UpsertAvailability), así que un
+        // PUT sin Availabilities NO debe borrar las existentes.
+        if (dto.Availabilities is not null)
         {
-            room.Availabilities.Add(new RoomAvailability
+            room.Availabilities.Clear();
+            foreach (var avail in dto.Availabilities)
             {
-                RoomId = roomId,
-                DayOfWeek = avail.DayOfWeek,
-                IsAvailable = avail.IsAvailable,
-                OpenTime = TimeOnly.Parse(avail.OpenTime),
-                CloseTime = TimeOnly.Parse(avail.CloseTime),
-                MinReservationMinutes = avail.MinReservationMinutes,
-                MaxReservationMinutes = avail.MaxReservationMinutes,
-                SlotIntervalMinutes = avail.SlotIntervalMinutes
-            });
+                room.Availabilities.Add(new RoomAvailability
+                {
+                    RoomId = roomId,
+                    DayOfWeek = avail.DayOfWeek,
+                    IsAvailable = avail.IsAvailable,
+                    OpenTime = TimeOnly.Parse(avail.OpenTime),
+                    CloseTime = TimeOnly.Parse(avail.CloseTime),
+                    MinReservationMinutes = avail.MinReservationMinutes,
+                    MaxReservationMinutes = avail.MaxReservationMinutes,
+                    SlotIntervalMinutes = avail.SlotIntervalMinutes
+                });
+            }
         }
 
         _uow.Rooms.Update(room);

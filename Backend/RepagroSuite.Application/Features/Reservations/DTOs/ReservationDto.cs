@@ -21,7 +21,13 @@ public class ReservationDto
     public string StatusName { get; set; } = string.Empty;
     public string? AdminComment { get; set; }
     public Guid? ApprovedByUserId { get; set; }
+    public string? ApprovedByName { get; set; }
     public DateTime? ApprovedAt { get; set; }
+    public Guid? RejectedByUserId { get; set; }
+    public string? RejectedByName { get; set; }
+    public DateTime? RejectedAt { get; set; }
+    public Guid? CancelledByUserId { get; set; }
+    public string? CancelledByName { get; set; }
     public string? CancellationReason { get; set; }
     public DateTime? CancelledAt { get; set; }
     public bool IsDirectAdminReservation { get; set; }

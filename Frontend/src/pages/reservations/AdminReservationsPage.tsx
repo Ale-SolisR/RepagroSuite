@@ -39,6 +39,22 @@ const SELECT_CLS =
 
 const isFuture = (dt: string) => new Date(dt) > new Date()
 
+// Muestra "Aprobada por X" / "Rechazada por X" / "Cancelada por X" debajo del badge de estado.
+// Para Pending no muestra nada (aún no hay acción).
+function ActionByLabel({ r, compact }: { r: ReservationDto; compact?: boolean }) {
+  let name: string | undefined
+  let verb: string | undefined
+  if (r.status === 'Approved') { name = r.approvedByName; verb = 'Aprobada' }
+  else if (r.status === 'Rejected') { name = r.rejectedByName; verb = 'Rechazada' }
+  else if (r.status === 'Cancelled') { name = r.cancelledByName; verb = 'Cancelada' }
+  if (!name) return null
+  return (
+    <span className={classNames('block text-[11px] text-ink2/60 truncate', compact ? 'mt-0.5 max-w-[180px]' : 'mt-1 max-w-[220px]')} title={`${verb} por ${name}`}>
+      por <span className="font-medium text-ink2">{name}</span>
+    </span>
+  )
+}
+
 // Acciones por reserva individual (pendiente → aprobar/rechazar; aprobada futura → cancelar)
 function RowActions({ r, onApprove, onReject, onCancel, compact }: {
   r: ReservationDto
@@ -148,7 +164,10 @@ function GroupRow({ entry, onApprove, onReject, onCancel, onApproveAll, onReject
                     <div key={o.id} className="flex items-center gap-3 py-2">
                       <span className="font-mono text-[13px] text-ink capitalize w-40 shrink-0">{formatDate(o.startDateTime, 'EEE d MMM yyyy')}</span>
                       <span className="font-mono text-[13px] text-ink2 tabular-nums w-28 shrink-0">{formatTime(o.startDateTime)}–{formatTime(o.endDateTime)}</span>
-                      <Badge status={o.status} />
+                      <div className="flex flex-col">
+                        <Badge status={o.status} />
+                        <ActionByLabel r={o} compact />
+                      </div>
                       <div className="ml-auto">
                         <RowActions r={o} onApprove={onApprove} onReject={onReject} onCancel={onCancel} />
                       </div>
@@ -383,7 +402,10 @@ export default function AdminReservationsPage() {
                         <span className="capitalize">{formatDate(entry.single.startDateTime, 'EEE d MMM yyyy')}</span>
                         <span className="block text-xs text-ink2/60 font-mono tabular-nums">{formatTime(entry.single.startDateTime)}–{formatTime(entry.single.endDateTime)}</span>
                       </td>
-                      <td className="px-3 py-3.5"><Badge status={entry.single.status} /></td>
+                      <td className="px-3 py-3.5">
+                        <Badge status={entry.single.status} />
+                        <ActionByLabel r={entry.single} />
+                      </td>
                       <td className="px-5 py-3.5">
                         <RowActions r={entry.single} onApprove={setApproveTarget} onReject={setRejectTarget} onCancel={setCancelTarget} />
                       </td>

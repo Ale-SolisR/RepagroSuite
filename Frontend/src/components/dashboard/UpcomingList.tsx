@@ -28,7 +28,7 @@ export default function UpcomingList({ items, isLoading }: UpcomingListProps) {
         <Link
           to="/admin/reservations"
           className="font-mono text-[11px] font-medium transition-colors hover:opacity-75"
-          style={{ color: '#006F55' }}
+          style={{ color: '#0E6B4B' }}
         >
           VER TODAS
         </Link>
@@ -53,7 +53,7 @@ export default function UpcomingList({ items, isLoading }: UpcomingListProps) {
           <Link
             to="/reservations"
             className="text-[12px] font-medium hover:opacity-75 transition-opacity"
-            style={{ color: '#006F55' }}
+            style={{ color: '#0E6B4B' }}
           >
             + Nueva reserva
           </Link>
@@ -66,7 +66,7 @@ export default function UpcomingList({ items, isLoading }: UpcomingListProps) {
               className="grid items-start gap-3"
               style={{ gridTemplateColumns: '72px 1fr auto' }}
             >
-              <span className="font-mono text-[13px] font-semibold pt-0.5" style={{ color: '#006F55' }}>
+              <span className="font-mono text-[13px] font-semibold pt-0.5" style={{ color: '#0E6B4B' }}>
                 {item.time}
               </span>
               <div className="min-w-0">

@@ -335,8 +335,11 @@ public class UserService : IUserService
             throw new InvalidOperationException("Para cambiar tu propia contraseña, usa la sección de perfil.");
 
         user.PasswordHash = _passwordService.HashPassword(dto.NewPassword);
-        user.MustChangePassword = true;
-        user.TemporaryPasswordExpiresAt = BusinessClock.Now.AddHours(72);
+        // "Cambiar contraseña" deja la clave lista para uso directo: NO se fuerza cambio en el
+        // próximo login y no hay expiración. Para forzar el cambio existe la acción aparte
+        // "Restablecer contraseña" (GenerateTemporaryPassword) y "Forzar cambio".
+        user.MustChangePassword = false;
+        user.TemporaryPasswordExpiresAt = null;
         user.LastPasswordChangedAt = BusinessClock.Now;
         _uow.Users.Update(user);
         await _uow.SaveChangesAsync(cancellationToken);
