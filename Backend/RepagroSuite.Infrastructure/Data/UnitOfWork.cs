@@ -1,6 +1,7 @@
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using RepagroSuite.Domain.Common;
 using RepagroSuite.Domain.Interfaces;
 using RepagroSuite.Domain.Interfaces.Repositories;
 using RepagroSuite.Infrastructure.Repositories;
@@ -15,6 +16,9 @@ public class UnitOfWork : IUnitOfWork
     private IUserRepository? _users;
     private IRoomRepository? _rooms;
     private IReservationRepository? _reservations;
+    private IItAssetRepository? _itAssets;
+    private IItTicketRepository? _itTickets;
+    private readonly Dictionary<Type, object> _genericRepos = [];
 
     public UnitOfWork(ApplicationDbContext context)
     {
@@ -24,6 +28,18 @@ public class UnitOfWork : IUnitOfWork
     public IUserRepository Users => _users ??= new UserRepository(_context);
     public IRoomRepository Rooms => _rooms ??= new RoomRepository(_context);
     public IReservationRepository Reservations => _reservations ??= new ReservationRepository(_context);
+    public IItAssetRepository ItAssets => _itAssets ??= new ItAssetRepository(_context);
+    public IItTicketRepository ItTickets => _itTickets ??= new ItTicketRepository(_context);
+
+    public IGenericRepository<T> Repository<T>() where T : BaseEntity
+    {
+        if (_genericRepos.TryGetValue(typeof(T), out var existing))
+            return (IGenericRepository<T>)existing;
+
+        var repo = new GenericRepository<T>(_context);
+        _genericRepos[typeof(T)] = repo;
+        return repo;
+    }
 
     public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         => await _context.SaveChangesAsync(cancellationToken);

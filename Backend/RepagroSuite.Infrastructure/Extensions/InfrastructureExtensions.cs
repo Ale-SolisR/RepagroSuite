@@ -65,6 +65,10 @@ public static class InfrastructureExtensions
         services.AddScoped<IIdentificationLookupService, IdentificationLookupService>();
         services.AddScoped<RepagroSuite.Application.Features.Settings.Services.ISettingsService, SettingsService>();
 
+        // Módulo TI — boletas
+        services.AddScoped<ISequenceGenerator, SequenceGenerator>();
+        services.AddSingleton<IPdfGenerator, PdfGenerator>();
+
         return services;
     }
 

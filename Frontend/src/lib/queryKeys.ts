@@ -40,6 +40,19 @@ export const qk = {
   settings: {
     all: ['settings'] as const,
   },
+  ti: {
+    all: ['ti'] as const,
+    assets: (page: number, pageSize: number, search: string, status: string, typeId: string, deptId: string) =>
+      ['ti', 'assets', page, pageSize, search, status, typeId, deptId] as const,
+    asset: (id: string) => ['ti', 'asset', id] as const,
+    history: (id: string) => ['ti', 'asset', id, 'history'] as const,
+    dashboard: ['ti', 'dashboard'] as const,
+    catalogs: ['ti', 'catalogs'] as const,
+    tickets: (page: number, type: string, status: string, search: string) =>
+      ['ti', 'tickets', page, type, status, search] as const,
+    ticket: (id: string) => ['ti', 'ticket', id] as const,
+    availableAssets: ['ti', 'available-assets'] as const,
+  },
 } as const
 
 // Cuánto tiempo consideramos cada dato "fresco" antes de re-pedirlo en focus/mount.
@@ -56,6 +69,9 @@ export const staleTimes = {
   users: 30_000,
   dashboard: 60_000,
   settings: 5 * 60_000,
+  ti: 30_000,
+  tiCatalogs: 5 * 60_000,
+  tiDashboard: 60_000,
 } as const
 
 // Prefijos para invalidar grupos completos (TanStack Query matchea por prefix).
@@ -73,4 +89,5 @@ export const invalidate = {
   reservations: (qc: QueryClient) => qc.invalidateQueries({ queryKey: qk.reservations.all }),
   users: (qc: QueryClient) => qc.invalidateQueries({ queryKey: qk.users.all }),
   settings: (qc: QueryClient) => qc.invalidateQueries({ queryKey: qk.settings.all }),
+  ti: (qc: QueryClient) => qc.invalidateQueries({ queryKey: qk.ti.all }),
 }

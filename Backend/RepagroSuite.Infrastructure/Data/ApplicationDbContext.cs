@@ -26,6 +26,21 @@ public class ApplicationDbContext : DbContext
     public DbSet<SystemModule> SystemModules => Set<SystemModule>();
     public DbSet<IdentificationLookupCache> IdentificationLookupCaches => Set<IdentificationLookupCache>();
 
+    // Módulo TI / Inventario de Activos Tecnológicos
+    public DbSet<ItAsset> ItAssets => Set<ItAsset>();
+    public DbSet<ItAssetSpec> ItAssetSpecs => Set<ItAssetSpec>();
+    public DbSet<ItAssetType> ItAssetTypes => Set<ItAssetType>();
+    public DbSet<ItBrand> ItBrands => Set<ItBrand>();
+    public DbSet<ItLocation> ItLocations => Set<ItLocation>();
+    public DbSet<Department> Departments => Set<Department>();
+    public DbSet<ItAssetHistory> ItAssetHistory => Set<ItAssetHistory>();
+    public DbSet<ItTicket> ItTickets => Set<ItTicket>();
+    public DbSet<ItTicketDetail> ItTicketDetails => Set<ItTicketDetail>();
+    public DbSet<ItAssignment> ItAssignments => Set<ItAssignment>();
+    public DbSet<ItTicketSignature> ItTicketSignatures => Set<ItTicketSignature>();
+    public DbSet<ItTicketPhoto> ItTicketPhotos => Set<ItTicketPhoto>();
+    public DbSet<ItDocumentSequence> ItDocumentSequences => Set<ItDocumentSequence>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -79,6 +94,17 @@ public class ApplicationDbContext : DbContext
             new() { Id = new Guid("a0000001-0000-0000-0000-000000000028"), Code = "Settings.Modules.Update",        Name = "Editar módulos",                   Module = "Settings",        IsActive = true, CreatedAt = now, RowVersion = [] },
             new() { Id = new Guid("a0000001-0000-0000-0000-000000000029"), Code = "Settings.Modules.Delete",        Name = "Eliminar módulos",                 Module = "Settings",        IsActive = true, CreatedAt = now, RowVersion = [] },
             new() { Id = new Guid("a0000001-0000-0000-0000-000000000030"), Code = "Settings.Security.Manage",       Name = "Gestionar seguridad",              Module = "Settings",        IsActive = true, CreatedAt = now, RowVersion = [] },
+            // --- Módulo TI / Inventario de Activos Tecnológicos ---
+            new() { Id = new Guid("a0000001-0000-0000-0000-000000000031"), Code = "Ti.Inventory.View",   Name = "Ver inventario TI",        Module = "TI", IsActive = true, CreatedAt = now, RowVersion = [] },
+            new() { Id = new Guid("a0000001-0000-0000-0000-000000000032"), Code = "Ti.Inventory.Create", Name = "Crear activos TI",         Module = "TI", IsActive = true, CreatedAt = now, RowVersion = [] },
+            new() { Id = new Guid("a0000001-0000-0000-0000-000000000033"), Code = "Ti.Inventory.Update", Name = "Editar activos TI",        Module = "TI", IsActive = true, CreatedAt = now, RowVersion = [] },
+            new() { Id = new Guid("a0000001-0000-0000-0000-000000000034"), Code = "Ti.Inventory.Delete", Name = "Eliminar activos TI",      Module = "TI", IsActive = true, CreatedAt = now, RowVersion = [] },
+            new() { Id = new Guid("a0000001-0000-0000-0000-000000000035"), Code = "Ti.Catalog.Manage",   Name = "Administrar catálogos TI", Module = "TI", IsActive = true, CreatedAt = now, RowVersion = [] },
+            new() { Id = new Guid("a0000001-0000-0000-0000-000000000036"), Code = "Ti.Dashboard.View",   Name = "Ver dashboard TI",         Module = "TI", IsActive = true, CreatedAt = now, RowVersion = [] },
+            new() { Id = new Guid("a0000001-0000-0000-0000-000000000037"), Code = "Ti.Assign",           Name = "Asignar activos TI",       Module = "TI", IsActive = true, CreatedAt = now, RowVersion = [] },
+            new() { Id = new Guid("a0000001-0000-0000-0000-000000000038"), Code = "Ti.Return",           Name = "Devolver activos TI",      Module = "TI", IsActive = true, CreatedAt = now, RowVersion = [] },
+            new() { Id = new Guid("a0000001-0000-0000-0000-000000000039"), Code = "Ti.Ticket.Create",    Name = "Crear boletas TI",         Module = "TI", IsActive = true, CreatedAt = now, RowVersion = [] },
+            new() { Id = new Guid("a0000001-0000-0000-0000-000000000040"), Code = "Ti.Ticket.Void",      Name = "Anular boletas TI",        Module = "TI", IsActive = true, CreatedAt = now, RowVersion = [] },
         };
         modelBuilder.Entity<Permission>().HasData(allPerms);
 
@@ -141,15 +167,61 @@ public class ApplicationDbContext : DbContext
         );
 
         // System Modules
-        modelBuilder.Entity<SystemModule>().HasData(new SystemModule
+        modelBuilder.Entity<SystemModule>().HasData(
+            new SystemModule
+            {
+                Id = new Guid("c0000001-0000-0000-0000-000000000001"),
+                Name = "Gestión de Salas", Code = "ROOMS",
+                Description = "Reservas y gestión de salas empresariales",
+                IconName = "door-open", RoutePrefix = "/rooms", SortOrder = 1,
+                IsActive = true, IsCore = true, Version = "1.0.0",
+                CreatedAt = now, RowVersion = []
+            },
+            new SystemModule
+            {
+                Id = new Guid("c0000001-0000-0000-0000-000000000002"),
+                Name = "Inventario TI", Code = "TI",
+                Description = "Inventario de activos tecnológicos, asignaciones y boletas",
+                IconName = "cpu", RoutePrefix = "/ti", SortOrder = 2,
+                IsActive = true, IsCore = false, Version = "1.0.0",
+                CreatedAt = now, RowVersion = []
+            });
+
+        // Catálogo base de tipos de activo TI (normaliza lo que en el Excel era texto libre).
+        modelBuilder.Entity<ItAssetType>().HasData(
+            NewType("d0000001-0000-0000-0000-000000000001", "Laptop",       "LAPTOP",  "laptop",         requiresSerial: true,  hasSpecs: true),
+            NewType("d0000001-0000-0000-0000-000000000002", "Desktop",      "DESKTOP", "monitor",        requiresSerial: true,  hasSpecs: true),
+            NewType("d0000001-0000-0000-0000-000000000003", "Tablet",       "TABLET",  "tablet",         requiresSerial: true,  hasSpecs: true),
+            NewType("d0000001-0000-0000-0000-000000000004", "Celular",      "PHONE",   "smartphone",     requiresSerial: true,  hasSpecs: true),
+            NewType("d0000001-0000-0000-0000-000000000005", "Impresora",    "PRINTER", "printer",        requiresSerial: true,  hasSpecs: false),
+            NewType("d0000001-0000-0000-0000-000000000006", "Monitor",      "SCREEN",  "monitor",        requiresSerial: true,  hasSpecs: false),
+            NewType("d0000001-0000-0000-0000-000000000007", "Cámara",       "CAMERA",  "camera",         requiresSerial: true,  hasSpecs: false),
+            NewType("d0000001-0000-0000-0000-000000000008", "Switch",       "SWITCH",  "network",        requiresSerial: true,  hasSpecs: false),
+            NewType("d0000001-0000-0000-0000-000000000009", "Access Point", "AP",      "wifi",           requiresSerial: true,  hasSpecs: false),
+            NewType("d0000001-0000-0000-0000-000000000010", "UPS",          "UPS",     "battery",        requiresSerial: true,  hasSpecs: false),
+            NewType("d0000001-0000-0000-0000-000000000011", "Servidor",     "SERVER",  "server",         requiresSerial: true,  hasSpecs: true),
+            NewType("d0000001-0000-0000-0000-000000000012", "Equipo de red","NETDEV",  "router",         requiresSerial: true,  hasSpecs: false),
+            NewType("d0000001-0000-0000-0000-000000000013", "Licencia",     "LICENSE", "key",            requiresSerial: false, hasSpecs: false, assignable: false),
+            NewType("d0000001-0000-0000-0000-000000000014", "Accesorio",    "ACCESS",  "mouse-pointer",  requiresSerial: false, hasSpecs: false),
+            NewType("d0000001-0000-0000-0000-000000000015", "Otro",         "OTHER",   "box",            requiresSerial: false, hasSpecs: false));
+
+        // Consecutivos 2026 pre-creados por tipo (evita la condición de carrera del INSERT inicial; §10).
+        var seqCodes = new[] { "ENT", "DEV", "PRE", "MAN", "REP", "TRA", "CRE", "ACC", "BAJ" };
+        modelBuilder.Entity<ItDocumentSequence>().HasData(
+            seqCodes.Select((code, i) => new ItDocumentSequence
+            {
+                Id = new Guid($"e0000001-0000-0000-0000-0000000000{(i + 1):D2}"),
+                TicketTypeCode = code, Year = 2026, Prefix = "TI", LastNumber = 0,
+                CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), RowVersion = []
+            }));
+
+        static ItAssetType NewType(string id, string name, string code, string icon,
+            bool requiresSerial, bool hasSpecs, bool assignable = true) => new()
         {
-            Id = new Guid("c0000001-0000-0000-0000-000000000001"),
-            Name = "Gestión de Salas", Code = "ROOMS",
-            Description = "Reservas y gestión de salas empresariales",
-            IconName = "door-open", RoutePrefix = "/rooms", SortOrder = 1,
-            IsActive = true, IsCore = true, Version = "1.0.0",
-            CreatedAt = now, RowVersion = []
-        });
+            Id = new Guid(id), Name = name, Code = code, IconName = icon,
+            RequiresSerial = requiresSerial, HasComputeSpecs = hasSpecs, IsAssignable = assignable,
+            IsActive = true, CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), RowVersion = []
+        };
 
         // System Settings
         modelBuilder.Entity<SystemSetting>().HasData(

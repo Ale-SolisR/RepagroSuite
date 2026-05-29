@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, DoorOpen, CalendarDays, Users,
   LogOut, Menu, X, BarChart3, ShieldCheck, Calendar, UserCircle,
-  ChevronsLeft, Crown, ChevronUp, UsersRound, Cpu,
+  ChevronsLeft, Crown, ChevronUp, UsersRound, Cpu, FileText,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { authApi } from '@/api/auth'
@@ -38,7 +38,9 @@ const navGroups: { label: string; items: NavItem[] }[] = [
   {
     label: 'TI',
     items: [
-      { to: '#', label: 'Próximamente', icon: Cpu, permission: null, role: null, comingSoon: true },
+      { to: '/ti',         label: 'Dashboard TI', icon: LayoutDashboard, permission: 'Ti.Dashboard.View', role: null },
+      { to: '/ti/assets',  label: 'Inventario',   icon: Cpu,             permission: 'Ti.Inventory.View',  role: null },
+      { to: '/ti/tickets', label: 'Boletas',      icon: FileText,        permission: 'Ti.Inventory.View',  role: null },
     ],
   },
   {

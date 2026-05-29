@@ -26,6 +26,16 @@ const SettingsPage = lazy(() => import('@/pages/settings/SettingsPage'))
 const ProfilePage = lazy(() => import('@/pages/profile/ProfilePage'))
 const CalendarPage = lazy(() => import('@/pages/calendar/CalendarPage'))
 
+// Módulo TI / Inventario
+const ItDashboardPage = lazy(() => import('@/pages/ti/ItDashboardPage'))
+const ItAssetsPage = lazy(() => import('@/pages/ti/ItAssetsPage'))
+const ItAssetFormPage = lazy(() => import('@/pages/ti/ItAssetFormPage'))
+const ItAssetDetailPage = lazy(() => import('@/pages/ti/ItAssetDetailPage'))
+const ItTicketsPage = lazy(() => import('@/pages/ti/ItTicketsPage'))
+const ItTicketDetailPage = lazy(() => import('@/pages/ti/ItTicketDetailPage'))
+const ItAssignmentWizardPage = lazy(() => import('@/pages/ti/ItAssignmentWizardPage'))
+const ItReturnWizardPage = lazy(() => import('@/pages/ti/ItReturnWizardPage'))
+
 // Fallback para Suspense — pantalla mínima mientras carga el chunk.
 function PageLoader() {
   return (
@@ -82,6 +92,25 @@ export default function App() {
                 </Route>
                 <Route element={<ProtectedRoute permission="Settings.View" />}>
                   <Route path="/settings" element={<SettingsPage />} />
+                </Route>
+
+                {/* Módulo TI / Inventario */}
+                <Route element={<ProtectedRoute permission="Ti.Dashboard.View" />}>
+                  <Route path="/ti" element={<ItDashboardPage />} />
+                </Route>
+                <Route element={<ProtectedRoute permission="Ti.Inventory.View" />}>
+                  <Route path="/ti/assets" element={<ItAssetsPage />} />
+                  <Route path="/ti/assets/new" element={<ItAssetFormPage />} />
+                  <Route path="/ti/assets/:id" element={<ItAssetDetailPage />} />
+                  <Route path="/ti/assets/:id/edit" element={<ItAssetFormPage />} />
+                  <Route path="/ti/tickets" element={<ItTicketsPage />} />
+                  <Route path="/ti/tickets/:id" element={<ItTicketDetailPage />} />
+                </Route>
+                <Route element={<ProtectedRoute permission="Ti.Assign" />}>
+                  <Route path="/ti/assignments/new" element={<ItAssignmentWizardPage />} />
+                </Route>
+                <Route element={<ProtectedRoute permission="Ti.Return" />}>
+                  <Route path="/ti/assets/:id/return" element={<ItReturnWizardPage />} />
                 </Route>
               </Route>
             </Route>

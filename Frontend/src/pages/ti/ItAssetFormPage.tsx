@@ -1,0 +1,317 @@
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useParams, Link } from 'react-router-dom'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Loader2, ArrowLeft, Save, Cpu } from 'lucide-react'
+import toast from 'react-hot-toast'
+
+import { itAssetsApi, itCatalogsApi } from '@/api/itAssets'
+import { usersApi } from '@/api/users'
+import { qk, staleTimes, invalidate } from '@/lib/queryKeys'
+import { useAuthStore } from '@/store/authStore'
+import { extractApiError } from '@/utils'
+import PhotoCapture from '@/components/ti/PhotoCapture'
+import { CONDITION_OPTIONS } from '@/components/ti/itStatus'
+import type {
+  CreateItAssetRequest, ItAssetSpecDto, PhysicalCondition,
+} from '@/types'
+
+const BRAND = '#0E6B4B'
+
+type FormState = CreateItAssetRequest & { spec: ItAssetSpecDto }
+
+const EMPTY: FormState = {
+  internalCode: '', assetTypeId: '', brandId: '', model: '', serialNumber: '', assetTag: '',
+  physicalCondition: 'Good', locationId: '', locationDetail: '', departmentId: '',
+  currentHolderUserId: '', purchaseDate: '', supplier: '', cost: undefined, currency: '',
+  hasWarranty: false, warrantyEndDate: '', notes: '', imageUrl: '', spec: {},
+}
+
+const inputCls = 'h-10 w-full rounded-[8px] border border-line bg-paper px-3 text-sm text-ink placeholder:text-ink2 focus:border-brand-400 focus:outline-none'
+const labelCls = 'mb-1 block text-[12px] font-medium text-ink2'
+
+function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className={labelCls}>{label}{required && <span className="text-red-600"> *</span>}</label>
+      {children}
+    </div>
+  )
+}
+
+export default function ItAssetFormPage() {
+  const { id } = useParams<{ id: string }>()
+  const isEdit = !!id
+  const navigate = useNavigate()
+  const qc = useQueryClient()
+  const { hasPermission } = useAuthStore()
+
+  const [form, setForm] = useState<FormState>(EMPTY)
+  const [rowVersion, setRowVersion] = useState<string | undefined>()
+
+  const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm(f => ({ ...f, [k]: v }))
+  const setSpec = (k: keyof ItAssetSpecDto, v: string | number | undefined) =>
+    setForm(f => ({ ...f, spec: { ...f.spec, [k]: v } }))
+
+  const catalogs = useQuery({
+    queryKey: qk.ti.catalogs,
+    queryFn: () => itCatalogsApi.getAll().then(r => r.data.data!),
+    staleTime: staleTimes.tiCatalogs,
+  })
+
+  // Responsables: sólo si el usuario puede ver usuarios (evita 403 ruidoso).
+  const users = useQuery({
+    queryKey: qk.users.list,
+    queryFn: () => usersApi.getAll({ pageSize: 200, status: 'Active' }).then(r => r.data.data?.items ?? []),
+    staleTime: staleTimes.roomsList,
+    enabled: hasPermission('Users.View'),
+  })
+
+  const existing = useQuery({
+    queryKey: qk.ti.asset(id ?? ''),
+    queryFn: () => itAssetsApi.getById(id!).then(r => r.data.data!),
+    enabled: isEdit,
+    staleTime: staleTimes.ti,
+  })
+
+  useEffect(() => {
+    if (!existing.data) return
+    const a = existing.data
+    setForm({
+      internalCode: a.internalCode, assetTypeId: a.assetTypeId, brandId: a.brandId ?? '',
+      model: a.model ?? '', serialNumber: a.serialNumber ?? '', assetTag: a.assetTag ?? '',
+      physicalCondition: a.physicalCondition, locationId: a.locationId ?? '', locationDetail: a.locationDetail ?? '',
+      departmentId: a.departmentId ?? '', currentHolderUserId: a.currentHolderUserId ?? '',
+      purchaseDate: a.purchaseDate?.slice(0, 10) ?? '', supplier: a.supplier ?? '', cost: a.cost,
+      currency: a.currency ?? '', hasWarranty: a.hasWarranty, warrantyEndDate: a.warrantyEndDate?.slice(0, 10) ?? '',
+      notes: a.notes ?? '', imageUrl: a.imageUrl ?? '', spec: a.spec ?? {},
+    })
+    setRowVersion(a.rowVersion)
+  }, [existing.data])
+
+  const selectedType = useMemo(
+    () => catalogs.data?.types.find(t => t.id === form.assetTypeId),
+    [catalogs.data, form.assetTypeId],
+  )
+
+  function buildPayload(): CreateItAssetRequest {
+    const clean = (s?: string) => (s && s.trim() ? s.trim() : undefined)
+    const specEmpty = Object.values(form.spec).every(v => v === undefined || v === '' || v === null)
+    return {
+      internalCode: form.internalCode.trim(),
+      assetTypeId: form.assetTypeId,
+      brandId: clean(form.brandId),
+      model: clean(form.model),
+      serialNumber: clean(form.serialNumber),
+      assetTag: clean(form.assetTag),
+      physicalCondition: form.physicalCondition,
+      locationId: clean(form.locationId),
+      locationDetail: clean(form.locationDetail),
+      departmentId: clean(form.departmentId),
+      currentHolderUserId: clean(form.currentHolderUserId),
+      purchaseDate: clean(form.purchaseDate),
+      supplier: clean(form.supplier),
+      cost: form.cost === undefined || Number.isNaN(form.cost) ? undefined : Number(form.cost),
+      currency: clean(form.currency),
+      hasWarranty: form.hasWarranty,
+      warrantyEndDate: clean(form.warrantyEndDate),
+      notes: clean(form.notes),
+      imageUrl: clean(form.imageUrl),
+      spec: specEmpty ? undefined : form.spec,
+    }
+  }
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const payload = buildPayload()
+      if (isEdit) return itAssetsApi.update(id!, { ...payload, rowVersion }).then(r => r.data.data!)
+      return itAssetsApi.create(payload).then(r => r.data.data!)
+    },
+    onSuccess: (asset) => {
+      invalidate.ti(qc)
+      toast.success(isEdit ? 'Activo actualizado.' : 'Activo registrado.')
+      navigate(`/ti/assets/${asset.id}`)
+    },
+    onError: (e) => toast.error(extractApiError(e)),
+  })
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!form.internalCode.trim()) return toast.error('El código interno es obligatorio.')
+    if (!form.assetTypeId) return toast.error('Seleccione el tipo de activo.')
+    if (selectedType?.requiresSerial && !form.serialNumber?.trim())
+      return toast.error(`El tipo «${selectedType.name}» exige número de serie.`)
+    mutation.mutate()
+  }
+
+  const loadingExisting = isEdit && existing.isLoading
+
+  return (
+    <div className="flex min-h-full flex-col">
+      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-line bg-paper px-6 py-3" style={{ minHeight: 64 }}>
+        <button onClick={() => navigate(-1)} className="rounded p-1.5 text-ink2 hover:bg-bg hover:text-ink" aria-label="Volver">
+          <ArrowLeft className="h-5 w-5" />
+        </button>
+        <div className="min-w-0 flex-1">
+          <p className="font-mono text-[12px] text-ink2 mb-0.5 leading-none">TI / Inventario / {isEdit ? 'Editar' : 'Nuevo'}</p>
+          <h1 className="text-[18px] font-semibold text-ink leading-tight tracking-tight flex items-center gap-2">
+            <Cpu className="h-4.5 w-4.5" style={{ color: BRAND }} /> {isEdit ? 'Editar activo' : 'Registrar activo'}
+          </h1>
+        </div>
+      </header>
+
+      {loadingExisting ? (
+        <div className="flex flex-1 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-ink2" /></div>
+      ) : (
+        <form onSubmit={submit} className="flex-1 p-6 bg-bg">
+          <div className="mx-auto max-w-3xl space-y-3.5">
+
+            {/* Identificación */}
+            <section className="rounded-[10px] border border-line bg-paper p-5 shadow-sh1">
+              <h2 className="mb-4 text-sm font-semibold text-ink">Identificación</h2>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Código interno" required>
+                  <input className={inputCls} value={form.internalCode} onChange={e => set('internalCode', e.target.value)} placeholder="EJ. TI-LAP-001" />
+                </Field>
+                <Field label="Tipo de activo" required>
+                  <select className={inputCls} value={form.assetTypeId} onChange={e => set('assetTypeId', e.target.value)}>
+                    <option value="">Seleccione…</option>
+                    {(catalogs.data?.types ?? []).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </Field>
+                <Field label="Marca">
+                  <select className={inputCls} value={form.brandId} onChange={e => set('brandId', e.target.value)}>
+                    <option value="">—</option>
+                    {(catalogs.data?.brands ?? []).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                </Field>
+                <Field label="Modelo">
+                  <input className={inputCls} value={form.model} onChange={e => set('model', e.target.value)} />
+                </Field>
+                <Field label={`Número de serie${selectedType?.requiresSerial ? '' : ' (opcional)'}`} required={selectedType?.requiresSerial}>
+                  <input className={inputCls} value={form.serialNumber} onChange={e => set('serialNumber', e.target.value)} />
+                </Field>
+                <Field label="Placa / etiqueta">
+                  <input className={inputCls} value={form.assetTag} onChange={e => set('assetTag', e.target.value)} />
+                </Field>
+                <Field label="Estado físico">
+                  <select className={inputCls} value={form.physicalCondition} onChange={e => set('physicalCondition', e.target.value as PhysicalCondition)}>
+                    {CONDITION_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </Field>
+              </div>
+            </section>
+
+            {/* Ubicación / responsable */}
+            <section className="rounded-[10px] border border-line bg-paper p-5 shadow-sh1">
+              <h2 className="mb-4 text-sm font-semibold text-ink">Ubicación y responsable</h2>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Ubicación">
+                  <select className={inputCls} value={form.locationId} onChange={e => set('locationId', e.target.value)}>
+                    <option value="">—</option>
+                    {(catalogs.data?.locations ?? []).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                  </select>
+                </Field>
+                <Field label="Detalle de ubicación">
+                  <input className={inputCls} value={form.locationDetail} onChange={e => set('locationDetail', e.target.value)} placeholder="Oficina, piso, escritorio…" />
+                </Field>
+                <Field label="Departamento">
+                  <select className={inputCls} value={form.departmentId} onChange={e => set('departmentId', e.target.value)}>
+                    <option value="">—</option>
+                    {(catalogs.data?.departments ?? []).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                </Field>
+                <Field label="Responsable actual">
+                  <select className={inputCls} value={form.currentHolderUserId} onChange={e => set('currentHolderUserId', e.target.value)} disabled={!hasPermission('Users.View')}>
+                    <option value="">{hasPermission('Users.View') ? '— Sin asignar —' : 'Sin permiso para listar usuarios'}</option>
+                    {(users.data ?? []).map(u => <option key={u.id} value={u.id}>{u.fullName}</option>)}
+                  </select>
+                </Field>
+              </div>
+            </section>
+
+            {/* Compra / garantía */}
+            <section className="rounded-[10px] border border-line bg-paper p-5 shadow-sh1">
+              <h2 className="mb-4 text-sm font-semibold text-ink">Compra y garantía</h2>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Fecha de compra">
+                  <input type="date" className={inputCls} value={form.purchaseDate} onChange={e => set('purchaseDate', e.target.value)} />
+                </Field>
+                <Field label="Proveedor">
+                  <input className={inputCls} value={form.supplier} onChange={e => set('supplier', e.target.value)} />
+                </Field>
+                <Field label="Costo">
+                  <input type="number" min="0" step="0.01" className={inputCls} value={form.cost ?? ''} onChange={e => set('cost', e.target.value === '' ? undefined : Number(e.target.value))} />
+                </Field>
+                <Field label="Moneda">
+                  <select className={inputCls} value={form.currency} onChange={e => set('currency', e.target.value)}>
+                    <option value="">—</option>
+                    <option value="CRC">CRC (₡)</option>
+                    <option value="USD">USD ($)</option>
+                  </select>
+                </Field>
+                <div className="flex items-center gap-2 pt-6">
+                  <input id="hasWarranty" type="checkbox" checked={form.hasWarranty} onChange={e => set('hasWarranty', e.target.checked)} className="h-4 w-4 rounded border-line" />
+                  <label htmlFor="hasWarranty" className="text-sm text-ink">Tiene garantía</label>
+                </div>
+                {form.hasWarranty && (
+                  <Field label="Vencimiento de garantía">
+                    <input type="date" className={inputCls} value={form.warrantyEndDate} onChange={e => set('warrantyEndDate', e.target.value)} />
+                  </Field>
+                )}
+              </div>
+            </section>
+
+            {/* Especificaciones técnicas (sólo tipos de cómputo) */}
+            {selectedType?.hasComputeSpecs && (
+              <section className="rounded-[10px] border border-line bg-paper p-5 shadow-sh1">
+                <h2 className="mb-1 text-sm font-semibold text-ink">Especificaciones técnicas</h2>
+                <p className="mb-4 text-[11px] text-ink2">El AnyDesk ID es sólo identificador — nunca se guardan contraseñas.</p>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Sistema operativo"><input className={inputCls} value={form.spec.operatingSystem ?? ''} onChange={e => setSpec('operatingSystem', e.target.value)} /></Field>
+                  <Field label="Procesador"><input className={inputCls} value={form.spec.processor ?? ''} onChange={e => setSpec('processor', e.target.value)} /></Field>
+                  <Field label="RAM (GB)"><input type="number" min="0" className={inputCls} value={form.spec.ramGb ?? ''} onChange={e => setSpec('ramGb', e.target.value === '' ? undefined : Number(e.target.value))} /></Field>
+                  <Field label="Disco (GB)"><input type="number" min="0" className={inputCls} value={form.spec.diskGb ?? ''} onChange={e => setSpec('diskGb', e.target.value === '' ? undefined : Number(e.target.value))} /></Field>
+                  <Field label="MAC Ethernet"><input className={inputCls} value={form.spec.macEthernet ?? ''} onChange={e => setSpec('macEthernet', e.target.value)} /></Field>
+                  <Field label="MAC WiFi"><input className={inputCls} value={form.spec.macWifi ?? ''} onChange={e => setSpec('macWifi', e.target.value)} /></Field>
+                  <Field label="Dirección IP"><input className={inputCls} value={form.spec.ipAddress ?? ''} onChange={e => setSpec('ipAddress', e.target.value)} /></Field>
+                  <Field label="Nombre en dominio"><input className={inputCls} value={form.spec.domainName ?? ''} onChange={e => setSpec('domainName', e.target.value)} /></Field>
+                  <Field label="AnyDesk ID"><input className={inputCls} value={form.spec.anyDeskId ?? ''} onChange={e => setSpec('anyDeskId', e.target.value)} /></Field>
+                  <Field label="Usuario Microsoft 365"><input className={inputCls} value={form.spec.microsoft365User ?? ''} onChange={e => setSpec('microsoft365User', e.target.value)} /></Field>
+                  <Field label="Estado antivirus"><input className={inputCls} value={form.spec.antivirusStatus ?? ''} onChange={e => setSpec('antivirusStatus', e.target.value)} /></Field>
+                </div>
+              </section>
+            )}
+
+            {/* Foto + observaciones */}
+            <section className="rounded-[10px] border border-line bg-paper p-5 shadow-sh1">
+              <h2 className="mb-4 text-sm font-semibold text-ink">Foto y observaciones</h2>
+              <div className="mb-4">
+                <PhotoCapture
+                  value={form.imageUrl ? [form.imageUrl] : []}
+                  onChange={(photos) => set('imageUrl', photos[0] ?? '')}
+                  max={1}
+                  label="Foto del activo"
+                  hint="Foto principal del equipo (frontal o etiqueta)."
+                />
+              </div>
+              <Field label="Observaciones">
+                <textarea className={`${inputCls} h-24 py-2`} value={form.notes} onChange={e => set('notes', e.target.value)} />
+              </Field>
+            </section>
+
+            {/* Acciones */}
+            <div className="flex items-center justify-end gap-2.5 pb-2">
+              <Link to="/ti/assets" className="rounded-[8px] border border-line bg-paper px-4 py-2.5 text-sm font-medium text-ink hover:bg-bg">Cancelar</Link>
+              <button type="submit" disabled={mutation.isPending}
+                className="inline-flex items-center gap-2 rounded-[8px] px-5 py-2.5 text-sm font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50"
+                style={{ background: BRAND }}>
+                {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                {isEdit ? 'Guardar cambios' : 'Registrar activo'}
+              </button>
+            </div>
+          </div>
+        </form>
+      )}
+    </div>
+  )
+}

@@ -388,3 +388,248 @@ export interface IdentificationResultDto {
   fromCache?: boolean
   found?: boolean
 }
+
+// ─── TI / Inventario de Activos ──────────────────────────────────────────────────
+// El backend serializa enums como string (JsonStringEnumConverter).
+export type ItAssetStatus =
+  | 'Available' | 'Assigned' | 'Loaned' | 'UnderReview' | 'UnderMaintenance'
+  | 'UnderRepair' | 'Returned' | 'Damaged' | 'Lost' | 'Stolen' | 'Disposed' | 'Inactive'
+
+export type PhysicalCondition = 'New' | 'Good' | 'Fair' | 'Poor' | 'Unusable'
+
+export interface ItAssetListDto {
+  id: string
+  internalCode: string
+  assetTypeName: string
+  brandName?: string
+  model?: string
+  serialNumber?: string
+  status: ItAssetStatus
+  statusName: string
+  locationName?: string
+  departmentName?: string
+  currentHolderName?: string
+  imageUrl?: string
+}
+
+export interface ItAssetSpecDto {
+  operatingSystem?: string
+  processor?: string
+  ramGb?: number
+  diskGb?: number
+  macEthernet?: string
+  macWifi?: string
+  ipAddress?: string
+  domainName?: string
+  anyDeskId?: string
+  microsoft365User?: string
+  antivirusStatus?: string
+  techNotes?: string
+}
+
+export interface ItAssetDto extends ItAssetListDto {
+  assetTypeId: string
+  brandId?: string
+  assetTag?: string
+  physicalCondition: PhysicalCondition
+  physicalConditionName: string
+  locationId?: string
+  locationDetail?: string
+  departmentId?: string
+  currentHolderUserId?: string
+  purchaseDate?: string
+  supplier?: string
+  cost?: number
+  currency?: string
+  hasWarranty: boolean
+  warrantyEndDate?: string
+  notes?: string
+  spec?: ItAssetSpecDto
+  createdAt: string
+  rowVersion?: string
+}
+
+export interface ItAssetHistoryDto {
+  id: string
+  eventType: string
+  fromStatus?: ItAssetStatus
+  toStatus?: ItAssetStatus
+  description?: string
+  occurredAt: string
+}
+
+export interface CreateItAssetRequest {
+  internalCode: string
+  assetTypeId: string
+  brandId?: string
+  model?: string
+  serialNumber?: string
+  assetTag?: string
+  physicalCondition: PhysicalCondition
+  locationId?: string
+  locationDetail?: string
+  departmentId?: string
+  currentHolderUserId?: string
+  purchaseDate?: string
+  supplier?: string
+  cost?: number
+  currency?: string
+  hasWarranty: boolean
+  warrantyEndDate?: string
+  notes?: string
+  imageUrl?: string
+  spec?: ItAssetSpecDto
+}
+
+export interface UpdateItAssetRequest extends CreateItAssetRequest {
+  rowVersion?: string
+}
+
+export interface ChangeItAssetStatusRequest {
+  status: ItAssetStatus
+  reason?: string
+}
+
+export interface ItAssetTypeDto {
+  id: string
+  name: string
+  code: string
+  requiresSerial: boolean
+  isAssignable: boolean
+  hasComputeSpecs: boolean
+  iconName?: string
+}
+
+export interface ItCatalogItemDto {
+  id: string
+  name: string
+  code?: string
+}
+
+export interface ItCatalogsDto {
+  types: ItAssetTypeDto[]
+  brands: ItCatalogItemDto[]
+  locations: ItCatalogItemDto[]
+  departments: ItCatalogItemDto[]
+}
+
+export interface CreateCatalogItemRequest {
+  name: string
+  code?: string
+}
+
+export interface ItCountByLabelDto {
+  label: string
+  count: number
+}
+
+export interface ItDashboardDto {
+  totalAssets: number
+  assigned: number
+  available: number
+  underRepair: number
+  underMaintenance: number
+  disposed: number
+  totalCostCrc: number
+  totalCostUsd: number
+  withoutSerial: number
+  withoutTag: number
+  withoutHolder: number
+  warrantyExpiringSoon: number
+  byType: ItCountByLabelDto[]
+  byStatus: ItCountByLabelDto[]
+  byDepartment: ItCountByLabelDto[]
+}
+
+// ─── TI / Boletas ────────────────────────────────────────────────────────────────
+export type ItTicketType =
+  | 'Entrega' | 'Devolucion' | 'Prestamo' | 'Mantenimiento' | 'Reparacion'
+  | 'Traslado' | 'CambioResponsable' | 'AsignacionAccesorios' | 'Baja'
+
+export type ItTicketStatus = 'Borrador' | 'PendienteFirma' | 'Firmada' | 'Emitida' | 'Anulada'
+
+export interface ItTicketListDto {
+  id: string
+  ticketNumber: string
+  ticketType: ItTicketType
+  ticketTypeName: string
+  status: ItTicketStatus
+  statusName: string
+  issuedAt: string
+  employeeName?: string
+  itResponsibleName?: string
+  assetCount: number
+}
+
+export interface ItTicketLineDto {
+  assetId?: string
+  lineType: string
+  internalCode?: string
+  typeName?: string
+  description?: string
+  serialNumber?: string
+  condition?: string
+}
+
+export interface ItTicketSignatureDto {
+  signerType: string
+  signerName?: string
+  imageBase64: string
+  signedAt: string
+}
+
+export interface ItTicketPhotoDto {
+  id: string
+  imageBase64: string
+}
+
+export interface ItTicketDto extends ItTicketListDto {
+  notes?: string
+  pdfSha256?: string
+  hasPdf: boolean
+  voidReason?: string
+  voidedAt?: string
+  lines: ItTicketLineDto[]
+  photos: ItTicketPhotoDto[]
+  signatures: ItTicketSignatureDto[]
+}
+
+export interface SignatureInput {
+  signerType: string
+  signerName?: string
+  imageBase64: string
+}
+
+export interface CreateAssignmentRequest {
+  employeeUserId: string
+  assetIds: string[]
+  conditionOut: PhysicalCondition
+  accessories?: string
+  notes?: string
+  photos: string[]
+  signatures: SignatureInput[]
+}
+
+export interface CreateReturnRequest {
+  assetId: string
+  conditionIn: PhysicalCondition
+  resultingStatus: ItAssetStatus
+  returnNotes?: string
+  photos: string[]
+  signatures: SignatureInput[]
+}
+
+export interface CreateGenericTicketRequest {
+  ticketType: ItTicketType
+  assetIds: string[]
+  employeeUserId?: string
+  notes?: string
+  newAssetStatus?: ItAssetStatus
+  statusReason?: string
+  photos: string[]
+  signatures: SignatureInput[]
+}
+
+export interface VoidTicketRequest {
+  reason: string
+}

@@ -1,3 +1,4 @@
+using RepagroSuite.Domain.Common;
 using RepagroSuite.Domain.Interfaces.Repositories;
 
 namespace RepagroSuite.Domain.Interfaces;
@@ -7,6 +8,15 @@ public interface IUnitOfWork : IDisposable
     IUserRepository Users { get; }
     IRoomRepository Rooms { get; }
     IReservationRepository Reservations { get; }
+    IItAssetRepository ItAssets { get; }
+    IItTicketRepository ItTickets { get; }
+
+    /// <summary>
+    /// Repositorio genérico para entidades que no tienen repositorio especializado
+    /// (p.ej. el módulo TI). Cachea una instancia por tipo dentro del scope.
+    /// </summary>
+    IGenericRepository<T> Repository<T>() where T : BaseEntity;
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
     Task BeginTransactionAsync(CancellationToken cancellationToken = default);
     Task CommitTransactionAsync(CancellationToken cancellationToken = default);

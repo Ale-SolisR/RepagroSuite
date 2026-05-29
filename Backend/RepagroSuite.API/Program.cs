@@ -142,7 +142,11 @@ builder.Services.AddAuthorization(options =>
         "AuditLogs.View", "Reports.View",
         "Settings.View", "Settings.Update", "Settings.Email.View", "Settings.Email.Update",
         "Settings.Email.Test", "Settings.Modules.View", "Settings.Modules.Create",
-        "Settings.Modules.Update", "Settings.Modules.Delete", "Settings.Security.Manage"
+        "Settings.Modules.Update", "Settings.Modules.Delete", "Settings.Security.Manage",
+        // Módulo TI / Inventario
+        "Ti.Inventory.View", "Ti.Inventory.Create", "Ti.Inventory.Update", "Ti.Inventory.Delete",
+        "Ti.Catalog.Manage", "Ti.Dashboard.View",
+        "Ti.Assign", "Ti.Return", "Ti.Ticket.Create", "Ti.Ticket.Void"
     };
 
     foreach (var perm in permissions)
