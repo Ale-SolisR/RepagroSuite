@@ -44,6 +44,24 @@ public class ItAssetsController : ControllerBase
         return Ok(ApiResponse<ItDashboardDto>.Ok(result));
     }
 
+    [HttpGet("export/excel")]
+    [Authorize(Policy = "Ti.Inventory.View")]
+    public async Task<IActionResult> ExportExcel(CancellationToken ct)
+    {
+        var bytes = await _assets.ExportInventoryExcelAsync(ct);
+        var name = $"Inventario_TI_REPAGRO_{DateTime.Now:yyyyMMdd_HHmm}.xlsx";
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", name);
+    }
+
+    [HttpGet("export/pdf")]
+    [Authorize(Policy = "Ti.Dashboard.View")]
+    public async Task<IActionResult> ExportDashboardPdf(CancellationToken ct)
+    {
+        var bytes = await _assets.GenerateDashboardPdfAsync(ct);
+        var name = $"Dashboard_TI_REPAGRO_{DateTime.Now:yyyyMMdd_HHmm}.pdf";
+        return File(bytes, "application/pdf", name);
+    }
+
     [HttpGet("{id:guid}")]
     [Authorize(Policy = "Ti.Inventory.View")]
     public async Task<ActionResult<ApiResponse<ItAssetDto>>> GetById(Guid id, CancellationToken ct)

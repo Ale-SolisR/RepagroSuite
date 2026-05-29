@@ -76,7 +76,22 @@ public class ItAssetRepository : GenericRepository<ItAsset>, IItAssetRepository
         => await _dbSet
             .Include(a => a.AssetType)
             .Include(a => a.Department)
+            .Include(a => a.Brand)
+            .Include(a => a.Location)
+            .Include(a => a.Holder)
             .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<ItAsset>> GetAllForExportAsync(CancellationToken cancellationToken = default)
+        => await _dbSet
+            .Include(a => a.AssetType)
+            .Include(a => a.Department)
+            .Include(a => a.Brand)
+            .Include(a => a.Location)
+            .Include(a => a.Holder)
+            .Include(a => a.Spec)
+            .AsNoTracking()
+            .OrderBy(a => a.InternalCode)
             .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<ItAssetType>> GetTypesAsync(CancellationToken cancellationToken = default)

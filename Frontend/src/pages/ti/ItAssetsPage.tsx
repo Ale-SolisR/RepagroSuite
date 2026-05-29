@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Plus, Search, Cpu, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, Search, Cpu, ChevronLeft, ChevronRight, FileSpreadsheet } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 import { itAssetsApi, itCatalogsApi } from '@/api/itAssets'
 import { qk, staleTimes } from '@/lib/queryKeys'
+import { downloadBlob } from '@/lib/download'
+import { extractApiError } from '@/utils'
 import { useAuthStore } from '@/store/authStore'
 import Chip from '@/components/ui/Chip'
 import { statusChipVariant, STATUS_OPTIONS } from '@/components/ti/itStatus'
@@ -20,6 +23,20 @@ export default function ItAssetsPage() {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
   const [typeId, setTypeId] = useState('')
+  const [exporting, setExporting] = useState(false)
+
+  async function exportExcel() {
+    setExporting(true)
+    try {
+      const res = await itAssetsApi.exportExcel()
+      const name = `Inventario_TI_REPAGRO_${new Date().toISOString().slice(0, 10)}.xlsx`
+      downloadBlob(res.data as Blob, name)
+    } catch (e) {
+      toast.error(extractApiError(e))
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const catalogs = useQuery({
     queryKey: qk.ti.catalogs,
@@ -53,6 +70,13 @@ export default function ItAssetsPage() {
             <Cpu className="h-4.5 w-4.5" style={{ color: BRAND }} /> Activos tecnológicos
           </h1>
         </div>
+        <button
+          onClick={exportExcel}
+          disabled={exporting}
+          className="inline-flex items-center gap-1.5 rounded-[8px] border border-line bg-paper px-3.5 py-2 text-sm font-medium text-ink transition-colors hover:bg-bg disabled:opacity-50"
+        >
+          <FileSpreadsheet className="h-4 w-4" style={{ color: '#1D7044' }} /> {exporting ? 'Generando…' : 'Exportar Excel'}
+        </button>
         {canCreate && (
           <Link to="/ti/assets/new" className="inline-flex items-center gap-1.5 rounded-[8px] px-3.5 py-2 text-sm font-medium text-white transition-colors hover:opacity-90" style={{ background: BRAND }}>
             <Plus className="h-4 w-4" /> Nuevo activo

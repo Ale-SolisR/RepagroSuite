@@ -523,22 +523,71 @@ export interface ItCountByLabelDto {
   count: number
 }
 
+export interface ItTrendPointDto {
+  label: string
+  count: number
+}
+
+export interface ItValueBreakdownDto {
+  label: string
+  count: number
+  crc: number
+  usd: number
+}
+
+export interface ItValueByLabelDto {
+  label: string
+  crc: number
+  usd: number
+  assetCount: number
+  breakdown: ItValueBreakdownDto[]
+}
+
 export interface ItDashboardDto {
   totalAssets: number
   assigned: number
   available: number
+  loaned: number
   underRepair: number
   underMaintenance: number
+  damaged: number
+  lost: number
+  stolen: number
   disposed: number
+
   totalCostCrc: number
   totalCostUsd: number
+  assetsWithCost: number
+
+  assignmentRatePct: number
+  availabilityRatePct: number
+  dataQualityPct: number
+  incidentRatePct: number
+
   withoutSerial: number
   withoutTag: number
   withoutHolder: number
   warrantyExpiringSoon: number
+
+  warrantyActive: number
+  warrantyExpired: number
+  withoutWarranty: number
+
+  avgAgeMonths: number
+  assetsWithPurchaseDate: number
+
   byType: ItCountByLabelDto[]
   byStatus: ItCountByLabelDto[]
   byDepartment: ItCountByLabelDto[]
+  byBrand: ItCountByLabelDto[]
+  byLocation: ItCountByLabelDto[]
+  byCondition: ItCountByLabelDto[]
+  byAgeBucket: ItCountByLabelDto[]
+  topHolders: ItCountByLabelDto[]
+  valueByHolder: ItValueByLabelDto[]
+  acquisitionTrend: ItTrendPointDto[]
+
+  generatedAt: string
 }
 
 // ─── TI / Boletas ────────────────────────────────────────────────────────────────

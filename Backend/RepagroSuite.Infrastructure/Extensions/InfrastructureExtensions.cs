@@ -68,6 +68,7 @@ public static class InfrastructureExtensions
         // Módulo TI — boletas
         services.AddScoped<ISequenceGenerator, SequenceGenerator>();
         services.AddSingleton<IPdfGenerator, PdfGenerator>();
+        services.AddSingleton<IItExcelExporter, ItExcelExporter>();
 
         return services;
     }

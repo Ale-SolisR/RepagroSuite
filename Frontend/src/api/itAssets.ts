@@ -28,6 +28,12 @@ export const itAssetsApi = {
   getDashboard: () =>
     api.get<ApiResponse<ItDashboardDto>>('/ti/assets/dashboard'),
 
+  exportExcel: () =>
+    api.get('/ti/assets/export/excel', { responseType: 'blob' }),
+
+  exportDashboardPdf: () =>
+    api.get('/ti/assets/export/pdf', { responseType: 'blob' }),
+
   create: (data: CreateItAssetRequest) =>
     api.post<ApiResponse<ItAssetDto>>('/ti/assets', data),
 

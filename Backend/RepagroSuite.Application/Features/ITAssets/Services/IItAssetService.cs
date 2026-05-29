@@ -15,4 +15,6 @@ public interface IItAssetService
     Task<ItAssetDto> ChangeStatusAsync(Guid id, ChangeItAssetStatusDto dto, Guid updatedBy, CancellationToken cancellationToken = default);
     Task DeleteAsync(Guid id, Guid deletedBy, CancellationToken cancellationToken = default);
     Task<ItDashboardDto> GetDashboardAsync(CancellationToken cancellationToken = default);
+    Task<byte[]> ExportInventoryExcelAsync(CancellationToken cancellationToken = default);
+    Task<byte[]> GenerateDashboardPdfAsync(CancellationToken cancellationToken = default);
 }

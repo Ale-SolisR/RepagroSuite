@@ -1,3 +1,5 @@
+using RepagroSuite.Application.Features.ITAssets.DTOs;
+
 namespace RepagroSuite.Application.Common.Interfaces;
 
 public class TicketPdfLine
@@ -35,4 +37,7 @@ public interface IPdfGenerator
 {
     /// <summary>Genera el PDF de una boleta TI. Devuelve los bytes (para hash + almacenamiento).</summary>
     byte[] GenerateTicketPdf(TicketPdfModel model);
+
+    /// <summary>Genera el PDF ejecutivo del dashboard de inventario TI (KPIs, gráficos y distribuciones).</summary>
+    byte[] GenerateDashboardPdf(ItDashboardDto dashboard);
 }

@@ -19,8 +19,11 @@ public interface IItAssetRepository : IGenericRepository<ItAsset>
     Task<bool> InternalCodeExistsAsync(string internalCode, Guid? excludeId = null, CancellationToken cancellationToken = default);
     Task<bool> SerialExistsAsync(string serialNumber, Guid? excludeId = null, CancellationToken cancellationToken = default);
 
-    /// <summary>Todos los activos vivos con Tipo y Departamento incluidos, para calcular KPIs del dashboard.</summary>
+    /// <summary>Todos los activos vivos con Tipo, Depto, Marca, Ubicación y Responsable, para KPIs del dashboard.</summary>
     Task<IReadOnlyList<ItAsset>> GetAllForDashboardAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Todos los activos con relaciones completas (incluye Spec) ordenados por código, para exportación a Excel.</summary>
+    Task<IReadOnlyList<ItAsset>> GetAllForExportAsync(CancellationToken cancellationToken = default);
 
     // Catálogos
     Task<IReadOnlyList<ItAssetType>> GetTypesAsync(CancellationToken cancellationToken = default);

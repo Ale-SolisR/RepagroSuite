@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { X, Search, Loader2, UserPlus, CheckCircle2 } from 'lucide-react'
+import { X, Loader2, UserPlus, CheckCircle2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { itEmployeesApi } from '@/api/itEmployees'
 import { qk } from '@/lib/queryKeys'
@@ -22,17 +22,31 @@ export default function EmployeeCreateModal({ open, onClose, onCreated }: Props)
   const [fullName, setFullName] = useState('')
   const [position, setPosition] = useState('')
   const [looked, setLooked] = useState<'idle' | 'found' | 'notfound'>('idle')
+  const lastLookup = useRef('')   // última cédula buscada, evita repetir
 
-  function reset() { setCedula(''); setFullName(''); setPosition(''); setLooked('idle') }
+  function reset() { setCedula(''); setFullName(''); setPosition(''); setLooked('idle'); lastLookup.current = '' }
 
   const lookup = useMutation({
-    mutationFn: () => itEmployeesApi.lookup(cedula).then(r => r.data.data!),
+    mutationFn: (digits: string) => itEmployeesApi.lookup(digits).then(r => r.data.data!),
     onSuccess: (res) => {
       if (res.found && res.fullName) { setFullName(res.fullName); setLooked('found') }
       else { setLooked('notfound') }
     },
     onError: (e) => toast.error(extractApiError(e)),
   })
+
+  // Búsqueda automática instantánea (con debounce) en cuanto la cédula es válida.
+  useEffect(() => {
+    if (!open) return
+    const digits = cedula.replace(/\D/g, '')
+    if (digits.length < 9 || digits === lastLookup.current) return
+    const t = setTimeout(() => {
+      lastLookup.current = digits
+      lookup.mutate(digits)
+    }, 400)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cedula, open])
 
   const create = useMutation({
     mutationFn: () => itEmployeesApi.create({
@@ -50,7 +64,7 @@ export default function EmployeeCreateModal({ open, onClose, onCreated }: Props)
   function submit() {
     const digits = cedula.replace(/\D/g, '')
     if (digits.length < 9) return toast.error('Ingrese una cédula válida.')
-    if (!fullName.trim()) return toast.error('Falta el nombre. Use "Buscar" o escríbalo.')
+    if (!fullName.trim()) return toast.error('Falta el nombre. Espere la búsqueda o escríbalo.')
     create.mutate()
   }
 
@@ -70,20 +84,20 @@ export default function EmployeeCreateModal({ open, onClose, onCreated }: Props)
         <div className="space-y-3 p-5">
           <div>
             <label className="mb-1 block text-[12px] font-medium text-ink2">Cédula *</label>
-            <div className="flex gap-2">
+            <div className="relative">
               <input
                 className={inputCls}
                 value={cedula}
                 onChange={e => { setCedula(e.target.value); setLooked('idle') }}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); lookup.mutate() } }}
                 placeholder="1 0123 0456"
                 inputMode="numeric"
+                autoFocus
               />
-              <button type="button" onClick={() => lookup.mutate()} disabled={lookup.isPending || cedula.replace(/\D/g, '').length < 9}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-[8px] px-3 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-40" style={{ background: BRAND }}>
-                {lookup.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />} Buscar
-              </button>
+              {lookup.isPending && <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-ink2" />}
             </div>
+            {looked === 'idle' && cedula.replace(/\D/g, '').length > 0 && cedula.replace(/\D/g, '').length < 9 && (
+              <p className="mt-1 text-[11px] text-ink2">Digite la cédula completa para buscar el nombre automáticamente.</p>
+            )}
             {looked === 'found' && <p className="mt-1 flex items-center gap-1 text-[11px] text-emerald-700"><CheckCircle2 className="h-3 w-3" /> Nombre autocompletado desde el registro civil.</p>}
             {looked === 'notfound' && <p className="mt-1 text-[11px] text-amber-700">No se encontró la cédula. Puede escribir el nombre manualmente.</p>}
           </div>
