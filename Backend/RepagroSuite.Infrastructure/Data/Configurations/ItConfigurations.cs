@@ -104,7 +104,7 @@ public class ItAssetConfiguration : IEntityTypeConfiguration<ItAsset>
         builder.Property(x => x.LocationId).HasColumnName("UbicacionId");
         builder.Property(x => x.LocationDetail).HasColumnName("DetalleUbicacion").HasMaxLength(200);
         builder.Property(x => x.DepartmentId).HasColumnName("DepartamentoId");
-        builder.Property(x => x.CurrentHolderUserId).HasColumnName("ResponsableActualId");
+        builder.Property(x => x.CurrentHolderEmployeeId).HasColumnName("ResponsableActualId");
 
         builder.Property(x => x.PurchaseDate).HasColumnName("FechaCompra");
         builder.Property(x => x.Supplier).HasColumnName("Proveedor").HasMaxLength(150);
@@ -121,7 +121,7 @@ public class ItAssetConfiguration : IEntityTypeConfiguration<ItAsset>
         builder.HasOne(x => x.Brand).WithMany(b => b.Assets).HasForeignKey(x => x.BrandId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.Location).WithMany(l => l.Assets).HasForeignKey(x => x.LocationId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.Department).WithMany(d => d.Assets).HasForeignKey(x => x.DepartmentId).OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne(x => x.CurrentHolder).WithMany().HasForeignKey(x => x.CurrentHolderUserId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.Holder).WithMany().HasForeignKey(x => x.CurrentHolderEmployeeId).OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(x => x.Spec).WithOne(s => s.Asset).HasForeignKey<ItAssetSpec>(s => s.AssetId).OnDelete(DeleteBehavior.Cascade);
         builder.HasMany(x => x.History).WithOne(h => h.Asset).HasForeignKey(h => h.AssetId).OnDelete(DeleteBehavior.Cascade);
@@ -153,6 +153,30 @@ public class ItAssetSpecConfiguration : IEntityTypeConfiguration<ItAssetSpec>
         builder.Property(x => x.Microsoft365User).HasColumnName("UsuarioM365").HasMaxLength(150);
         builder.Property(x => x.AntivirusStatus).HasColumnName("EstadoAntivirus").HasMaxLength(50);
         builder.Property(x => x.TechNotes).HasColumnName("ObservacionesTecnicas").HasMaxLength(1000);
+
+        builder.HasQueryFilter(x => !x.IsDeleted);
+    }
+}
+
+public class ItEmployeeConfiguration : IEntityTypeConfiguration<ItEmployee>
+{
+    public void Configure(EntityTypeBuilder<ItEmployee> builder)
+    {
+        builder.ToTable("TI_Colaboradores");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.RowVersion).IsRowVersion();
+        builder.MapBaseEntityColumns();
+
+        builder.Property(x => x.IdentificationType).HasColumnName("TipoIdentificacion");
+        builder.Property(x => x.IdentificationNumber).HasColumnName("Identificacion").IsRequired().HasMaxLength(30);
+        builder.Property(x => x.NormalizedIdentificationNumber).HasColumnName("IdentificacionNormalizada").IsRequired().HasMaxLength(30);
+        builder.HasIndex(x => x.NormalizedIdentificationNumber).IsUnique().HasFilter("[EliminadoLogico] = 0");
+        builder.Property(x => x.FullName).HasColumnName("NombreCompleto").IsRequired().HasMaxLength(200);
+        builder.Property(x => x.Position).HasColumnName("Puesto").HasMaxLength(150);
+        builder.Property(x => x.Department).HasColumnName("Departamento").HasMaxLength(150);
+        builder.Property(x => x.Email).HasColumnName("Correo").HasMaxLength(200);
+        builder.Property(x => x.PhoneNumber).HasColumnName("Telefono").HasMaxLength(30);
+        builder.Property(x => x.IsActive).HasColumnName("EsActivo");
 
         builder.HasQueryFilter(x => !x.IsDeleted);
     }

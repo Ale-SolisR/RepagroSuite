@@ -40,6 +40,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<ItTicketSignature> ItTicketSignatures => Set<ItTicketSignature>();
     public DbSet<ItTicketPhoto> ItTicketPhotos => Set<ItTicketPhoto>();
     public DbSet<ItDocumentSequence> ItDocumentSequences => Set<ItDocumentSequence>();
+    public DbSet<ItEmployee> ItEmployees => Set<ItEmployee>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -105,6 +106,7 @@ public class ApplicationDbContext : DbContext
             new() { Id = new Guid("a0000001-0000-0000-0000-000000000038"), Code = "Ti.Return",           Name = "Devolver activos TI",      Module = "TI", IsActive = true, CreatedAt = now, RowVersion = [] },
             new() { Id = new Guid("a0000001-0000-0000-0000-000000000039"), Code = "Ti.Ticket.Create",    Name = "Crear boletas TI",         Module = "TI", IsActive = true, CreatedAt = now, RowVersion = [] },
             new() { Id = new Guid("a0000001-0000-0000-0000-000000000040"), Code = "Ti.Ticket.Void",      Name = "Anular boletas TI",        Module = "TI", IsActive = true, CreatedAt = now, RowVersion = [] },
+            new() { Id = new Guid("a0000001-0000-0000-0000-000000000041"), Code = "Ti.Employee.Manage",   Name = "Gestionar colaboradores TI", Module = "TI", IsActive = true, CreatedAt = now, RowVersion = [] },
         };
         modelBuilder.Entity<Permission>().HasData(allPerms);
 

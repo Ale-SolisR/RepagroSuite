@@ -6,11 +6,13 @@ import toast from 'react-hot-toast'
 
 import { itAssetsApi } from '@/api/itAssets'
 import { itTicketsApi } from '@/api/itTickets'
-import { usersApi } from '@/api/users'
+import { itEmployeesApi } from '@/api/itEmployees'
 import { qk, staleTimes, invalidate } from '@/lib/queryKeys'
+import { useAuthStore } from '@/store/authStore'
 import { extractApiError } from '@/utils'
 import PhotoCapture from '@/components/ti/PhotoCapture'
 import SignaturePad from '@/components/ti/SignaturePad'
+import EmployeeCreateModal from '@/components/ti/EmployeeCreateModal'
 import { CONDITION_OPTIONS } from '@/components/ti/itStatus'
 import type { PhysicalCondition, SignatureInput } from '@/types'
 
@@ -20,10 +22,12 @@ const inputCls = 'h-10 w-full rounded-[8px] border border-line bg-paper px-3 tex
 export default function ItAssignmentWizardPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const { hasPermission } = useAuthStore()
   const [params] = useSearchParams()
   const preAsset = params.get('assetId')
 
   const [employeeId, setEmployeeId] = useState('')
+  const [empModal, setEmpModal] = useState(false)
   const [assetIds, setAssetIds] = useState<string[]>(preAsset ? [preAsset] : [])
   const [condition, setCondition] = useState<PhysicalCondition>('Good')
   const [accessories, setAccessories] = useState('')
@@ -32,10 +36,10 @@ export default function ItAssignmentWizardPage() {
   const [sigEmployee, setSigEmployee] = useState<string | null>(null)
   const [sigIt, setSigIt] = useState<string | null>(null)
 
-  const users = useQuery({
-    queryKey: qk.users.list,
-    queryFn: () => usersApi.getAll({ pageSize: 200, status: 'Active' }).then(r => r.data.data?.items ?? []),
-    staleTime: staleTimes.roomsList,
+  const employees = useQuery({
+    queryKey: [...qk.ti.all, 'employees-active'] as const,
+    queryFn: () => itEmployeesApi.getActive().then(r => r.data.data ?? []),
+    staleTime: staleTimes.ti,
   })
 
   const assets = useQuery({
@@ -51,10 +55,10 @@ export default function ItAssignmentWizardPage() {
   const mutation = useMutation({
     mutationFn: () => {
       const signatures: SignatureInput[] = []
-      if (sigEmployee) signatures.push({ signerType: 'Colaborador', signerName: users.data?.find(u => u.id === employeeId)?.fullName, imageBase64: sigEmployee })
+      if (sigEmployee) signatures.push({ signerType: 'Colaborador', signerName: employees.data?.find(e => e.id === employeeId)?.fullName, imageBase64: sigEmployee })
       if (sigIt) signatures.push({ signerType: 'ResponsableTI', imageBase64: sigIt })
       return itTicketsApi.createAssignment({
-        employeeUserId: employeeId, assetIds, conditionOut: condition,
+        employeeId, assetIds, conditionOut: condition,
         accessories: accessories || undefined, notes: notes || undefined, photos, signatures,
       }).then(r => r.data.data!)
     },
@@ -91,10 +95,16 @@ export default function ItAssignmentWizardPage() {
           <section className="rounded-[10px] border border-line bg-paper p-5 shadow-sh1">
             <h2 className="mb-3 text-sm font-semibold text-ink">Colaborador y equipos</h2>
             <label className="mb-1 block text-[12px] font-medium text-ink2">Colaborador *</label>
-            <select className={`${inputCls} mb-4`} value={employeeId} onChange={e => setEmployeeId(e.target.value)}>
-              <option value="">Seleccione…</option>
-              {(users.data ?? []).map(u => <option key={u.id} value={u.id}>{u.fullName}</option>)}
-            </select>
+            <div className="mb-4 flex gap-2">
+              <select className={inputCls} value={employeeId} onChange={e => setEmployeeId(e.target.value)}>
+                <option value="">Seleccione…</option>
+                {(employees.data ?? []).map(emp => <option key={emp.id} value={emp.id}>{emp.fullName}{emp.position ? ` · ${emp.position}` : ''}</option>)}
+              </select>
+              {hasPermission('Ti.Employee.Manage') && (
+                <button type="button" onClick={() => setEmpModal(true)} title="Nuevo colaborador"
+                  className="inline-flex shrink-0 items-center rounded-[8px] border border-line bg-paper px-3 text-sm font-medium text-ink hover:bg-bg">+</button>
+              )}
+            </div>
 
             <label className="mb-1 block text-[12px] font-medium text-ink2">Activos disponibles *</label>
             <div className="max-h-64 overflow-y-auto rounded-[8px] border border-line">
@@ -151,6 +161,12 @@ export default function ItAssignmentWizardPage() {
           </section>
         </div>
       </div>
+
+      <EmployeeCreateModal
+        open={empModal}
+        onClose={() => setEmpModal(false)}
+        onCreated={(emp) => { employees.refetch(); setEmployeeId(emp.id) }}
+      />
     </div>
   )
 }

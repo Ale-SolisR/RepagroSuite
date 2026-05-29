@@ -436,7 +436,7 @@ export interface ItAssetDto extends ItAssetListDto {
   locationId?: string
   locationDetail?: string
   departmentId?: string
-  currentHolderUserId?: string
+  currentHolderEmployeeId?: string
   purchaseDate?: string
   supplier?: string
   cost?: number
@@ -469,7 +469,7 @@ export interface CreateItAssetRequest {
   locationId?: string
   locationDetail?: string
   departmentId?: string
-  currentHolderUserId?: string
+  currentHolderEmployeeId?: string
   purchaseDate?: string
   supplier?: string
   cost?: number
@@ -601,7 +601,7 @@ export interface SignatureInput {
 }
 
 export interface CreateAssignmentRequest {
-  employeeUserId: string
+  employeeId: string
   assetIds: string[]
   conditionOut: PhysicalCondition
   accessories?: string
@@ -622,7 +622,7 @@ export interface CreateReturnRequest {
 export interface CreateGenericTicketRequest {
   ticketType: ItTicketType
   assetIds: string[]
-  employeeUserId?: string
+  employeeId?: string
   notes?: string
   newAssetStatus?: ItAssetStatus
   statusReason?: string
@@ -632,4 +632,41 @@ export interface CreateGenericTicketRequest {
 
 export interface VoidTicketRequest {
   reason: string
+}
+
+// ─── TI / Colaboradores ──────────────────────────────────────────────────────────
+export interface ItEmployeeDto {
+  id: string
+  identificationNumber: string
+  fullName: string
+  position?: string
+  department?: string
+  email?: string
+  phoneNumber?: string
+  isActive: boolean
+}
+
+export interface CreateItEmployeeRequest {
+  identificationNumber: string
+  fullName: string
+  position?: string
+  department?: string
+  email?: string
+  phoneNumber?: string
+}
+
+export interface UpdateItEmployeeRequest {
+  fullName: string
+  position?: string
+  department?: string
+  email?: string
+  phoneNumber?: string
+  isActive: boolean
+}
+
+// Resultado del lookup de cédula (endpoint /identifications/lookup).
+export interface IdentificationLookupResult {
+  identificationNumber: string
+  fullName?: string
+  found: boolean
 }

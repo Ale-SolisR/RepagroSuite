@@ -63,9 +63,9 @@ public class ItTicketService : IItTicketService
 
         var ticketId = await _uow.ExecuteInTransactionAsync(async ct =>
         {
-            var employee = await _uow.Users.GetByIdAsync(dto.EmployeeUserId, ct)
+            var employee = await _uow.ItEmployees.GetByIdAsync(dto.EmployeeId, ct)
                 ?? throw new InvalidOperationException("Colaborador no encontrado.");
-            if (employee.Status != UserStatus.Active)
+            if (!employee.IsActive)
                 throw new InvalidOperationException("El colaborador no está activo.");
 
             var number = await _sequence.NextTicketNumberAsync(ItTicket.TypeCode(ItTicketType.Entrega), ct);
@@ -74,7 +74,7 @@ public class ItTicketService : IItTicketService
                 TicketNumber = number,
                 TicketType = ItTicketType.Entrega,
                 Status = ItTicketStatus.Emitida,
-                EmployeeUserId = employee.Id,
+                EmployeeId = employee.Id,
                 ItResponsibleUserId = actorUserId,
                 Notes = dto.Notes?.Trim(),
                 CreatedBy = actorUserId
@@ -95,14 +95,14 @@ public class ItTicketService : IItTicketService
 
                 await _uow.Repository<ItAssignment>().AddAsync(new ItAssignment
                 {
-                    AssetId = asset.Id, EmployeeUserId = employee.Id, AssignedTicketId = ticket.Id,
+                    AssetId = asset.Id, EmployeeId = employee.Id, AssignedTicketId = ticket.Id,
                     ConditionOut = dto.ConditionOut, Accessories = dto.Accessories?.Trim(),
                     Status = AssignmentStatus.Activa, CreatedBy = actorUserId
                 }, ct);
 
                 var from = asset.Status;
                 asset.Status = ItAssetStatus.Assigned;
-                asset.CurrentHolderUserId = employee.Id;
+                asset.CurrentHolderEmployeeId = employee.Id;
                 asset.UpdatedBy = actorUserId;
                 _uow.ItAssets.Update(asset);
                 await AddHistoryAsync(asset.Id, from, ItAssetStatus.Assigned, $"Asignado a {employee.FullName} ({number}).", actorUserId, ct);
@@ -143,7 +143,7 @@ public class ItTicketService : IItTicketService
                 TicketNumber = number,
                 TicketType = ItTicketType.Devolucion,
                 Status = ItTicketStatus.Emitida,
-                EmployeeUserId = assignment.EmployeeUserId,
+                EmployeeId = assignment.EmployeeId,
                 ItResponsibleUserId = actorUserId,
                 Notes = dto.ReturnNotes?.Trim(),
                 CreatedBy = actorUserId
@@ -168,7 +168,7 @@ public class ItTicketService : IItTicketService
 
             var from = asset.Status;
             asset.Status = dto.ResultingStatus;
-            asset.CurrentHolderUserId = null;
+            asset.CurrentHolderEmployeeId = null;
             asset.PhysicalCondition = dto.ConditionIn;
             asset.UpdatedBy = actorUserId;
             _uow.ItAssets.Update(asset);
@@ -198,7 +198,7 @@ public class ItTicketService : IItTicketService
                 TicketNumber = number,
                 TicketType = dto.TicketType,
                 Status = ItTicketStatus.Emitida,
-                EmployeeUserId = dto.EmployeeUserId,
+                EmployeeId = dto.EmployeeId,
                 ItResponsibleUserId = actorUserId,
                 Notes = dto.Notes?.Trim(),
                 CreatedBy = actorUserId

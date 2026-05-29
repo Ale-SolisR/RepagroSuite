@@ -21,7 +21,7 @@ public class ItTicketConfiguration : IEntityTypeConfiguration<ItTicket>
         builder.Property(x => x.IssuedAt).HasColumnName("EmitidaEn");
         builder.HasIndex(x => x.IssuedAt);
 
-        builder.Property(x => x.EmployeeUserId).HasColumnName("ColaboradorId");
+        builder.Property(x => x.EmployeeId).HasColumnName("ColaboradorId");
         builder.Property(x => x.ItResponsibleUserId).HasColumnName("ResponsableTiId");
         builder.Property(x => x.Notes).HasColumnName("Observaciones").HasMaxLength(2000);
 
@@ -32,7 +32,7 @@ public class ItTicketConfiguration : IEntityTypeConfiguration<ItTicket>
         builder.Property(x => x.VoidedAt).HasColumnName("AnuladaEn");
         builder.Property(x => x.VoidReason).HasColumnName("MotivoAnulacion").HasMaxLength(500);
 
-        builder.HasOne(x => x.Employee).WithMany().HasForeignKey(x => x.EmployeeUserId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.Employee).WithMany().HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.ItResponsible).WithMany().HasForeignKey(x => x.ItResponsibleUserId).OnDelete(DeleteBehavior.Restrict);
         builder.HasMany(x => x.Details).WithOne(d => d.Ticket).HasForeignKey(d => d.TicketId).OnDelete(DeleteBehavior.Cascade);
         builder.HasMany(x => x.Photos).WithOne(p => p.Ticket).HasForeignKey(p => p.TicketId).OnDelete(DeleteBehavior.Cascade);
@@ -74,7 +74,7 @@ public class ItAssignmentConfiguration : IEntityTypeConfiguration<ItAssignment>
         builder.MapBaseEntityColumns();
 
         builder.Property(x => x.AssetId).HasColumnName("ActivoId");
-        builder.Property(x => x.EmployeeUserId).HasColumnName("ColaboradorId");
+        builder.Property(x => x.EmployeeId).HasColumnName("ColaboradorId");
         builder.Property(x => x.AssignedTicketId).HasColumnName("BoletaEntregaId");
         builder.Property(x => x.ReturnTicketId).HasColumnName("BoletaDevolucionId");
         builder.Property(x => x.AssignedAt).HasColumnName("AsignadoEn");
@@ -89,7 +89,7 @@ public class ItAssignmentConfiguration : IEntityTypeConfiguration<ItAssignment>
         builder.HasIndex(x => x.AssetId).IsUnique().HasFilter("[Estado] = 0 AND [EliminadoLogico] = 0");
 
         builder.HasOne(x => x.Asset).WithMany().HasForeignKey(x => x.AssetId).OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne(x => x.Employee).WithMany().HasForeignKey(x => x.EmployeeUserId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.Employee).WithMany().HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.AssignedTicket).WithMany().HasForeignKey(x => x.AssignedTicketId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.ReturnTicket).WithMany().HasForeignKey(x => x.ReturnTicketId).OnDelete(DeleteBehavior.Restrict);
 

@@ -19,7 +19,7 @@ public class ItAssetRepository : GenericRepository<ItAsset>, IItAssetRepository
             .Include(a => a.Brand)
             .Include(a => a.Location)
             .Include(a => a.Department)
-            .Include(a => a.CurrentHolder)
+            .Include(a => a.Holder)
             .AsNoTracking()
             .AsQueryable();
 
@@ -52,7 +52,7 @@ public class ItAssetRepository : GenericRepository<ItAsset>, IItAssetRepository
             .Include(a => a.Brand)
             .Include(a => a.Location)
             .Include(a => a.Department)
-            .Include(a => a.CurrentHolder)
+            .Include(a => a.Holder)
             .Include(a => a.Spec)
             .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
 
@@ -62,6 +62,9 @@ public class ItAssetRepository : GenericRepository<ItAsset>, IItAssetRepository
             .Where(h => h.AssetId == assetId)
             .OrderByDescending(h => h.OccurredAt)
             .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<string>> GetAllInternalCodesAsync(CancellationToken cancellationToken = default)
+        => await _dbSet.AsNoTracking().Select(a => a.InternalCode).ToListAsync(cancellationToken);
 
     public async Task<bool> InternalCodeExistsAsync(string internalCode, Guid? excludeId = null, CancellationToken cancellationToken = default)
         => await _dbSet.AnyAsync(a => a.InternalCode == internalCode && (excludeId == null || a.Id != excludeId), cancellationToken);

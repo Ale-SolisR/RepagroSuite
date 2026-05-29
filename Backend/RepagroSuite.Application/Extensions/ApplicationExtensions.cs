@@ -23,6 +23,8 @@ public static class ApplicationExtensions
         services.AddScoped<IItAssetService, ItAssetService>();
         services.AddScoped<IItCatalogService, ItCatalogService>();
         services.AddScoped<IItTicketService, ItTicketService>();
+        services.AddScoped<IItEmployeeService, ItEmployeeService>();
+        services.AddScoped<IItImportService, ItImportService>();
 
         return services;
     }

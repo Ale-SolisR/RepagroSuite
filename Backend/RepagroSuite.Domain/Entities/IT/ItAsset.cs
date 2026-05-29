@@ -30,8 +30,8 @@ public class ItAsset : BaseEntity
     public string? LocationDetail { get; set; }
     public Guid? DepartmentId { get; set; }
     public Department? Department { get; set; }
-    public Guid? CurrentHolderUserId { get; set; }   // Responsable actual (colaborador = User)
-    public User? CurrentHolder { get; set; }
+    public Guid? CurrentHolderEmployeeId { get; set; }   // Responsable actual (colaborador)
+    public ItEmployee? Holder { get; set; }
 
     // Compra / garantía
     public DateTime? PurchaseDate { get; set; }

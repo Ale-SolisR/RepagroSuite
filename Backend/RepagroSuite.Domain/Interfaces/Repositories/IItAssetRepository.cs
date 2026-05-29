@@ -15,6 +15,7 @@ public interface IItAssetRepository : IGenericRepository<ItAsset>
 
     Task<IReadOnlyList<ItAssetHistory>> GetHistoryAsync(Guid assetId, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<string>> GetAllInternalCodesAsync(CancellationToken cancellationToken = default);
     Task<bool> InternalCodeExistsAsync(string internalCode, Guid? excludeId = null, CancellationToken cancellationToken = default);
     Task<bool> SerialExistsAsync(string serialNumber, Guid? excludeId = null, CancellationToken cancellationToken = default);
 

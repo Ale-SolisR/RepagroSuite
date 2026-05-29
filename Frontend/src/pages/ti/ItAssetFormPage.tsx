@@ -5,11 +5,12 @@ import { Loader2, ArrowLeft, Save, Cpu } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 import { itAssetsApi, itCatalogsApi } from '@/api/itAssets'
-import { usersApi } from '@/api/users'
+import { itEmployeesApi } from '@/api/itEmployees'
 import { qk, staleTimes, invalidate } from '@/lib/queryKeys'
 import { useAuthStore } from '@/store/authStore'
 import { extractApiError } from '@/utils'
 import PhotoCapture from '@/components/ti/PhotoCapture'
+import EmployeeCreateModal from '@/components/ti/EmployeeCreateModal'
 import { CONDITION_OPTIONS } from '@/components/ti/itStatus'
 import type {
   CreateItAssetRequest, ItAssetSpecDto, PhysicalCondition,
@@ -22,7 +23,7 @@ type FormState = CreateItAssetRequest & { spec: ItAssetSpecDto }
 const EMPTY: FormState = {
   internalCode: '', assetTypeId: '', brandId: '', model: '', serialNumber: '', assetTag: '',
   physicalCondition: 'Good', locationId: '', locationDetail: '', departmentId: '',
-  currentHolderUserId: '', purchaseDate: '', supplier: '', cost: undefined, currency: '',
+  currentHolderEmployeeId: '', purchaseDate: '', supplier: '', cost: undefined, currency: '',
   hasWarranty: false, warrantyEndDate: '', notes: '', imageUrl: '', spec: {},
 }
 
@@ -47,6 +48,7 @@ export default function ItAssetFormPage() {
 
   const [form, setForm] = useState<FormState>(EMPTY)
   const [rowVersion, setRowVersion] = useState<string | undefined>()
+  const [empModal, setEmpModal] = useState(false)
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm(f => ({ ...f, [k]: v }))
   const setSpec = (k: keyof ItAssetSpecDto, v: string | number | undefined) =>
@@ -58,12 +60,11 @@ export default function ItAssetFormPage() {
     staleTime: staleTimes.tiCatalogs,
   })
 
-  // Responsables: sólo si el usuario puede ver usuarios (evita 403 ruidoso).
-  const users = useQuery({
-    queryKey: qk.users.list,
-    queryFn: () => usersApi.getAll({ pageSize: 200, status: 'Active' }).then(r => r.data.data?.items ?? []),
-    staleTime: staleTimes.roomsList,
-    enabled: hasPermission('Users.View'),
+  // Responsables = colaboradores TI (creados por cédula).
+  const employees = useQuery({
+    queryKey: [...qk.ti.all, 'employees-active'] as const,
+    queryFn: () => itEmployeesApi.getActive().then(r => r.data.data ?? []),
+    staleTime: staleTimes.ti,
   })
 
   const existing = useQuery({
@@ -80,7 +81,7 @@ export default function ItAssetFormPage() {
       internalCode: a.internalCode, assetTypeId: a.assetTypeId, brandId: a.brandId ?? '',
       model: a.model ?? '', serialNumber: a.serialNumber ?? '', assetTag: a.assetTag ?? '',
       physicalCondition: a.physicalCondition, locationId: a.locationId ?? '', locationDetail: a.locationDetail ?? '',
-      departmentId: a.departmentId ?? '', currentHolderUserId: a.currentHolderUserId ?? '',
+      departmentId: a.departmentId ?? '', currentHolderEmployeeId: a.currentHolderEmployeeId ?? '',
       purchaseDate: a.purchaseDate?.slice(0, 10) ?? '', supplier: a.supplier ?? '', cost: a.cost,
       currency: a.currency ?? '', hasWarranty: a.hasWarranty, warrantyEndDate: a.warrantyEndDate?.slice(0, 10) ?? '',
       notes: a.notes ?? '', imageUrl: a.imageUrl ?? '', spec: a.spec ?? {},
@@ -107,7 +108,7 @@ export default function ItAssetFormPage() {
       locationId: clean(form.locationId),
       locationDetail: clean(form.locationDetail),
       departmentId: clean(form.departmentId),
-      currentHolderUserId: clean(form.currentHolderUserId),
+      currentHolderEmployeeId: clean(form.currentHolderEmployeeId),
       purchaseDate: clean(form.purchaseDate),
       supplier: clean(form.supplier),
       cost: form.cost === undefined || Number.isNaN(form.cost) ? undefined : Number(form.cost),
@@ -221,10 +222,16 @@ export default function ItAssetFormPage() {
                   </select>
                 </Field>
                 <Field label="Responsable actual">
-                  <select className={inputCls} value={form.currentHolderUserId} onChange={e => set('currentHolderUserId', e.target.value)} disabled={!hasPermission('Users.View')}>
-                    <option value="">{hasPermission('Users.View') ? '— Sin asignar —' : 'Sin permiso para listar usuarios'}</option>
-                    {(users.data ?? []).map(u => <option key={u.id} value={u.id}>{u.fullName}</option>)}
-                  </select>
+                  <div className="flex gap-2">
+                    <select className={inputCls} value={form.currentHolderEmployeeId} onChange={e => set('currentHolderEmployeeId', e.target.value)}>
+                      <option value="">— Sin asignar —</option>
+                      {(employees.data ?? []).map(emp => <option key={emp.id} value={emp.id}>{emp.fullName}{emp.position ? ` · ${emp.position}` : ''}</option>)}
+                    </select>
+                    {hasPermission('Ti.Employee.Manage') && (
+                      <button type="button" onClick={() => setEmpModal(true)} title="Nuevo colaborador"
+                        className="inline-flex shrink-0 items-center rounded-[8px] border border-line bg-paper px-3 text-sm font-medium text-ink hover:bg-bg">+</button>
+                    )}
+                  </div>
                 </Field>
               </div>
             </section>
@@ -312,6 +319,12 @@ export default function ItAssetFormPage() {
           </div>
         </form>
       )}
+
+      <EmployeeCreateModal
+        open={empModal}
+        onClose={() => setEmpModal(false)}
+        onCreated={(emp) => { employees.refetch(); set('currentHolderEmployeeId', emp.id) }}
+      />
     </div>
   )
 }

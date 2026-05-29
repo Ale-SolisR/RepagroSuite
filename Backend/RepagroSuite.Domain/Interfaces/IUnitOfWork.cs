@@ -10,6 +10,7 @@ public interface IUnitOfWork : IDisposable
     IReservationRepository Reservations { get; }
     IItAssetRepository ItAssets { get; }
     IItTicketRepository ItTickets { get; }
+    IItEmployeeRepository ItEmployees { get; }
 
     /// <summary>
     /// Repositorio genérico para entidades que no tienen repositorio especializado

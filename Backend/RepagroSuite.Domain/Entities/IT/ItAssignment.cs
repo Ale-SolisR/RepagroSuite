@@ -12,8 +12,8 @@ public class ItAssignment : BaseEntity
     public Guid AssetId { get; set; }
     public ItAsset? Asset { get; set; }
 
-    public Guid EmployeeUserId { get; set; }
-    public User? Employee { get; set; }
+    public Guid EmployeeId { get; set; }
+    public ItEmployee? Employee { get; set; }
 
     public Guid AssignedTicketId { get; set; }
     public ItTicket? AssignedTicket { get; set; }

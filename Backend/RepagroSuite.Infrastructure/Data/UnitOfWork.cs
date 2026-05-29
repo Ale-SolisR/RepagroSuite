@@ -18,6 +18,7 @@ public class UnitOfWork : IUnitOfWork
     private IReservationRepository? _reservations;
     private IItAssetRepository? _itAssets;
     private IItTicketRepository? _itTickets;
+    private IItEmployeeRepository? _itEmployees;
     private readonly Dictionary<Type, object> _genericRepos = [];
 
     public UnitOfWork(ApplicationDbContext context)
@@ -30,6 +31,7 @@ public class UnitOfWork : IUnitOfWork
     public IReservationRepository Reservations => _reservations ??= new ReservationRepository(_context);
     public IItAssetRepository ItAssets => _itAssets ??= new ItAssetRepository(_context);
     public IItTicketRepository ItTickets => _itTickets ??= new ItTicketRepository(_context);
+    public IItEmployeeRepository ItEmployees => _itEmployees ??= new ItEmployeeRepository(_context);
 
     public IGenericRepository<T> Repository<T>() where T : BaseEntity
     {

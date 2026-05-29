@@ -83,7 +83,7 @@ public class ItAssetService : IItAssetService
             LocationId = dto.LocationId,
             LocationDetail = dto.LocationDetail?.Trim(),
             DepartmentId = dto.DepartmentId,
-            CurrentHolderUserId = dto.CurrentHolderUserId,
+            CurrentHolderEmployeeId = dto.CurrentHolderEmployeeId,
             PurchaseDate = dto.PurchaseDate,
             Supplier = dto.Supplier?.Trim(),
             Cost = dto.Cost,
@@ -142,7 +142,7 @@ public class ItAssetService : IItAssetService
         asset.LocationId = dto.LocationId;
         asset.LocationDetail = dto.LocationDetail?.Trim();
         asset.DepartmentId = dto.DepartmentId;
-        asset.CurrentHolderUserId = dto.CurrentHolderUserId;
+        asset.CurrentHolderEmployeeId = dto.CurrentHolderEmployeeId;
         asset.PurchaseDate = dto.PurchaseDate;
         asset.Supplier = dto.Supplier?.Trim();
         asset.Cost = dto.Cost;
@@ -237,7 +237,7 @@ public class ItAssetService : IItAssetService
             TotalCostUsd = assets.Where(a => a.Currency == "USD").Sum(a => a.Cost ?? 0),
             WithoutSerial = assets.Count(a => string.IsNullOrWhiteSpace(a.SerialNumber)),
             WithoutTag = assets.Count(a => string.IsNullOrWhiteSpace(a.AssetTag)),
-            WithoutHolder = assets.Count(a => a.CurrentHolderUserId == null),
+            WithoutHolder = assets.Count(a => a.CurrentHolderEmployeeId == null),
             WarrantyExpiringSoon = assets.Count(a => a.HasWarranty && a.WarrantyEndDate != null
                 && a.WarrantyEndDate >= BusinessClock.Now && a.WarrantyEndDate <= soon),
             ByType = assets.GroupBy(a => a.AssetType?.Name ?? "—")
@@ -328,7 +328,7 @@ public class ItAssetService : IItAssetService
         StatusName = StatusName(a.Status),
         LocationName = a.Location?.Name,
         DepartmentName = a.Department?.Name,
-        CurrentHolderName = a.CurrentHolder?.FullName,
+        CurrentHolderName = a.Holder?.FullName,
         ImageUrl = a.ImageUrl
     };
 
@@ -352,8 +352,8 @@ public class ItAssetService : IItAssetService
         LocationDetail = a.LocationDetail,
         DepartmentId = a.DepartmentId,
         DepartmentName = a.Department?.Name,
-        CurrentHolderUserId = a.CurrentHolderUserId,
-        CurrentHolderName = a.CurrentHolder?.FullName,
+        CurrentHolderEmployeeId = a.CurrentHolderEmployeeId,
+        CurrentHolderName = a.Holder?.FullName,
         PurchaseDate = a.PurchaseDate,
         Supplier = a.Supplier,
         Cost = a.Cost,

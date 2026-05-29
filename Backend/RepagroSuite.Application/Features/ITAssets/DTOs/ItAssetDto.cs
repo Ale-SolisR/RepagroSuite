@@ -32,7 +32,7 @@ public class ItAssetDto : ItAssetListDto
     public Guid? LocationId { get; set; }
     public string? LocationDetail { get; set; }
     public Guid? DepartmentId { get; set; }
-    public Guid? CurrentHolderUserId { get; set; }
+    public Guid? CurrentHolderEmployeeId { get; set; }
     public DateTime? PurchaseDate { get; set; }
     public string? Supplier { get; set; }
     public decimal? Cost { get; set; }
@@ -85,7 +85,7 @@ public class CreateItAssetDto
     public Guid? LocationId { get; set; }
     public string? LocationDetail { get; set; }
     public Guid? DepartmentId { get; set; }
-    public Guid? CurrentHolderUserId { get; set; }
+    public Guid? CurrentHolderEmployeeId { get; set; }
     public DateTime? PurchaseDate { get; set; }
     public string? Supplier { get; set; }
     public decimal? Cost { get; set; }

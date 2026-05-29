@@ -66,7 +66,7 @@ public class SignatureInputDto
 
 public class CreateAssignmentDto
 {
-    public Guid EmployeeUserId { get; set; }
+    public Guid EmployeeId { get; set; }
     public List<Guid> AssetIds { get; set; } = [];
     public PhysicalCondition ConditionOut { get; set; } = PhysicalCondition.Good;
     public string? Accessories { get; set; }
@@ -90,7 +90,7 @@ public class CreateGenericTicketDto
 {
     public ItTicketType TicketType { get; set; }
     public List<Guid> AssetIds { get; set; } = [];
-    public Guid? EmployeeUserId { get; set; }
+    public Guid? EmployeeId { get; set; }
     public string? Notes { get; set; }
     /// <summary>Si se indica, cambia el estado de los activos (validado por la máquina de estados).</summary>
     public ItAssetStatus? NewAssetStatus { get; set; }

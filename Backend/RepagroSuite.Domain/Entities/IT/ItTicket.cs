@@ -14,9 +14,9 @@ public class ItTicket : BaseEntity
     public ItTicketStatus Status { get; set; } = ItTicketStatus.Borrador;
     public DateTime IssuedAt { get; set; } = BusinessClock.Now;
 
-    public Guid? EmployeeUserId { get; set; }     // Colaborador (contraparte)
-    public User? Employee { get; set; }
-    public Guid? ItResponsibleUserId { get; set; } // Responsable de TI
+    public Guid? EmployeeId { get; set; }          // Colaborador (contraparte)
+    public ItEmployee? Employee { get; set; }
+    public Guid? ItResponsibleUserId { get; set; } // Responsable de TI (usuario del sistema)
     public User? ItResponsible { get; set; }
 
     public string? Notes { get; set; }

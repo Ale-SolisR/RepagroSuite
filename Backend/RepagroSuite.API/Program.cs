@@ -8,6 +8,7 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.ResponseCompression;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -146,7 +147,7 @@ builder.Services.AddAuthorization(options =>
         // Módulo TI / Inventario
         "Ti.Inventory.View", "Ti.Inventory.Create", "Ti.Inventory.Update", "Ti.Inventory.Delete",
         "Ti.Catalog.Manage", "Ti.Dashboard.View",
-        "Ti.Assign", "Ti.Return", "Ti.Ticket.Create", "Ti.Ticket.Void"
+        "Ti.Assign", "Ti.Return", "Ti.Ticket.Create", "Ti.Ticket.Void", "Ti.Employee.Manage"
     };
 
     foreach (var perm in permissions)
@@ -269,6 +270,28 @@ builder.Services.AddHostedService<RepagroSuite.API.BackgroundServices.Reservatio
 builder.Services.AddValidatorsFromAssembly(typeof(RepagroSuite.Application.Extensions.ApplicationExtensions).Assembly);
 
 var app = builder.Build();
+
+// CLI: importar inventario desde un JSON (uso: dotnet run -- import-ti <ruta.json>).
+// Aplica migraciones, ejecuta el import y termina SIN levantar el web host.
+if (args.Contains("import-ti"))
+{
+    await app.Services.ApplyMigrationsAsync();
+    var path = args.SkipWhile(a => a != "import-ti").Skip(1).FirstOrDefault();
+    if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+    {
+        Console.Error.WriteLine($"[import-ti] Archivo no encontrado: {path}");
+        return;
+    }
+    var rows = JsonSerializer.Deserialize<List<RepagroSuite.Application.Features.ITAssets.DTOs.ItAssetImportRow>>(
+        await File.ReadAllTextAsync(path), new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? [];
+    using var importScope = app.Services.CreateScope();
+    var importer = importScope.ServiceProvider.GetRequiredService<RepagroSuite.Application.Features.ITAssets.Services.IItImportService>();
+    var adminId = new Guid("33333333-3333-3333-3333-333333333333");
+    var res = await importer.ImportAssetsAsync(rows, adminId);
+    Console.WriteLine($"[import-ti] Creados={res.Created} Omitidos(existentes)={res.SkippedExisting} Marcas+={res.BrandsCreated} Ubicaciones+={res.LocationsCreated} Departamentos+={res.DepartmentsCreated}");
+    foreach (var w in res.Warnings) Console.WriteLine("  WARN: " + w);
+    return;
+}
 
 // Migraciones en startup: SOLO si se opta explícitamente (flag de config) o en Development.
 // En Production se recomienda correr `dotnet ef database update` desde CI/CD para evitar

@@ -39,8 +39,9 @@ const navGroups: { label: string; items: NavItem[] }[] = [
     label: 'TI',
     items: [
       { to: '/ti',         label: 'Dashboard TI', icon: LayoutDashboard, permission: 'Ti.Dashboard.View', role: null },
-      { to: '/ti/assets',  label: 'Inventario',   icon: Cpu,             permission: 'Ti.Inventory.View',  role: null },
-      { to: '/ti/tickets', label: 'Boletas',      icon: FileText,        permission: 'Ti.Inventory.View',  role: null },
+      { to: '/ti/assets',    label: 'Inventario',    icon: Cpu,        permission: 'Ti.Inventory.View',  role: null },
+      { to: '/ti/tickets',   label: 'Boletas',       icon: FileText,   permission: 'Ti.Inventory.View',  role: null },
+      { to: '/ti/employees', label: 'Colaboradores', icon: UsersRound, permission: 'Ti.Inventory.View',  role: null },
     ],
   },
   {
