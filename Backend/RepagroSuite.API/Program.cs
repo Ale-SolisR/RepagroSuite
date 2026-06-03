@@ -147,7 +147,10 @@ builder.Services.AddAuthorization(options =>
         // Módulo TI / Inventario
         "Ti.Inventory.View", "Ti.Inventory.Create", "Ti.Inventory.Update", "Ti.Inventory.Delete",
         "Ti.Catalog.Manage", "Ti.Dashboard.View",
-        "Ti.Assign", "Ti.Return", "Ti.Ticket.Create", "Ti.Ticket.Void", "Ti.Employee.Manage"
+        "Ti.Assign", "Ti.Return", "Ti.Ticket.Create", "Ti.Ticket.Void", "Ti.Employee.Manage",
+        // Administración de usuarios del Sistema de Rastreo (esquema RASTREO, independientes de Repagro)
+        "RastreoUsers.View", "RastreoUsers.Create", "RastreoUsers.ResetPassword",
+        "RastreoUsers.ManageRole", "RastreoUsers.ManageStatus"
     };
 
     foreach (var perm in permissions)

@@ -409,7 +409,16 @@ export interface ItAssetListDto {
   locationName?: string
   departmentName?: string
   currentHolderName?: string
-  imageUrl?: string
+}
+
+/** Foto del activo (binario en BD). `url` es una data URL sólo para previsualizar. */
+export interface ItAssetPhotoDto {
+  id: string
+  sortOrder: number
+  url: string
+  mimeType: string
+  sizeBytes: number
+  fileName?: string
 }
 
 export interface ItAssetSpecDto {
@@ -438,13 +447,15 @@ export interface ItAssetDto extends ItAssetListDto {
   departmentId?: string
   currentHolderEmployeeId?: string
   purchaseDate?: string
-  supplier?: string
+  supplierId?: string
+  supplierName?: string
   cost?: number
   currency?: string
   hasWarranty: boolean
   warrantyEndDate?: string
   notes?: string
   spec?: ItAssetSpecDto
+  photos: ItAssetPhotoDto[]
   createdAt: string
   rowVersion?: string
 }
@@ -471,13 +482,14 @@ export interface CreateItAssetRequest {
   departmentId?: string
   currentHolderEmployeeId?: string
   purchaseDate?: string
-  supplier?: string
+  supplierId?: string
   cost?: number
   currency?: string
   hasWarranty: boolean
   warrantyEndDate?: string
   notes?: string
-  imageUrl?: string
+  /** Hasta 5 fotos como data URLs base64; el servidor las guarda como binario. */
+  photos?: string[]
   spec?: ItAssetSpecDto
 }
 
@@ -511,11 +523,37 @@ export interface ItCatalogsDto {
   brands: ItCatalogItemDto[]
   locations: ItCatalogItemDto[]
   departments: ItCatalogItemDto[]
+  suppliers: ItCatalogItemDto[]
 }
 
 export interface CreateCatalogItemRequest {
   name: string
   code?: string
+}
+
+// Departamento con estado y uso, para el mantenimiento (CRUD) desde el formulario de activo.
+export interface ItDepartmentDto {
+  id: string
+  name: string
+  code?: string
+  isActive: boolean
+  assetCount: number
+}
+
+// Marca con estado y uso, para el mantenimiento (CRUD) desde el formulario de activo.
+export interface ItBrandDto {
+  id: string
+  name: string
+  isActive: boolean
+  assetCount: number
+}
+
+// Proveedor con estado y uso, para el mantenimiento (CRUD) desde el formulario de activo.
+export interface ItSupplierDto {
+  id: string
+  name: string
+  isActive: boolean
+  assetCount: number
 }
 
 export interface ItCountByLabelDto {
@@ -718,4 +756,31 @@ export interface IdentificationLookupResult {
   identificationNumber: string
   fullName?: string
   found: boolean
+}
+
+// ─── Usuarios del Sistema de Rastreo ────────────────────────────────────────────
+// Independientes de los usuarios de Repagro (UserDto): viven en el esquema RASTREO,
+// se administran desde aquí pero NUNCA otorgan acceso a Repagro Suite.
+export type RastreoRol = 'ADMIN' | 'USUARIO'
+
+export interface RastreoUserDto {
+  id: number
+  nombre?: string | null
+  correo: string
+  rol: RastreoRol
+  activo: boolean
+  fechaCreacion: string
+  tieneSesionActiva: boolean
+}
+
+export interface CreateRastreoUserRequest {
+  nombre?: string
+  correo: string
+  rol: RastreoRol
+  password: string
+}
+
+export interface ResetRastreoUserPasswordRequest {
+  newPassword: string
+  closeActiveSession: boolean
 }

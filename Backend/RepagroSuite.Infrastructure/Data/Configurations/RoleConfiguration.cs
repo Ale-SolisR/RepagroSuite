@@ -8,7 +8,7 @@ public class RoleConfiguration : IEntityTypeConfiguration<Role>
 {
     public void Configure(EntityTypeBuilder<Role> builder)
     {
-        builder.ToTable("Roles");
+        builder.ToTable("Roles", "CORE");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.MapBaseEntityColumns();
@@ -28,7 +28,7 @@ public class PermissionConfiguration : IEntityTypeConfiguration<Permission>
 {
     public void Configure(EntityTypeBuilder<Permission> builder)
     {
-        builder.ToTable("Permisos");
+        builder.ToTable("Permisos", "CORE");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.MapBaseEntityColumns();
@@ -48,7 +48,7 @@ public class UserRoleConfiguration : IEntityTypeConfiguration<UserRole>
 {
     public void Configure(EntityTypeBuilder<UserRole> builder)
     {
-        builder.ToTable("UsuariosRoles");
+        builder.ToTable("UsuariosRoles", "CORE");
         builder.HasKey(x => new { x.UserId, x.RoleId });
 
         builder.Property(x => x.UserId).HasColumnName("UsuarioId");
@@ -65,7 +65,7 @@ public class RolePermissionConfiguration : IEntityTypeConfiguration<RolePermissi
 {
     public void Configure(EntityTypeBuilder<RolePermission> builder)
     {
-        builder.ToTable("RolesPermisos");
+        builder.ToTable("RolesPermisos", "CORE");
         builder.HasKey(x => new { x.RoleId, x.PermissionId });
 
         builder.Property(x => x.RoleId).HasColumnName("RolId");

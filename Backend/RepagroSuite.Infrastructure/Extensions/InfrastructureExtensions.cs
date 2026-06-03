@@ -21,6 +21,16 @@ public static class InfrastructureExtensions
             )
         );
 
+        // DbContext ACOTADO al esquema RASTREO (misma BD) — solo para administrar usuarios del
+        // sistema de Rastreo. Sin MigrationsAssembly a propósito: este contexto NUNCA migra ni
+        // altera el esquema RASTREO; solo lee/escribe la tabla Usuarios. Ver RastreoDbContext.
+        services.AddDbContext<Data.Rastreo.RastreoDbContext>(options =>
+            options.UseSqlServer(
+                configuration.GetConnectionString("DefaultConnection"),
+                sql => sql.EnableRetryOnFailure(3)
+            )
+        );
+
         // GoMeta es un proveedor externo: retry + circuit breaker para resiliencia.
         // - Retry: hasta 2 reintentos con backoff exponencial en fallas transitorias (5xx, timeouts).
         // - Circuit breaker: si falla el 50% de >=8 requests en 30s, abre el circuito 30s
@@ -64,6 +74,9 @@ public static class InfrastructureExtensions
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddScoped<IIdentificationLookupService, IdentificationLookupService>();
         services.AddScoped<RepagroSuite.Application.Features.Settings.Services.ISettingsService, SettingsService>();
+
+        // Administración de usuarios del sistema de Rastreo (esquema RASTREO, misma BD).
+        services.AddScoped<RepagroSuite.Application.Features.RastreoUsers.Services.IRastreoUserAdminService, RastreoUserAdminService>();
 
         // Módulo TI — boletas
         services.AddScoped<ISequenceGenerator, SequenceGenerator>();

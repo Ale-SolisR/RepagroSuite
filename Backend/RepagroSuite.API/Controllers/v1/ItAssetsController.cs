@@ -70,6 +70,15 @@ public class ItAssetsController : ControllerBase
         return Ok(ApiResponse<ItAssetDto>.Ok(result));
     }
 
+    [HttpGet("{id:guid}/photos/{photoId:guid}/download")]
+    [Authorize(Policy = "Ti.Inventory.View")]
+    public async Task<IActionResult> DownloadPhoto(Guid id, Guid photoId, CancellationToken ct)
+    {
+        var file = await _assets.GetPhotoFileAsync(id, photoId, ct);
+        if (file is null) return NotFound();
+        return File(file.Content, file.MimeType, file.FileName);
+    }
+
     [HttpGet("{id:guid}/history")]
     [Authorize(Policy = "Ti.Inventory.View")]
     public async Task<ActionResult<ApiResponse<IEnumerable<ItAssetHistoryDto>>>> GetHistory(Guid id, CancellationToken ct)

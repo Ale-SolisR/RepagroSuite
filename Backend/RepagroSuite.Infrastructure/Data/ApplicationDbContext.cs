@@ -31,9 +31,11 @@ public class ApplicationDbContext : DbContext
     public DbSet<ItAssetSpec> ItAssetSpecs => Set<ItAssetSpec>();
     public DbSet<ItAssetType> ItAssetTypes => Set<ItAssetType>();
     public DbSet<ItBrand> ItBrands => Set<ItBrand>();
+    public DbSet<Supplier> Suppliers => Set<Supplier>();
     public DbSet<ItLocation> ItLocations => Set<ItLocation>();
     public DbSet<Department> Departments => Set<Department>();
     public DbSet<ItAssetHistory> ItAssetHistory => Set<ItAssetHistory>();
+    public DbSet<ItAssetPhoto> ItAssetPhotos => Set<ItAssetPhoto>();
     public DbSet<ItTicket> ItTickets => Set<ItTicket>();
     public DbSet<ItTicketDetail> ItTicketDetails => Set<ItTicketDetail>();
     public DbSet<ItAssignment> ItAssignments => Set<ItAssignment>();
@@ -107,6 +109,12 @@ public class ApplicationDbContext : DbContext
             new() { Id = new Guid("a0000001-0000-0000-0000-000000000039"), Code = "Ti.Ticket.Create",    Name = "Crear boletas TI",         Module = "TI", IsActive = true, CreatedAt = now, RowVersion = [] },
             new() { Id = new Guid("a0000001-0000-0000-0000-000000000040"), Code = "Ti.Ticket.Void",      Name = "Anular boletas TI",        Module = "TI", IsActive = true, CreatedAt = now, RowVersion = [] },
             new() { Id = new Guid("a0000001-0000-0000-0000-000000000041"), Code = "Ti.Employee.Manage",   Name = "Gestionar colaboradores TI", Module = "TI", IsActive = true, CreatedAt = now, RowVersion = [] },
+            // --- Administración de usuarios del Sistema de Rastreo (esquema RASTREO, independientes de Repagro) ---
+            new() { Id = new Guid("a0000001-0000-0000-0000-000000000042"), Code = "RastreoUsers.View",          Name = "Ver usuarios de rastreo",          Module = "Rastreo", IsActive = true, CreatedAt = now, RowVersion = [] },
+            new() { Id = new Guid("a0000001-0000-0000-0000-000000000043"), Code = "RastreoUsers.Create",        Name = "Crear usuarios de rastreo",        Module = "Rastreo", IsActive = true, CreatedAt = now, RowVersion = [] },
+            new() { Id = new Guid("a0000001-0000-0000-0000-000000000044"), Code = "RastreoUsers.ResetPassword", Name = "Restablecer contraseña de rastreo",Module = "Rastreo", IsActive = true, CreatedAt = now, RowVersion = [] },
+            new() { Id = new Guid("a0000001-0000-0000-0000-000000000045"), Code = "RastreoUsers.ManageRole",    Name = "Cambiar rol de usuario de rastreo",Module = "Rastreo", IsActive = true, CreatedAt = now, RowVersion = [] },
+            new() { Id = new Guid("a0000001-0000-0000-0000-000000000046"), Code = "RastreoUsers.ManageStatus",  Name = "Activar/desactivar usuario rastreo",Module = "Rastreo", IsActive = true, CreatedAt = now, RowVersion = [] },
         };
         modelBuilder.Entity<Permission>().HasData(allPerms);
 

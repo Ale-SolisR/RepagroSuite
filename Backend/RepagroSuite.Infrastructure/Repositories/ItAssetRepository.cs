@@ -53,7 +53,9 @@ public class ItAssetRepository : GenericRepository<ItAsset>, IItAssetRepository
             .Include(a => a.Location)
             .Include(a => a.Department)
             .Include(a => a.Holder)
+            .Include(a => a.Supplier)
             .Include(a => a.Spec)
+            .Include(a => a.Photos)
             .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
 
     public async Task<IReadOnlyList<ItAssetHistory>> GetHistoryAsync(Guid assetId, CancellationToken cancellationToken = default)
@@ -79,6 +81,7 @@ public class ItAssetRepository : GenericRepository<ItAsset>, IItAssetRepository
             .Include(a => a.Brand)
             .Include(a => a.Location)
             .Include(a => a.Holder)
+            .Include(a => a.Supplier)
             .AsNoTracking()
             .ToListAsync(cancellationToken);
 
@@ -89,6 +92,7 @@ public class ItAssetRepository : GenericRepository<ItAsset>, IItAssetRepository
             .Include(a => a.Brand)
             .Include(a => a.Location)
             .Include(a => a.Holder)
+            .Include(a => a.Supplier)
             .Include(a => a.Spec)
             .AsNoTracking()
             .OrderBy(a => a.InternalCode)
@@ -105,4 +109,62 @@ public class ItAssetRepository : GenericRepository<ItAsset>, IItAssetRepository
 
     public async Task<IReadOnlyList<Department>> GetDepartmentsAsync(CancellationToken cancellationToken = default)
         => await _context.Departments.AsNoTracking().Where(d => d.IsActive).OrderBy(d => d.Name).ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Supplier>> GetSuppliersAsync(CancellationToken cancellationToken = default)
+        => await _context.Suppliers.AsNoTracking().Where(s => s.IsActive).OrderBy(s => s.Name).ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Department>> GetAllDepartmentsAsync(string? search, CancellationToken cancellationToken = default)
+    {
+        var query = _context.Departments.AsNoTracking().AsQueryable();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var s = search.Trim();
+            query = query.Where(d => d.Name.Contains(s) || (d.Code != null && d.Code.Contains(s)));
+        }
+        // Activos primero, luego por nombre (el filtro global ya excluye los eliminados lógicamente).
+        return await query.OrderByDescending(d => d.IsActive).ThenBy(d => d.Name).ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, int>> GetDepartmentAssetCountsAsync(CancellationToken cancellationToken = default)
+        => await _context.ItAssets.AsNoTracking()
+            .Where(a => a.DepartmentId != null)
+            .GroupBy(a => a.DepartmentId!.Value)
+            .Select(g => new { DepartmentId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.DepartmentId, x => x.Count, cancellationToken);
+
+    public async Task<IReadOnlyList<ItBrand>> GetAllBrandsAsync(string? search, CancellationToken cancellationToken = default)
+    {
+        var query = _context.ItBrands.AsNoTracking().AsQueryable();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var s = search.Trim();
+            query = query.Where(b => b.Name.Contains(s));
+        }
+        return await query.OrderByDescending(b => b.IsActive).ThenBy(b => b.Name).ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, int>> GetBrandAssetCountsAsync(CancellationToken cancellationToken = default)
+        => await _context.ItAssets.AsNoTracking()
+            .Where(a => a.BrandId != null)
+            .GroupBy(a => a.BrandId!.Value)
+            .Select(g => new { BrandId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.BrandId, x => x.Count, cancellationToken);
+
+    public async Task<IReadOnlyList<Supplier>> GetAllSuppliersAsync(string? search, CancellationToken cancellationToken = default)
+    {
+        var query = _context.Suppliers.AsNoTracking().AsQueryable();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var s = search.Trim();
+            query = query.Where(p => p.Name.Contains(s));
+        }
+        return await query.OrderByDescending(p => p.IsActive).ThenBy(p => p.Name).ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, int>> GetSupplierAssetCountsAsync(CancellationToken cancellationToken = default)
+        => await _context.ItAssets.AsNoTracking()
+            .Where(a => a.SupplierId != null)
+            .GroupBy(a => a.SupplierId!.Value)
+            .Select(g => new { SupplierId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.SupplierId, x => x.Count, cancellationToken);
 }

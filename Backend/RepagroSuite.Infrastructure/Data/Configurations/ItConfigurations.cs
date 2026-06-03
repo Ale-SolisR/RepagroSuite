@@ -8,7 +8,7 @@ public class ItAssetTypeConfiguration : IEntityTypeConfiguration<ItAssetType>
 {
     public void Configure(EntityTypeBuilder<ItAssetType> builder)
     {
-        builder.ToTable("TI_TiposActivo");
+        builder.ToTable("TiposActivo", "SOPORTE");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.MapBaseEntityColumns();
@@ -30,7 +30,7 @@ public class ItBrandConfiguration : IEntityTypeConfiguration<ItBrand>
 {
     public void Configure(EntityTypeBuilder<ItBrand> builder)
     {
-        builder.ToTable("TI_Marcas");
+        builder.ToTable("Marcas", "SOPORTE");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.MapBaseEntityColumns();
@@ -43,11 +43,28 @@ public class ItBrandConfiguration : IEntityTypeConfiguration<ItBrand>
     }
 }
 
+public class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
+{
+    public void Configure(EntityTypeBuilder<Supplier> builder)
+    {
+        builder.ToTable("Proveedores", "SOPORTE");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.RowVersion).IsRowVersion();
+        builder.MapBaseEntityColumns();
+
+        builder.Property(x => x.Name).HasColumnName("Nombre").IsRequired().HasMaxLength(150);
+        builder.HasIndex(x => x.Name).IsUnique().HasFilter("[EliminadoLogico] = 0");
+        builder.Property(x => x.IsActive).HasColumnName("EsActivo");
+
+        builder.HasQueryFilter(x => !x.IsDeleted);
+    }
+}
+
 public class ItLocationConfiguration : IEntityTypeConfiguration<ItLocation>
 {
     public void Configure(EntityTypeBuilder<ItLocation> builder)
     {
-        builder.ToTable("TI_Ubicaciones");
+        builder.ToTable("Ubicaciones", "SOPORTE");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.MapBaseEntityColumns();
@@ -64,7 +81,7 @@ public class DepartmentConfiguration : IEntityTypeConfiguration<Department>
 {
     public void Configure(EntityTypeBuilder<Department> builder)
     {
-        builder.ToTable("TI_Departamentos");
+        builder.ToTable("Departamentos", "SOPORTE");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.MapBaseEntityColumns();
@@ -81,7 +98,7 @@ public class ItAssetConfiguration : IEntityTypeConfiguration<ItAsset>
 {
     public void Configure(EntityTypeBuilder<ItAsset> builder)
     {
-        builder.ToTable("TI_Activos");
+        builder.ToTable("Activos", "SOPORTE");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.MapBaseEntityColumns();
@@ -107,7 +124,7 @@ public class ItAssetConfiguration : IEntityTypeConfiguration<ItAsset>
         builder.Property(x => x.CurrentHolderEmployeeId).HasColumnName("ResponsableActualId");
 
         builder.Property(x => x.PurchaseDate).HasColumnName("FechaCompra");
-        builder.Property(x => x.Supplier).HasColumnName("Proveedor").HasMaxLength(150);
+        builder.Property(x => x.SupplierId).HasColumnName("ProveedorId");
         builder.Property(x => x.Cost).HasColumnName("Costo").HasColumnType("decimal(18,2)");
         builder.Property(x => x.Currency).HasColumnName("Moneda").HasMaxLength(3);
         builder.Property(x => x.HasWarranty).HasColumnName("TieneGarantia");
@@ -115,16 +132,38 @@ public class ItAssetConfiguration : IEntityTypeConfiguration<ItAsset>
         builder.HasIndex(x => x.WarrantyEndDate);
 
         builder.Property(x => x.Notes).HasColumnName("Observaciones").HasMaxLength(2000);
-        builder.Property(x => x.ImageUrl).HasColumnName("UrlImagen").HasColumnType("nvarchar(max)");
 
         builder.HasOne(x => x.AssetType).WithMany(t => t.Assets).HasForeignKey(x => x.AssetTypeId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.Brand).WithMany(b => b.Assets).HasForeignKey(x => x.BrandId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.Location).WithMany(l => l.Assets).HasForeignKey(x => x.LocationId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.Department).WithMany(d => d.Assets).HasForeignKey(x => x.DepartmentId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.Supplier).WithMany(s => s.Assets).HasForeignKey(x => x.SupplierId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.Holder).WithMany().HasForeignKey(x => x.CurrentHolderEmployeeId).OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(x => x.Spec).WithOne(s => s.Asset).HasForeignKey<ItAssetSpec>(s => s.AssetId).OnDelete(DeleteBehavior.Cascade);
         builder.HasMany(x => x.History).WithOne(h => h.Asset).HasForeignKey(h => h.AssetId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasMany(x => x.Photos).WithOne(p => p.Asset).HasForeignKey(p => p.AssetId).OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasQueryFilter(x => !x.IsDeleted);
+    }
+}
+
+public class ItAssetPhotoConfiguration : IEntityTypeConfiguration<ItAssetPhoto>
+{
+    public void Configure(EntityTypeBuilder<ItAssetPhoto> builder)
+    {
+        builder.ToTable("FotosActivo", "SOPORTE");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.RowVersion).IsRowVersion();
+        builder.MapBaseEntityColumns();
+
+        builder.Property(x => x.AssetId).HasColumnName("ActivoId");
+        builder.Property(x => x.SortOrder).HasColumnName("Orden");
+        builder.Property(x => x.Content).HasColumnName("Contenido").HasColumnType("varbinary(max)").IsRequired();
+        builder.Property(x => x.MimeType).HasColumnName("MimeType").HasMaxLength(40);
+        builder.Property(x => x.SizeBytes).HasColumnName("PesoBytes");
+        builder.Property(x => x.FileName).HasColumnName("NombreArchivo").HasMaxLength(200);
+        builder.HasIndex(x => new { x.AssetId, x.SortOrder });
 
         builder.HasQueryFilter(x => !x.IsDeleted);
     }
@@ -134,7 +173,7 @@ public class ItAssetSpecConfiguration : IEntityTypeConfiguration<ItAssetSpec>
 {
     public void Configure(EntityTypeBuilder<ItAssetSpec> builder)
     {
-        builder.ToTable("TI_EspecificacionesActivo");
+        builder.ToTable("EspecificacionesActivo", "SOPORTE");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.MapBaseEntityColumns();
@@ -162,7 +201,7 @@ public class ItEmployeeConfiguration : IEntityTypeConfiguration<ItEmployee>
 {
     public void Configure(EntityTypeBuilder<ItEmployee> builder)
     {
-        builder.ToTable("TI_Colaboradores");
+        builder.ToTable("Colaboradores", "SOPORTE");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.MapBaseEntityColumns();
@@ -186,7 +225,7 @@ public class ItAssetHistoryConfiguration : IEntityTypeConfiguration<ItAssetHisto
 {
     public void Configure(EntityTypeBuilder<ItAssetHistory> builder)
     {
-        builder.ToTable("TI_HistorialActivo");
+        builder.ToTable("HistorialActivo", "SOPORTE");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.MapBaseEntityColumns();

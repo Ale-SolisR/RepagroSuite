@@ -23,12 +23,12 @@ public class SequenceGenerator : ISequenceGenerator
 
         const string sql = @"
 SET NOCOUNT ON;
-UPDATE TI_ConsecutivosDocumento SET UltimoNumero = UltimoNumero + 1
+UPDATE SOPORTE.ConsecutivosDocumento SET UltimoNumero = UltimoNumero + 1
  WHERE CodigoTipo = @code AND Anio = @year AND EliminadoLogico = 0;
 IF @@ROWCOUNT = 0
-    INSERT INTO TI_ConsecutivosDocumento (Id, CodigoTipo, Anio, Prefijo, UltimoNumero, CreadoEn, EliminadoLogico)
+    INSERT INTO SOPORTE.ConsecutivosDocumento (Id, CodigoTipo, Anio, Prefijo, UltimoNumero, CreadoEn, EliminadoLogico)
     VALUES (NEWID(), @code, @year, 'TI', 1, SYSUTCDATETIME(), 0);
-SELECT CAST(UltimoNumero AS bigint) AS Value FROM TI_ConsecutivosDocumento
+SELECT CAST(UltimoNumero AS bigint) AS Value FROM SOPORTE.ConsecutivosDocumento
  WHERE CodigoTipo = @code AND Anio = @year AND EliminadoLogico = 0;";
 
         var result = await _context.Database

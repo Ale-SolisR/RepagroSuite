@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using RepagroSuite.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using RepagroSuite.Infrastructure.Data;
 namespace RepagroSuite.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260603152704_PermisosRastreoUsers")]
+    partial class PermisosRastreoUsers
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -540,6 +543,10 @@ namespace RepagroSuite.Infrastructure.Data.Migrations
                         .HasColumnType("bit")
                         .HasColumnName("TieneGarantia");
 
+                    b.Property<string>("ImageUrl")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("UrlImagen");
+
                     b.Property<string>("InternalCode")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -593,9 +600,10 @@ namespace RepagroSuite.Infrastructure.Data.Migrations
                         .HasColumnType("int")
                         .HasColumnName("Estado");
 
-                    b.Property<Guid?>("SupplierId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("ProveedorId");
+                    b.Property<string>("Supplier")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)")
+                        .HasColumnName("Proveedor");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2")
@@ -630,8 +638,6 @@ namespace RepagroSuite.Infrastructure.Data.Migrations
                         .HasFilter("[NumeroSerie] IS NOT NULL AND [EliminadoLogico] = 0");
 
                     b.HasIndex("Status");
-
-                    b.HasIndex("SupplierId");
 
                     b.HasIndex("WarrantyEndDate");
 
@@ -716,83 +722,6 @@ namespace RepagroSuite.Infrastructure.Data.Migrations
                     b.HasIndex("AssetId", "OccurredAt");
 
                     b.ToTable("HistorialActivo", "SOPORTE");
-                });
-
-            modelBuilder.Entity("RepagroSuite.Domain.Entities.ItAssetPhoto", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("Id");
-
-                    b.Property<Guid>("AssetId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("ActivoId");
-
-                    b.Property<byte[]>("Content")
-                        .IsRequired()
-                        .HasColumnType("varbinary(max)")
-                        .HasColumnName("Contenido");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("CreadoEn");
-
-                    b.Property<Guid?>("CreatedBy")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("CreadoPor");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("EliminadoEn");
-
-                    b.Property<Guid?>("DeletedBy")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("EliminadoPor");
-
-                    b.Property<string>("FileName")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)")
-                        .HasColumnName("NombreArchivo");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit")
-                        .HasColumnName("EliminadoLogico");
-
-                    b.Property<string>("MimeType")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("nvarchar(40)")
-                        .HasColumnName("MimeType");
-
-                    b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("rowversion")
-                        .HasColumnName("VersionFila");
-
-                    b.Property<int>("SizeBytes")
-                        .HasColumnType("int")
-                        .HasColumnName("PesoBytes");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("int")
-                        .HasColumnName("Orden");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("ActualizadoEn");
-
-                    b.Property<Guid?>("UpdatedBy")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("ActualizadoPor");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AssetId", "SortOrder");
-
-                    b.ToTable("FotosActivo", "SOPORTE");
                 });
 
             modelBuilder.Entity("RepagroSuite.Domain.Entities.ItAssetSpec", b =>
@@ -3701,67 +3630,6 @@ namespace RepagroSuite.Infrastructure.Data.Migrations
                     b.ToTable("SalasCaracteristicas", "SALAS");
                 });
 
-            modelBuilder.Entity("RepagroSuite.Domain.Entities.Supplier", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("Id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("CreadoEn");
-
-                    b.Property<Guid?>("CreatedBy")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("CreadoPor");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("EliminadoEn");
-
-                    b.Property<Guid?>("DeletedBy")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("EliminadoPor");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit")
-                        .HasColumnName("EsActivo");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit")
-                        .HasColumnName("EliminadoLogico");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)")
-                        .HasColumnName("Nombre");
-
-                    b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("rowversion")
-                        .HasColumnName("VersionFila");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("ActualizadoEn");
-
-                    b.Property<Guid?>("UpdatedBy")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("ActualizadoPor");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Name")
-                        .IsUnique()
-                        .HasFilter("[EliminadoLogico] = 0");
-
-                    b.ToTable("Proveedores", "SOPORTE");
-                });
-
             modelBuilder.Entity("RepagroSuite.Domain.Entities.SystemModule", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4568,11 +4436,6 @@ namespace RepagroSuite.Infrastructure.Data.Migrations
                         .HasForeignKey("LocationId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("RepagroSuite.Domain.Entities.Supplier", "Supplier")
-                        .WithMany("Assets")
-                        .HasForeignKey("SupplierId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.Navigation("AssetType");
 
                     b.Navigation("Brand");
@@ -4582,25 +4445,12 @@ namespace RepagroSuite.Infrastructure.Data.Migrations
                     b.Navigation("Holder");
 
                     b.Navigation("Location");
-
-                    b.Navigation("Supplier");
                 });
 
             modelBuilder.Entity("RepagroSuite.Domain.Entities.ItAssetHistory", b =>
                 {
                     b.HasOne("RepagroSuite.Domain.Entities.ItAsset", "Asset")
                         .WithMany("History")
-                        .HasForeignKey("AssetId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Asset");
-                });
-
-            modelBuilder.Entity("RepagroSuite.Domain.Entities.ItAssetPhoto", b =>
-                {
-                    b.HasOne("RepagroSuite.Domain.Entities.ItAsset", "Asset")
-                        .WithMany("Photos")
                         .HasForeignKey("AssetId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -4844,8 +4694,6 @@ namespace RepagroSuite.Infrastructure.Data.Migrations
                 {
                     b.Navigation("History");
 
-                    b.Navigation("Photos");
-
                     b.Navigation("Spec");
                 });
 
@@ -4894,11 +4742,6 @@ namespace RepagroSuite.Infrastructure.Data.Migrations
                     b.Navigation("Reservations");
 
                     b.Navigation("RoomFeatures");
-                });
-
-            modelBuilder.Entity("RepagroSuite.Domain.Entities.Supplier", b =>
-                {
-                    b.Navigation("Assets");
                 });
 
             modelBuilder.Entity("RepagroSuite.Domain.Entities.User", b =>

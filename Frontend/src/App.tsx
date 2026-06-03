@@ -22,6 +22,7 @@ const RoomsPage = lazy(() => import('@/pages/rooms/RoomsPage'))
 const MyReservationsPage = lazy(() => import('@/pages/reservations/MyReservationsPage'))
 const AdminReservationsPage = lazy(() => import('@/pages/reservations/AdminReservationsPage'))
 const AdminUsersPage = lazy(() => import('@/pages/users/AdminUsersPage'))
+const RastreoUsersPage = lazy(() => import('@/pages/rastreo/RastreoUsersPage'))
 const SettingsPage = lazy(() => import('@/pages/settings/SettingsPage'))
 const ProfilePage = lazy(() => import('@/pages/profile/ProfilePage'))
 const CalendarPage = lazy(() => import('@/pages/calendar/CalendarPage'))
@@ -93,6 +94,9 @@ export default function App() {
                 </Route>
                 <Route element={<ProtectedRoute permission="Settings.View" />}>
                   <Route path="/settings" element={<SettingsPage />} />
+                </Route>
+                <Route element={<ProtectedRoute permission="RastreoUsers.View" />}>
+                  <Route path="/admin/rastreo-users" element={<RastreoUsersPage />} />
                 </Route>
 
                 {/* Módulo TI / Inventario */}

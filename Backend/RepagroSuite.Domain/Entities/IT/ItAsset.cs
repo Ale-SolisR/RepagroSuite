@@ -35,7 +35,8 @@ public class ItAsset : BaseEntity
 
     // Compra / garantía
     public DateTime? PurchaseDate { get; set; }
-    public string? Supplier { get; set; }
+    public Guid? SupplierId { get; set; }
+    public Supplier? Supplier { get; set; }
     public decimal? Cost { get; set; }
     public string? Currency { get; set; }   // CRC | USD
     public bool HasWarranty { get; set; }
@@ -43,11 +44,11 @@ public class ItAsset : BaseEntity
 
     // Otros
     public string? Notes { get; set; }
-    public string? ImageUrl { get; set; }   // URL externa o data URL base64 (igual que Room.ImageUrl)
 
     // Relaciones
     public ItAssetSpec? Spec { get; set; }
     public ICollection<ItAssetHistory> History { get; set; } = [];
+    public ICollection<ItAssetPhoto> Photos { get; set; } = [];   // Galería (hasta 5). ImageUrl = primera foto (miniatura).
 
     /// <summary>
     /// Máquina de estados del ciclo de vida. Se valida en el dominio (no sólo en la UI).

@@ -12,6 +12,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    host: true,          // escucha en 0.0.0.0 para poder probar desde el teléfono (LAN)
     proxy: {
       '/api': {
         target: 'https://localhost:7266',

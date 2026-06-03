@@ -43,6 +43,18 @@ public class ItAssetService : IItAssetService
         return MapToDto(asset);
     }
 
+    public async Task<ItAssetPhotoFileDto?> GetPhotoFileAsync(Guid assetId, Guid photoId, CancellationToken cancellationToken = default)
+    {
+        var photo = await _uow.Repository<ItAssetPhoto>().GetByIdAsync(photoId, cancellationToken);
+        if (photo is null || photo.AssetId != assetId || photo.Content.Length == 0) return null;
+        return new ItAssetPhotoFileDto
+        {
+            Content = photo.Content,
+            MimeType = string.IsNullOrEmpty(photo.MimeType) ? "image/jpeg" : photo.MimeType,
+            FileName = string.IsNullOrWhiteSpace(photo.FileName) ? $"{photoId}.jpg" : photo.FileName
+        };
+    }
+
     public async Task<IEnumerable<ItAssetHistoryDto>> GetHistoryAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var history = await _uow.ItAssets.GetHistoryAsync(id, cancellationToken);
@@ -89,15 +101,18 @@ public class ItAssetService : IItAssetService
             DepartmentId = dto.DepartmentId,
             CurrentHolderEmployeeId = dto.CurrentHolderEmployeeId,
             PurchaseDate = dto.PurchaseDate,
-            Supplier = dto.Supplier?.Trim(),
+            SupplierId = dto.SupplierId,
             Cost = dto.Cost,
             Currency = NormalizeCurrency(dto.Currency),
             HasWarranty = dto.HasWarranty,
             WarrantyEndDate = dto.WarrantyEndDate,
             Notes = dto.Notes?.Trim(),
-            ImageUrl = dto.ImageUrl?.Trim(),
             CreatedBy = createdBy
         };
+
+        // Galería de fotos (hasta 5), guardadas como binario en BD.
+        foreach (var p in BuildPhotos(dto.Photos, asset.InternalCode, createdBy))
+            asset.Photos.Add(p);
 
         if (dto.Spec is not null && HasAnySpec(dto.Spec))
             asset.Spec = MapSpec(dto.Spec, createdBy);
@@ -148,14 +163,24 @@ public class ItAssetService : IItAssetService
         asset.DepartmentId = dto.DepartmentId;
         asset.CurrentHolderEmployeeId = dto.CurrentHolderEmployeeId;
         asset.PurchaseDate = dto.PurchaseDate;
-        asset.Supplier = dto.Supplier?.Trim();
+        asset.SupplierId = dto.SupplierId;
         asset.Cost = dto.Cost;
         asset.Currency = NormalizeCurrency(dto.Currency);
         asset.HasWarranty = dto.HasWarranty;
         asset.WarrantyEndDate = dto.WarrantyEndDate;
         asset.Notes = dto.Notes?.Trim();
-        asset.ImageUrl = dto.ImageUrl?.Trim();
         asset.UpdatedBy = updatedBy;
+
+        // Reemplazo total de la galería sólo si el cliente envía la colección (evita borrarla en updates parciales).
+        if (dto.Photos is not null)
+        {
+            asset.Photos.Clear();   // cascade delete elimina las huérfanas al guardar
+            foreach (var p in BuildPhotos(dto.Photos, asset.InternalCode, updatedBy))
+            {
+                p.AssetId = asset.Id;
+                asset.Photos.Add(p);
+            }
+        }
 
         // Spec 1:1 — crea o actualiza
         if (dto.Spec is not null && HasAnySpec(dto.Spec))
@@ -374,7 +399,7 @@ public class ItAssetService : IItAssetService
             Department = a.Department?.Name,
             Holder = a.Holder?.FullName,
             PurchaseDate = a.PurchaseDate,
-            Supplier = a.Supplier,
+            Supplier = a.Supplier?.Name,
             Cost = a.Cost,
             Currency = a.Currency,
             Warranty = a.HasWarranty
@@ -426,6 +451,63 @@ public class ItAssetService : IItAssetService
         if (string.IsNullOrWhiteSpace(c)) return null;
         var u = c.Trim().ToUpperInvariant();
         return u is "CRC" or "USD" ? u : null;
+    }
+
+    private const int MaxPhotos = 5;
+
+    /// <summary>
+    /// Decodifica data URLs base64 a entidades de foto BINARIAS (máx. 5). Las imágenes inválidas se ignoran.
+    /// </summary>
+    private static List<ItAssetPhoto> BuildPhotos(IEnumerable<string>? photos, string internalCode, Guid by)
+    {
+        if (photos is null) return [];
+
+        var result = new List<ItAssetPhoto>();
+        int order = 0;
+        foreach (var raw in photos)
+        {
+            if (!TryDecodeDataUrl(raw, out var bytes, out var mime) || bytes.Length == 0) continue;
+            var ext = mime switch
+            {
+                "image/png" => "png",
+                "image/webp" => "webp",
+                "image/gif" => "gif",
+                _ => "jpg"
+            };
+            result.Add(new ItAssetPhoto
+            {
+                Content = bytes,
+                MimeType = mime,
+                SizeBytes = bytes.Length,
+                FileName = $"{internalCode}_{order + 1}.{ext}",
+                SortOrder = order,
+                CreatedBy = by
+            });
+            order++;
+            if (order >= MaxPhotos) break;
+        }
+        return result;
+    }
+
+    /// <summary>Convierte "data:image/jpeg;base64,XXXX" en bytes + mime. Devuelve false si no es una data URL base64 válida.</summary>
+    private static bool TryDecodeDataUrl(string? dataUrl, out byte[] bytes, out string mime)
+    {
+        bytes = [];
+        mime = "image/jpeg";
+        if (string.IsNullOrWhiteSpace(dataUrl)) return false;
+        var s = dataUrl.Trim();
+        if (!s.StartsWith("data:", StringComparison.OrdinalIgnoreCase)) return false;
+
+        var comma = s.IndexOf(',');
+        if (comma < 0) return false;
+        var header = s[5..comma];                 // "image/jpeg;base64"
+        var semi = header.IndexOf(';');
+        if (semi > 0) mime = header[..semi];
+        else if (header.Length > 0) mime = header;
+
+        try { bytes = Convert.FromBase64String(s[(comma + 1)..]); }
+        catch (FormatException) { return false; }
+        return true;
     }
 
     private static bool HasAnySpec(ItAssetSpecDto s) =>
@@ -495,8 +577,7 @@ public class ItAssetService : IItAssetService
         StatusName = StatusName(a.Status),
         LocationName = a.Location?.Name,
         DepartmentName = a.Department?.Name,
-        CurrentHolderName = a.Holder?.FullName,
-        ImageUrl = a.ImageUrl
+        CurrentHolderName = a.Holder?.FullName
     };
 
     private static ItAssetDto MapToDto(ItAsset a) => new()
@@ -522,13 +603,22 @@ public class ItAssetService : IItAssetService
         CurrentHolderEmployeeId = a.CurrentHolderEmployeeId,
         CurrentHolderName = a.Holder?.FullName,
         PurchaseDate = a.PurchaseDate,
-        Supplier = a.Supplier,
+        SupplierId = a.SupplierId,
+        SupplierName = a.Supplier?.Name,
         Cost = a.Cost,
         Currency = a.Currency,
         HasWarranty = a.HasWarranty,
         WarrantyEndDate = a.WarrantyEndDate,
         Notes = a.Notes,
-        ImageUrl = a.ImageUrl,
+        Photos = a.Photos.OrderBy(p => p.SortOrder).Select(p => new ItAssetPhotoDto
+        {
+            Id = p.Id,
+            SortOrder = p.SortOrder,
+            Url = $"data:{(string.IsNullOrEmpty(p.MimeType) ? "image/jpeg" : p.MimeType)};base64,{Convert.ToBase64String(p.Content)}",
+            MimeType = string.IsNullOrEmpty(p.MimeType) ? "image/jpeg" : p.MimeType,
+            SizeBytes = p.SizeBytes,
+            FileName = p.FileName
+        }).ToList(),
         CreatedAt = a.CreatedAt,
         RowVersion = a.RowVersion is { Length: > 0 } ? Convert.ToBase64String(a.RowVersion) : null,
         Spec = a.Spec is null ? null : new ItAssetSpecDto

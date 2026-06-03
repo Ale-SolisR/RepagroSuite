@@ -30,4 +30,23 @@ public interface IItAssetRepository : IGenericRepository<ItAsset>
     Task<IReadOnlyList<ItBrand>> GetBrandsAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ItLocation>> GetLocationsAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Department>> GetDepartmentsAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Supplier>> GetSuppliersAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Todos los departamentos (activos e inactivos, no eliminados) con búsqueda por nombre/código, para el mantenimiento.</summary>
+    Task<IReadOnlyList<Department>> GetAllDepartmentsAsync(string? search, CancellationToken cancellationToken = default);
+
+    /// <summary>Conteo de activos (no eliminados) por departamento, para informar uso antes de inactivar.</summary>
+    Task<IReadOnlyDictionary<Guid, int>> GetDepartmentAssetCountsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Todas las marcas (activas e inactivas, no eliminadas) con búsqueda por nombre, para el mantenimiento.</summary>
+    Task<IReadOnlyList<ItBrand>> GetAllBrandsAsync(string? search, CancellationToken cancellationToken = default);
+
+    /// <summary>Conteo de activos (no eliminados) por marca, para informar uso antes de inactivar.</summary>
+    Task<IReadOnlyDictionary<Guid, int>> GetBrandAssetCountsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Todos los proveedores (activos e inactivos, no eliminados) con búsqueda por nombre, para el mantenimiento.</summary>
+    Task<IReadOnlyList<Supplier>> GetAllSuppliersAsync(string? search, CancellationToken cancellationToken = default);
+
+    /// <summary>Conteo de activos (no eliminados) por proveedor, para informar uso antes de inactivar.</summary>
+    Task<IReadOnlyDictionary<Guid, int>> GetSupplierAssetCountsAsync(CancellationToken cancellationToken = default);
 }

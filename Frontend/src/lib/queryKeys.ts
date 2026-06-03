@@ -33,6 +33,10 @@ export const qk = {
     list: ['users', 'list'] as const,             // selector pageSize=100 (filtros de auditoría)
     admin: (page: number, tab: string, search: string) => ['users', 'admin', page, tab, search] as const,
   },
+  rastreoUsers: {
+    all: ['rastreoUsers'] as const,
+    admin: (page: number, tab: string, search: string) => ['rastreoUsers', 'admin', page, tab, search] as const,
+  },
   dashboard: {
     stats: ['dashboard', 'stats'] as const,
     statusBreakdown: ['dashboard', 'rooms-status'] as const,
@@ -48,6 +52,9 @@ export const qk = {
     history: (id: string) => ['ti', 'asset', id, 'history'] as const,
     dashboard: ['ti', 'dashboard'] as const,
     catalogs: ['ti', 'catalogs'] as const,
+    departments: (search: string) => ['ti', 'departments', search] as const,
+    brands: (search: string) => ['ti', 'brands', search] as const,
+    suppliers: (search: string) => ['ti', 'suppliers', search] as const,
     tickets: (page: number, type: string, status: string, search: string) =>
       ['ti', 'tickets', page, type, status, search] as const,
     ticket: (id: string) => ['ti', 'ticket', id] as const,
@@ -67,6 +74,7 @@ export const staleTimes = {
   myReservations: 30_000,
   adminReservations: 30_000,
   users: 30_000,
+  rastreoUsers: 30_000,
   dashboard: 60_000,
   settings: 5 * 60_000,
   ti: 30_000,
@@ -88,6 +96,7 @@ export const invalidate = {
   },
   reservations: (qc: QueryClient) => qc.invalidateQueries({ queryKey: qk.reservations.all }),
   users: (qc: QueryClient) => qc.invalidateQueries({ queryKey: qk.users.all }),
+  rastreoUsers: (qc: QueryClient) => qc.invalidateQueries({ queryKey: qk.rastreoUsers.all }),
   settings: (qc: QueryClient) => qc.invalidateQueries({ queryKey: qk.settings.all }),
   ti: (qc: QueryClient) => qc.invalidateQueries({ queryKey: qk.ti.all }),
 }

@@ -8,7 +8,7 @@ public class RoomConfiguration : IEntityTypeConfiguration<Room>
 {
     public void Configure(EntityTypeBuilder<Room> builder)
     {
-        builder.ToTable("Salas");
+        builder.ToTable("Salas", "SALAS");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.MapBaseEntityColumns();
@@ -38,7 +38,7 @@ public class FeatureConfiguration : IEntityTypeConfiguration<Feature>
 {
     public void Configure(EntityTypeBuilder<Feature> builder)
     {
-        builder.ToTable("Caracteristicas");
+        builder.ToTable("Caracteristicas", "SALAS");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.MapBaseEntityColumns();
@@ -55,7 +55,7 @@ public class RoomFeatureConfiguration : IEntityTypeConfiguration<RoomFeature>
 {
     public void Configure(EntityTypeBuilder<RoomFeature> builder)
     {
-        builder.ToTable("SalasCaracteristicas");
+        builder.ToTable("SalasCaracteristicas", "SALAS");
         builder.HasKey(x => new { x.RoomId, x.FeatureId });
 
         builder.Property(x => x.RoomId).HasColumnName("SalaId");
@@ -70,7 +70,7 @@ public class RoomAvailabilityConfiguration : IEntityTypeConfiguration<RoomAvaila
 {
     public void Configure(EntityTypeBuilder<RoomAvailability> builder)
     {
-        builder.ToTable("DisponibilidadSalas");
+        builder.ToTable("DisponibilidadSalas", "SALAS");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.MapBaseEntityColumns();
@@ -97,7 +97,7 @@ public class RoomBlockConfiguration : IEntityTypeConfiguration<RoomBlock>
 {
     public void Configure(EntityTypeBuilder<RoomBlock> builder)
     {
-        builder.ToTable("BloquesSalas");
+        builder.ToTable("BloquesSalas", "SALAS");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.MapBaseEntityColumns();

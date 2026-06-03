@@ -8,7 +8,7 @@ public class ItTicketConfiguration : IEntityTypeConfiguration<ItTicket>
 {
     public void Configure(EntityTypeBuilder<ItTicket> builder)
     {
-        builder.ToTable("TI_Boletas");
+        builder.ToTable("Boletas", "SOPORTE");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.MapBaseEntityColumns();
@@ -46,7 +46,7 @@ public class ItTicketDetailConfiguration : IEntityTypeConfiguration<ItTicketDeta
 {
     public void Configure(EntityTypeBuilder<ItTicketDetail> builder)
     {
-        builder.ToTable("TI_DetalleBoleta");
+        builder.ToTable("DetalleBoleta", "SOPORTE");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.MapBaseEntityColumns();
@@ -68,7 +68,7 @@ public class ItAssignmentConfiguration : IEntityTypeConfiguration<ItAssignment>
 {
     public void Configure(EntityTypeBuilder<ItAssignment> builder)
     {
-        builder.ToTable("TI_Asignaciones");
+        builder.ToTable("Asignaciones", "SOPORTE");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.MapBaseEntityColumns();
@@ -101,7 +101,7 @@ public class ItTicketSignatureConfiguration : IEntityTypeConfiguration<ItTicketS
 {
     public void Configure(EntityTypeBuilder<ItTicketSignature> builder)
     {
-        builder.ToTable("TI_FirmasBoleta");
+        builder.ToTable("FirmasBoleta", "SOPORTE");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.MapBaseEntityColumns();
@@ -124,7 +124,7 @@ public class ItTicketPhotoConfiguration : IEntityTypeConfiguration<ItTicketPhoto
 {
     public void Configure(EntityTypeBuilder<ItTicketPhoto> builder)
     {
-        builder.ToTable("TI_FotosBoleta");
+        builder.ToTable("FotosBoleta", "SOPORTE");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.MapBaseEntityColumns();
@@ -145,7 +145,7 @@ public class ItDocumentSequenceConfiguration : IEntityTypeConfiguration<ItDocume
 {
     public void Configure(EntityTypeBuilder<ItDocumentSequence> builder)
     {
-        builder.ToTable("TI_ConsecutivosDocumento");
+        builder.ToTable("ConsecutivosDocumento", "SOPORTE");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.MapBaseEntityColumns();

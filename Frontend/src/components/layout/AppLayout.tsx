@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, DoorOpen, CalendarDays, Users,
   LogOut, Menu, X, BarChart3, ShieldCheck, Calendar, UserCircle,
-  ChevronsLeft, Crown, ChevronUp, UsersRound, Cpu, FileText,
+  ChevronsLeft, Crown, ChevronUp, UsersRound, Cpu, FileText, Sprout,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { authApi } from '@/api/auth'
@@ -47,9 +47,10 @@ const navGroups: { label: string; items: NavItem[] }[] = [
   {
     label: 'Administración',
     items: [
-      { to: '/admin/users',        label: 'Usuarios',  icon: Users,       permission: 'Users.View',         role: null },
-      { to: '/admin/reservations', label: 'Auditoría', icon: ShieldCheck, permission: 'Reservations.View',  role: null },
-      { to: '/settings',           label: 'Ajustes',   icon: BarChart3,   permission: 'Settings.View',      role: null },
+      { to: '/admin/users',         label: 'Usuarios',            icon: Users,       permission: 'Users.View',         role: null },
+      { to: '/admin/rastreo-users', label: 'Usuarios de Rastreo', icon: Sprout,      permission: 'RastreoUsers.View',  role: null },
+      { to: '/admin/reservations',  label: 'Auditoría',           icon: ShieldCheck, permission: 'Reservations.View',  role: null },
+      { to: '/settings',            label: 'Ajustes',             icon: BarChart3,   permission: 'Settings.View',      role: null },
     ],
   },
   {

@@ -8,7 +8,7 @@ public class ReservationConfiguration : IEntityTypeConfiguration<Reservation>
 {
     public void Configure(EntityTypeBuilder<Reservation> builder)
     {
-        builder.ToTable("Reservas");
+        builder.ToTable("Reservas", "SALAS");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.MapBaseEntityColumns();
@@ -51,7 +51,7 @@ public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
 {
     public void Configure(EntityTypeBuilder<RefreshToken> builder)
     {
-        builder.ToTable("TokensRenovacion");
+        builder.ToTable("TokensRenovacion", "CORE");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.MapBaseEntityColumns();
@@ -75,7 +75,7 @@ public class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
 {
     public void Configure(EntityTypeBuilder<AuditLog> builder)
     {
-        builder.ToTable("RegistrosAuditoria");
+        builder.ToTable("RegistrosAuditoria", "CORE");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.MapBaseEntityColumns();
@@ -102,7 +102,7 @@ public class NotificationConfiguration : IEntityTypeConfiguration<Notification>
 {
     public void Configure(EntityTypeBuilder<Notification> builder)
     {
-        builder.ToTable("Notificaciones");
+        builder.ToTable("Notificaciones", "CORE");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.MapBaseEntityColumns();
@@ -129,7 +129,7 @@ public class SystemSettingConfiguration : IEntityTypeConfiguration<SystemSetting
 {
     public void Configure(EntityTypeBuilder<SystemSetting> builder)
     {
-        builder.ToTable("ConfiguracionSistema");
+        builder.ToTable("ConfiguracionSistema", "CORE");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.MapBaseEntityColumns();
@@ -152,7 +152,7 @@ public class SystemModuleConfiguration : IEntityTypeConfiguration<SystemModule>
 {
     public void Configure(EntityTypeBuilder<SystemModule> builder)
     {
-        builder.ToTable("ModulosSistema");
+        builder.ToTable("ModulosSistema", "CORE");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.MapBaseEntityColumns();
@@ -176,7 +176,7 @@ public class IdentificationLookupCacheConfiguration : IEntityTypeConfiguration<I
 {
     public void Configure(EntityTypeBuilder<IdentificationLookupCache> builder)
     {
-        builder.ToTable("CacheIdentificaciones");
+        builder.ToTable("CacheIdentificaciones", "CORE");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.MapBaseEntityColumns();

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Loader2, ArrowLeft, Save, Cpu } from 'lucide-react'
+import { Loader2, ArrowLeft, Save, Cpu, Settings2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 import { itAssetsApi, itCatalogsApi } from '@/api/itAssets'
@@ -11,6 +11,9 @@ import { useAuthStore } from '@/store/authStore'
 import { extractApiError } from '@/utils'
 import PhotoCapture from '@/components/ti/PhotoCapture'
 import EmployeeCreateModal from '@/components/ti/EmployeeCreateModal'
+import DepartmentManagerModal from '@/components/ti/DepartmentManagerModal'
+import BrandManagerModal from '@/components/ti/BrandManagerModal'
+import SupplierManagerModal from '@/components/ti/SupplierManagerModal'
 import { CONDITION_OPTIONS } from '@/components/ti/itStatus'
 import type {
   CreateItAssetRequest, ItAssetSpecDto, PhysicalCondition,
@@ -18,13 +21,13 @@ import type {
 
 const BRAND = '#0E6B4B'
 
-type FormState = CreateItAssetRequest & { spec: ItAssetSpecDto }
+type FormState = CreateItAssetRequest & { spec: ItAssetSpecDto; photos: string[] }
 
 const EMPTY: FormState = {
   internalCode: '', assetTypeId: '', brandId: '', model: '', serialNumber: '', assetTag: '',
   physicalCondition: 'Good', locationId: '', locationDetail: '', departmentId: '',
-  currentHolderEmployeeId: '', purchaseDate: '', supplier: '', cost: undefined, currency: '',
-  hasWarranty: false, warrantyEndDate: '', notes: '', imageUrl: '', spec: {},
+  currentHolderEmployeeId: '', purchaseDate: '', supplierId: '', cost: undefined, currency: '',
+  hasWarranty: false, warrantyEndDate: '', notes: '', photos: [], spec: {},
 }
 
 const inputCls = 'h-10 w-full rounded-[8px] border border-line bg-paper px-3 text-sm text-ink placeholder:text-ink2 focus:border-brand-400 focus:outline-none'
@@ -49,6 +52,9 @@ export default function ItAssetFormPage() {
   const [form, setForm] = useState<FormState>(EMPTY)
   const [rowVersion, setRowVersion] = useState<string | undefined>()
   const [empModal, setEmpModal] = useState(false)
+  const [deptModal, setDeptModal] = useState(false)
+  const [brandModal, setBrandModal] = useState(false)
+  const [supplierModal, setSupplierModal] = useState(false)
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm(f => ({ ...f, [k]: v }))
   const setSpec = (k: keyof ItAssetSpecDto, v: string | number | undefined) =>
@@ -82,9 +88,9 @@ export default function ItAssetFormPage() {
       model: a.model ?? '', serialNumber: a.serialNumber ?? '', assetTag: a.assetTag ?? '',
       physicalCondition: a.physicalCondition, locationId: a.locationId ?? '', locationDetail: a.locationDetail ?? '',
       departmentId: a.departmentId ?? '', currentHolderEmployeeId: a.currentHolderEmployeeId ?? '',
-      purchaseDate: a.purchaseDate?.slice(0, 10) ?? '', supplier: a.supplier ?? '', cost: a.cost,
+      purchaseDate: a.purchaseDate?.slice(0, 10) ?? '', supplierId: a.supplierId ?? '', cost: a.cost,
       currency: a.currency ?? '', hasWarranty: a.hasWarranty, warrantyEndDate: a.warrantyEndDate?.slice(0, 10) ?? '',
-      notes: a.notes ?? '', imageUrl: a.imageUrl ?? '', spec: a.spec ?? {},
+      notes: a.notes ?? '', photos: (a.photos ?? []).map(p => p.url), spec: a.spec ?? {},
     })
     setRowVersion(a.rowVersion)
   }, [existing.data])
@@ -110,13 +116,13 @@ export default function ItAssetFormPage() {
       departmentId: clean(form.departmentId),
       currentHolderEmployeeId: clean(form.currentHolderEmployeeId),
       purchaseDate: clean(form.purchaseDate),
-      supplier: clean(form.supplier),
+      supplierId: clean(form.supplierId),
       cost: form.cost === undefined || Number.isNaN(form.cost) ? undefined : Number(form.cost),
       currency: clean(form.currency),
       hasWarranty: form.hasWarranty,
       warrantyEndDate: clean(form.warrantyEndDate),
       notes: clean(form.notes),
-      imageUrl: clean(form.imageUrl),
+      photos: form.photos,
       spec: specEmpty ? undefined : form.spec,
     }
   }
@@ -180,10 +186,18 @@ export default function ItAssetFormPage() {
                   </select>
                 </Field>
                 <Field label="Marca">
-                  <select className={inputCls} value={form.brandId} onChange={e => set('brandId', e.target.value)}>
-                    <option value="">—</option>
-                    {(catalogs.data?.brands ?? []).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                  </select>
+                  <div className="flex gap-2">
+                    <select className={inputCls} value={form.brandId} onChange={e => set('brandId', e.target.value)}>
+                      <option value="">—</option>
+                      {(catalogs.data?.brands ?? []).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select>
+                    {hasPermission('Ti.Catalog.Manage') && (
+                      <button type="button" onClick={() => setBrandModal(true)} title="Administrar marcas"
+                        className="inline-flex shrink-0 items-center rounded-[8px] border border-line bg-paper px-3 text-sm font-medium text-ink hover:bg-bg">
+                        <Settings2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
                 </Field>
                 <Field label="Modelo">
                   <input className={inputCls} value={form.model} onChange={e => set('model', e.target.value)} />
@@ -216,10 +230,18 @@ export default function ItAssetFormPage() {
                   <input className={inputCls} value={form.locationDetail} onChange={e => set('locationDetail', e.target.value)} placeholder="Oficina, piso, escritorio…" />
                 </Field>
                 <Field label="Departamento">
-                  <select className={inputCls} value={form.departmentId} onChange={e => set('departmentId', e.target.value)}>
-                    <option value="">—</option>
-                    {(catalogs.data?.departments ?? []).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  </select>
+                  <div className="flex gap-2">
+                    <select className={inputCls} value={form.departmentId} onChange={e => set('departmentId', e.target.value)}>
+                      <option value="">—</option>
+                      {(catalogs.data?.departments ?? []).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                    {hasPermission('Ti.Catalog.Manage') && (
+                      <button type="button" onClick={() => setDeptModal(true)} title="Administrar departamentos"
+                        className="inline-flex shrink-0 items-center rounded-[8px] border border-line bg-paper px-3 text-sm font-medium text-ink hover:bg-bg">
+                        <Settings2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
                 </Field>
                 <Field label="Responsable actual">
                   <div className="flex gap-2">
@@ -244,7 +266,18 @@ export default function ItAssetFormPage() {
                   <input type="date" className={inputCls} value={form.purchaseDate} onChange={e => set('purchaseDate', e.target.value)} />
                 </Field>
                 <Field label="Proveedor">
-                  <input className={inputCls} value={form.supplier} onChange={e => set('supplier', e.target.value)} />
+                  <div className="flex gap-2">
+                    <select className={inputCls} value={form.supplierId} onChange={e => set('supplierId', e.target.value)}>
+                      <option value="">—</option>
+                      {(catalogs.data?.suppliers ?? []).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                    {hasPermission('Ti.Catalog.Manage') && (
+                      <button type="button" onClick={() => setSupplierModal(true)} title="Administrar proveedores"
+                        className="inline-flex shrink-0 items-center rounded-[8px] border border-line bg-paper px-3 text-sm font-medium text-ink hover:bg-bg">
+                        <Settings2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
                 </Field>
                 <Field label="Costo">
                   <input type="number" min="0" step="0.01" className={inputCls} value={form.cost ?? ''} onChange={e => set('cost', e.target.value === '' ? undefined : Number(e.target.value))} />
@@ -294,11 +327,11 @@ export default function ItAssetFormPage() {
               <h2 className="mb-4 text-sm font-semibold text-ink">Foto y observaciones</h2>
               <div className="mb-4">
                 <PhotoCapture
-                  value={form.imageUrl ? [form.imageUrl] : []}
-                  onChange={(photos) => set('imageUrl', photos[0] ?? '')}
-                  max={1}
-                  label="Foto del activo"
-                  hint="Foto principal del equipo (frontal o etiqueta)."
+                  value={form.photos}
+                  onChange={(photos) => set('photos', photos)}
+                  max={5}
+                  label="Fotos del activo"
+                  hint="Hasta 5 fotos (frontal, etiqueta/serie, estado físico). En móvil puedes tomarlas con la cámara. Se guardan en la base de datos."
                 />
               </div>
               <Field label="Observaciones">
@@ -324,6 +357,24 @@ export default function ItAssetFormPage() {
         open={empModal}
         onClose={() => setEmpModal(false)}
         onCreated={(emp) => { employees.refetch(); set('currentHolderEmployeeId', emp.id) }}
+      />
+
+      <DepartmentManagerModal
+        open={deptModal}
+        onClose={() => setDeptModal(false)}
+        onChanged={() => catalogs.refetch()}
+      />
+
+      <BrandManagerModal
+        open={brandModal}
+        onClose={() => setBrandModal(false)}
+        onChanged={() => catalogs.refetch()}
+      />
+
+      <SupplierManagerModal
+        open={supplierModal}
+        onClose={() => setSupplierModal(false)}
+        onChanged={() => catalogs.refetch()}
       />
     </div>
   )
