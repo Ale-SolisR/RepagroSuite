@@ -64,11 +64,11 @@ public class ItAssetService : IItAssetService
     }
 
     public async Task<PagedResult<ItAssetListDto>> GetPagedAsync(int page, int pageSize, string? search,
-        ItAssetStatus? status, Guid? assetTypeId, Guid? departmentId, CancellationToken cancellationToken = default)
+        ItAssetStatus? status, Guid? assetTypeId, Guid? departmentId, Guid? holderId, CancellationToken cancellationToken = default)
     {
         await ReleaseVoidedAssignmentSideEffectsAsync(cancellationToken);
 
-        var (items, total) = await _uow.ItAssets.GetPagedAsync(page, pageSize, search, status, assetTypeId, departmentId, cancellationToken);
+        var (items, total) = await _uow.ItAssets.GetPagedAsync(page, pageSize, search, status, assetTypeId, departmentId, holderId, cancellationToken);
         return new PagedResult<ItAssetListDto>
         {
             Items = items.Select(MapToListDto),

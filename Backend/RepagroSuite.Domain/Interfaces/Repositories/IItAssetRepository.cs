@@ -8,7 +8,7 @@ public interface IItAssetRepository : IGenericRepository<ItAsset>
     /// <summary>Listado paginado con detalles (tipo, marca, ubicación, depto, responsable) ya incluidos.</summary>
     Task<(IReadOnlyList<ItAsset> Items, int Total)> GetPagedAsync(
         int page, int pageSize, string? search, ItAssetStatus? status,
-        Guid? assetTypeId, Guid? departmentId, CancellationToken cancellationToken = default);
+        Guid? assetTypeId, Guid? departmentId, Guid? holderId, CancellationToken cancellationToken = default);
 
     /// <summary>Activo con todas sus relaciones (incluye Spec) para la ficha de detalle/edición.</summary>
     Task<ItAsset?> GetWithDetailsAsync(Guid id, CancellationToken cancellationToken = default);

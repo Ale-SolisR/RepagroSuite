@@ -13,6 +13,7 @@ export interface ItAssetListParams {
   status?: string
   assetTypeId?: string
   departmentId?: string
+  holderId?: string
 }
 
 export const itAssetsApi = {

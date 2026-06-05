@@ -13,7 +13,7 @@ public class ItAssetRepository : GenericRepository<ItAsset>, IItAssetRepository
 
     public async Task<(IReadOnlyList<ItAsset> Items, int Total)> GetPagedAsync(
         int page, int pageSize, string? search, ItAssetStatus? status,
-        Guid? assetTypeId, Guid? departmentId, CancellationToken cancellationToken = default)
+        Guid? assetTypeId, Guid? departmentId, Guid? holderId, CancellationToken cancellationToken = default)
     {
         var query = _dbSet
             .Include(a => a.AssetType)
@@ -31,11 +31,14 @@ public class ItAssetRepository : GenericRepository<ItAsset>, IItAssetRepository
                 a.InternalCode.Contains(s) ||
                 (a.SerialNumber != null && a.SerialNumber.Contains(s)) ||
                 (a.Model != null && a.Model.Contains(s)) ||
-                (a.AssetTag != null && a.AssetTag.Contains(s)));
+                (a.AssetTag != null && a.AssetTag.Contains(s)) ||
+                (a.Holder != null && a.Holder.FullName.Contains(s)) ||
+                (a.Holder != null && a.Holder.IdentificationNumber.Contains(s)));
         }
         if (status.HasValue) query = query.Where(a => a.Status == status.Value);
         if (assetTypeId.HasValue) query = query.Where(a => a.AssetTypeId == assetTypeId.Value);
         if (departmentId.HasValue) query = query.Where(a => a.DepartmentId == departmentId.Value);
+        if (holderId.HasValue) query = query.Where(a => a.CurrentHolderEmployeeId == holderId.Value);
 
         var total = await query.CountAsync(cancellationToken);
         var items = await query

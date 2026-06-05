@@ -5,6 +5,7 @@ import { Plus, Search, Cpu, ChevronLeft, ChevronRight, FileSpreadsheet, KeyRound
 import toast from 'react-hot-toast'
 
 import { itAssetsApi, itCatalogsApi } from '@/api/itAssets'
+import { itEmployeesApi } from '@/api/itEmployees'
 import { qk, staleTimes } from '@/lib/queryKeys'
 import { downloadBlob } from '@/lib/download'
 import { extractApiError } from '@/utils'
@@ -26,6 +27,7 @@ export default function ItAssetsPage() {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
   const [typeId, setTypeId] = useState('')
+  const [holderId, setHolderId] = useState('')
   const [exporting, setExporting] = useState(false)
   const [credentialAsset, setCredentialAsset] = useState<ItAssetListDto | null>(null)
 
@@ -48,13 +50,21 @@ export default function ItAssetsPage() {
     staleTime: staleTimes.tiCatalogs,
   })
 
+  // Colaboradores activos para el filtro por responsable.
+  const employees = useQuery({
+    queryKey: ['ti', 'employees', 'active'],
+    queryFn: () => itEmployeesApi.getActive().then(r => r.data.data ?? []),
+    staleTime: staleTimes.ti,
+  })
+
   const { data, isLoading, isFetching } = useQuery({
-    queryKey: qk.ti.assets(page, PAGE_SIZE, search, status, typeId, ''),
+    queryKey: qk.ti.assets(page, PAGE_SIZE, search, status, typeId, holderId),
     queryFn: () => itAssetsApi.getAll({
       page, pageSize: PAGE_SIZE,
       search: search || undefined,
       status: status || undefined,
       assetTypeId: typeId || undefined,
+      holderId: holderId || undefined,
     }).then(r => r.data.data!),
     staleTime: staleTimes.ti,
     placeholderData: keepPreviousData,
@@ -104,7 +114,7 @@ export default function ItAssetsPage() {
             <input
               type="search" value={search}
               onChange={(e) => resetAnd(() => setSearch(e.target.value))}
-              placeholder="Buscar por código, serie, modelo o etiqueta"
+              placeholder="Buscar por código, serie, modelo, etiqueta o colaborador (nombre/cédula)"
               className="h-10 w-full rounded-[8px] border border-line bg-paper pl-9 pr-3 text-sm text-ink placeholder:text-ink2 focus:border-brand-400 focus:outline-none"
             />
           </label>
@@ -117,6 +127,11 @@ export default function ItAssetsPage() {
             className="h-10 rounded-[8px] border border-line bg-paper px-3 text-sm text-ink focus:border-brand-400 focus:outline-none">
             <option value="">Todos los tipos</option>
             {(catalogs.data?.types ?? []).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+          <select value={holderId} onChange={(e) => resetAnd(() => setHolderId(e.target.value))}
+            className="h-10 max-w-[220px] rounded-[8px] border border-line bg-paper px-3 text-sm text-ink focus:border-brand-400 focus:outline-none">
+            <option value="">Todos los colaboradores</option>
+            {(employees.data ?? []).map(e => <option key={e.id} value={e.id}>{e.fullName}</option>)}
           </select>
         </div>
 

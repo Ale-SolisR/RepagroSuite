@@ -7,7 +7,7 @@ namespace RepagroSuite.Application.Features.ITAssets.Services;
 public interface IItAssetService
 {
     Task<PagedResult<ItAssetListDto>> GetPagedAsync(int page, int pageSize, string? search,
-        ItAssetStatus? status, Guid? assetTypeId, Guid? departmentId, CancellationToken cancellationToken = default);
+        ItAssetStatus? status, Guid? assetTypeId, Guid? departmentId, Guid? holderId, CancellationToken cancellationToken = default);
     Task<ItAssetDto> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<ItAssetPhotoFileDto?> GetPhotoFileAsync(Guid assetId, Guid photoId, CancellationToken cancellationToken = default);
     Task<IEnumerable<ItAssetHistoryDto>> GetHistoryAsync(Guid id, CancellationToken cancellationToken = default);

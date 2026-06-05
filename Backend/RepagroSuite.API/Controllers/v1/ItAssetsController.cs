@@ -30,9 +30,10 @@ public class ItAssetsController : ControllerBase
         [FromQuery] int page = 1, [FromQuery] int pageSize = 20,
         [FromQuery] string? search = null, [FromQuery] ItAssetStatus? status = null,
         [FromQuery] Guid? assetTypeId = null, [FromQuery] Guid? departmentId = null,
+        [FromQuery] Guid? holderId = null,
         CancellationToken ct = default)
     {
-        var result = await _assets.GetPagedAsync(page, pageSize, search, status, assetTypeId, departmentId, ct);
+        var result = await _assets.GetPagedAsync(page, pageSize, search, status, assetTypeId, departmentId, holderId, ct);
         return Ok(ApiResponse<PagedResult<ItAssetListDto>>.Ok(result));
     }
 
