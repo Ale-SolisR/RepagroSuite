@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft, Pencil, Trash2, Loader2, Cpu, History,
-  Download, X, ChevronLeft, ChevronRight, ImageOff, KeyRound, FileText,
+  Download, X, ChevronLeft, ChevronRight, ImageOff, KeyRound, FileText, UserRound,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format, parseISO } from 'date-fns'
@@ -201,6 +201,9 @@ export default function ItAssetDetailPage() {
                       {h.description && <p className="text-[12px] text-ink2">{h.description}</p>}
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
                         <p className="font-mono text-[11px] text-ink2">{format(parseISO(h.occurredAt), "d MMM yyyy · HH:mm", { locale: es })}</p>
+                        <span className="inline-flex items-center gap-1 text-[11px] text-ink2">
+                          <UserRound className="h-3 w-3" /> {h.performedByName ?? 'Sistema'}
+                        </span>
                         {h.ticketId && (
                           <Link to={`/ti/tickets/${h.ticketId}`} className="inline-flex items-center gap-1 text-[11px] font-medium hover:underline" style={{ color: BRAND }}>
                             <FileText className="h-3 w-3" /> Ver boleta

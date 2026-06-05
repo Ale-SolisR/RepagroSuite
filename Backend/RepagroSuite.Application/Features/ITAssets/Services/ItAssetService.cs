@@ -102,6 +102,13 @@ public class ItAssetService : IItAssetService
     public async Task<IEnumerable<ItAssetHistoryDto>> GetHistoryAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var history = await _uow.ItAssets.GetHistoryAsync(id, cancellationToken);
+
+        // Resolvemos el nombre del usuario que ejecutó cada evento (auditoría legible).
+        var userIds = history.Where(h => h.PerformedBy.HasValue).Select(h => h.PerformedBy!.Value).Distinct().ToList();
+        var names = userIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : (await _uow.Users.FindAsync(u => userIds.Contains(u.Id), cancellationToken)).ToDictionary(u => u.Id, u => u.FullName);
+
         return history.Select(h => new ItAssetHistoryDto
         {
             Id = h.Id,
@@ -110,7 +117,9 @@ public class ItAssetService : IItAssetService
             ToStatus = h.ToStatus,
             Description = h.Description,
             OccurredAt = h.OccurredAt,
-            TicketId = h.TicketId
+            TicketId = h.TicketId,
+            PerformedBy = h.PerformedBy,
+            PerformedByName = h.PerformedBy.HasValue && names.TryGetValue(h.PerformedBy.Value, out var n) ? n : null
         });
     }
 

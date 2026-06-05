@@ -69,6 +69,7 @@ public class ItTicketDto : ItTicketListDto
     public bool HasPdf { get; set; }
     public string? VoidReason { get; set; }
     public DateTime? VoidedAt { get; set; }
+    public string? VoidedByName { get; set; }   // usuario que anuló la boleta (auditoría)
     public List<ItTicketLineDto> Lines { get; set; } = [];
     public List<ItTicketPhotoDto> Photos { get; set; } = [];
     public List<ItTicketSignatureDto> Signatures { get; set; } = [];

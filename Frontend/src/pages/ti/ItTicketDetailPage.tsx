@@ -139,7 +139,7 @@ export default function ItTicketDetailPage() {
         <div className="mx-auto max-w-3xl space-y-3.5">
           {t.status === 'Anulada' && (
             <div className="rounded-[10px] border p-4" style={{ background: '#FEF2F2', borderColor: '#FECACA' }}>
-              <p className="text-sm font-medium" style={{ color: '#991B1B' }}>Boleta anulada{t.voidedAt ? ` el ${format(parseISO(t.voidedAt), 'd MMM yyyy', { locale: es })}` : ''}</p>
+              <p className="text-sm font-medium" style={{ color: '#991B1B' }}>Boleta anulada{t.voidedAt ? ` el ${format(parseISO(t.voidedAt), 'd MMM yyyy', { locale: es })}` : ''}{t.voidedByName ? ` por ${t.voidedByName}` : ''}</p>
               {t.voidReason && <p className="text-[13px]" style={{ color: '#B91C1C' }}>Motivo: {t.voidReason}</p>}
             </div>
           )}

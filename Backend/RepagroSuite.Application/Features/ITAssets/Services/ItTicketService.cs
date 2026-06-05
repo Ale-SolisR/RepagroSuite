@@ -47,6 +47,11 @@ public class ItTicketService : IItTicketService
             ?? throw new KeyNotFoundException("Boleta no encontrada.");
         var dto = MapToDto(t);
         dto.Chain = await BuildChainAsync(id, cancellationToken);
+
+        // Auditoría: usuario que anuló la boleta.
+        if (t.VoidedBy.HasValue)
+            dto.VoidedByName = (await _uow.Users.GetByIdAsync(t.VoidedBy.Value, cancellationToken))?.FullName;
+
         return dto;
     }
 

@@ -92,6 +92,8 @@ public class ItAssetHistoryDto
     public string? Description { get; set; }
     public DateTime OccurredAt { get; set; }
     public Guid? TicketId { get; set; }
+    public Guid? PerformedBy { get; set; }
+    public string? PerformedByName { get; set; }   // usuario que ejecutó la acción (auditoría)
 }
 
 // ─── Escritura ──────────────────────────────────────────────────────────────────

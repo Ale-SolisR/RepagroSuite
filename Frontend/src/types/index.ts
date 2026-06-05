@@ -470,6 +470,8 @@ export interface ItAssetHistoryDto {
   description?: string
   occurredAt: string
   ticketId?: string
+  performedBy?: string
+  performedByName?: string
 }
 
 export interface CreateItAssetRequest {
@@ -731,6 +733,7 @@ export interface ItTicketDto extends ItTicketListDto {
   hasPdf: boolean
   voidReason?: string
   voidedAt?: string
+  voidedByName?: string
   lines: ItTicketLineDto[]
   photos: ItTicketPhotoDto[]
   signatures: ItTicketSignatureDto[]
