@@ -77,6 +77,11 @@ public class AuthService : IAuthService
         var accessToken = _tokenService.GenerateAccessToken(user, roles, permissions);
         var refreshToken = _tokenService.GenerateRefreshToken(user.Id, ipAddress, userAgent);
 
+        // Sesión única: revoca los refresh tokens de cualquier sesión previa del usuario. Combinado
+        // con el sello de sesión (LastLoginAt en el claim "lat"), el inicio de sesión más reciente
+        // invalida de inmediato cualquier otra sesión activa.
+        await _uow.Users.RevokeActiveRefreshTokensAsync(user.Id, "Reemplazada por una nueva sesión", cancellationToken);
+
         await _uow.Users.AddRefreshTokenAsync(refreshToken, cancellationToken);
         await _uow.SaveChangesAsync(cancellationToken);
 

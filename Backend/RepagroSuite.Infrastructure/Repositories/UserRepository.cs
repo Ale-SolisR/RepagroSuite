@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using RepagroSuite.Domain.Common;
 using RepagroSuite.Domain.Entities;
 using RepagroSuite.Domain.Enums;
 using RepagroSuite.Domain.Interfaces.Repositories;
@@ -48,6 +49,20 @@ public class UserRepository : GenericRepository<User>, IUserRepository
 
     public async Task AddRefreshTokenAsync(RefreshToken token, CancellationToken cancellationToken = default)
         => await _context.Set<RefreshToken>().AddAsync(token, cancellationToken);
+
+    public async Task<DateTime?> GetSessionStampAsync(Guid userId, CancellationToken cancellationToken = default)
+        => await _dbSet.AsNoTracking()
+            .Where(u => u.Id == userId)
+            .Select(u => u.LastLoginAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    public async Task RevokeActiveRefreshTokensAsync(Guid userId, string reason, CancellationToken cancellationToken = default)
+        => await _context.Set<RefreshToken>()
+            .Where(rt => rt.UserId == userId && !rt.IsRevoked && !rt.IsDeleted && rt.ExpiresAt > DateTime.UtcNow)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(rt => rt.IsRevoked, true)
+                .SetProperty(rt => rt.RevokedAt, BusinessClock.Now)
+                .SetProperty(rt => rt.RevokedReason, reason), cancellationToken);
 
     public async Task<(IEnumerable<User> Items, int Total)> GetPagedAsync(
         int page, int pageSize, string? search = null, UserStatus? status = null, CancellationToken cancellationToken = default)

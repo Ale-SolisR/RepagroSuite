@@ -110,6 +110,20 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                     context.Token = accessToken;
                 return Task.CompletedTask;
             },
+            // Sesión única: el token lleva el sello de su sesión (claim "lat" = LastLoginAt). Si el
+            // usuario inició sesión después (en otro dispositivo), el sello cambia y este token deja
+            // de ser válido de inmediato. Tokens antiguos sin sello se permiten (expiran solos).
+            OnTokenValidated = async context =>
+            {
+                var latClaim = context.Principal?.FindFirst("lat")?.Value;
+                var idClaim = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(latClaim) || !Guid.TryParse(idClaim, out var userId))
+                    return;
+                var uow = context.HttpContext.RequestServices.GetRequiredService<RepagroSuite.Domain.Interfaces.IUnitOfWork>();
+                var stamp = await uow.Users.GetSessionStampAsync(userId, context.HttpContext.RequestAborted);
+                if (!stamp.HasValue || stamp.Value.Ticks.ToString() != latClaim)
+                    context.Fail("Sesión finalizada: se inició sesión más reciente en otro dispositivo.");
+            },
             OnChallenge = context =>
             {
                 context.HandleResponse();

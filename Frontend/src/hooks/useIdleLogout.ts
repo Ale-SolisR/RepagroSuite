@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '@/store/authStore'
 
-const IDLE_TIMEOUT_MS = 60 * 60 * 1000
+const IDLE_TIMEOUT_MS = 3 * 60 * 60 * 1000   // 3 horas de inactividad
 const STORAGE_KEY = 'repagro-last-activity'
 const ACTIVITY_EVENTS = ['mousedown', 'keydown', 'touchstart', 'scroll', 'visibilitychange'] as const
 

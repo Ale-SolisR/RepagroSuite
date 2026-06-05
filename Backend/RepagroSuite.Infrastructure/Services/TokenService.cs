@@ -33,6 +33,11 @@ public class TokenService : ITokenService
             new("fullName", user.FullName),
         };
 
+        // Sello de sesión: ata el token a la última sesión iniciada (sesión única). Si el usuario
+        // vuelve a iniciar sesión, LastLoginAt cambia y los tokens anteriores dejan de ser válidos.
+        if (user.LastLoginAt.HasValue)
+            claims.Add(new Claim("lat", user.LastLoginAt.Value.Ticks.ToString()));
+
         claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
         claims.AddRange(permissions.Select(p => new Claim("permission", p)));
 
@@ -55,13 +60,15 @@ public class TokenService : ITokenService
         using var rng = RandomNumberGenerator.Create();
         rng.GetBytes(randomBytes);
 
-        var refreshDays = int.Parse(_config["Jwt:RefreshTokenExpiryDays"] ?? "30");
+        // Expiración por inactividad: el refresh token es deslizante (se rota en cada refresh).
+        // Si el usuario no tiene actividad durante este lapso, el token caduca y la sesión se cierra.
+        var refreshHours = int.Parse(_config["Jwt:RefreshTokenExpiryHours"] ?? "3");
 
         return new RefreshToken
         {
             UserId = userId,
             Token = Convert.ToBase64String(randomBytes),
-            ExpiresAt = DateTime.UtcNow.AddDays(refreshDays),
+            ExpiresAt = DateTime.UtcNow.AddHours(refreshHours),
             IpAddress = ipAddress,
             UserAgent = userAgent
         };

@@ -16,4 +16,11 @@ public interface IUserRepository : IGenericRepository<User>
     Task<User?> GetByRefreshTokenAsync(string token, CancellationToken cancellationToken = default);
     Task AddRefreshTokenAsync(RefreshToken token, CancellationToken cancellationToken = default);
     Task<(IEnumerable<User> Items, int Total)> GetPagedAsync(int page, int pageSize, string? search = null, UserStatus? status = null, CancellationToken cancellationToken = default);
+
+    /// <summary>Sello de sesión del usuario (LastLoginAt): cambia en cada login y sirve para
+    /// invalidar tokens de sesiones anteriores (sesión única). Devuelve null si no existe.</summary>
+    Task<DateTime?> GetSessionStampAsync(Guid userId, CancellationToken cancellationToken = default);
+
+    /// <summary>Revoca todos los refresh tokens activos del usuario (al iniciar una nueva sesión única).</summary>
+    Task RevokeActiveRefreshTokensAsync(Guid userId, string reason, CancellationToken cancellationToken = default);
 }
