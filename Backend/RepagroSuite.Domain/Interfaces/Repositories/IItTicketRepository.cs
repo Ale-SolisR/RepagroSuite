@@ -7,7 +7,7 @@ public interface IItTicketRepository : IGenericRepository<ItTicket>
 {
     Task<(IReadOnlyList<ItTicket> Items, int Total)> GetPagedAsync(
         int page, int pageSize, ItTicketType? type, ItTicketStatus? status, string? search,
-        CancellationToken cancellationToken = default);
+        Guid? employeeId, CancellationToken cancellationToken = default);
 
     /// <summary>Boleta con detalles (+activo), fotos, firmas y contrapartes.</summary>
     Task<ItTicket?> GetWithDetailsAsync(Guid id, CancellationToken cancellationToken = default);

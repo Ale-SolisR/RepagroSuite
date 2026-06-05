@@ -55,8 +55,8 @@ export const qk = {
     departments: (search: string) => ['ti', 'departments', search] as const,
     brands: (search: string) => ['ti', 'brands', search] as const,
     suppliers: (search: string) => ['ti', 'suppliers', search] as const,
-    tickets: (page: number, type: string, status: string, search: string) =>
-      ['ti', 'tickets', page, type, status, search] as const,
+    tickets: (page: number, type: string, status: string, search: string, employeeId = '') =>
+      ['ti', 'tickets', page, type, status, search, employeeId] as const,
     ticket: (id: string) => ['ti', 'ticket', id] as const,
     availableAssets: ['ti', 'available-assets'] as const,
     employee: (id: string) => ['ti', 'employee', id] as const,

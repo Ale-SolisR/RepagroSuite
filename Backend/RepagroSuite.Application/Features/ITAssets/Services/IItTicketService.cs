@@ -7,7 +7,7 @@ namespace RepagroSuite.Application.Features.ITAssets.Services;
 public interface IItTicketService
 {
     Task<PagedResult<ItTicketListDto>> GetPagedAsync(int page, int pageSize, ItTicketType? type,
-        ItTicketStatus? status, string? search, CancellationToken cancellationToken = default);
+        ItTicketStatus? status, string? search, Guid? employeeId, CancellationToken cancellationToken = default);
     Task<ItTicketDto> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     /// <summary>Devuelve el PDF de la boleta junto con un nombre de archivo identificativo
     /// (número de boleta + tipo + colaborador), seguro para descarga.</summary>

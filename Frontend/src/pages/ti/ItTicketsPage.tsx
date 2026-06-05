@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { Search, FileText, ChevronLeft, ChevronRight, ClipboardCheck } from 'lucide-react'
 
 import { itTicketsApi } from '@/api/itTickets'
+import { itEmployeesApi } from '@/api/itEmployees'
 import { qk, staleTimes } from '@/lib/queryKeys'
 import { useAuthStore } from '@/store/authStore'
 import { format, parseISO } from 'date-fns'
@@ -26,11 +27,20 @@ export default function ItTicketsPage() {
   const [search, setSearch] = useState('')
   const [type, setType] = useState('')
   const [status, setStatus] = useState('')
+  const [employeeId, setEmployeeId] = useState('')
+
+  // Colaboradores activos para el filtro por colaborador.
+  const employees = useQuery({
+    queryKey: ['ti', 'employees', 'active'],
+    queryFn: () => itEmployeesApi.getActive().then(r => r.data.data ?? []),
+    staleTime: staleTimes.ti,
+  })
 
   const { data, isLoading, isFetching } = useQuery({
-    queryKey: qk.ti.tickets(page, type, status, search),
+    queryKey: qk.ti.tickets(page, type, status, search, employeeId),
     queryFn: () => itTicketsApi.getAll({
-      page, pageSize: PAGE_SIZE, type: type || undefined, status: status || undefined, search: search || undefined,
+      page, pageSize: PAGE_SIZE, type: type || undefined, status: status || undefined,
+      search: search || undefined, employeeId: employeeId || undefined,
     }).then(r => r.data.data!),
     staleTime: staleTimes.ti,
     placeholderData: keepPreviousData,
@@ -61,8 +71,12 @@ export default function ItTicketsPage() {
           <label className="relative flex flex-1 min-w-[200px] items-center">
             <Search className="pointer-events-none absolute left-3 h-4 w-4 text-ink2" />
             <input type="search" value={search} onChange={e => reset(() => setSearch(e.target.value))}
-              placeholder="Buscar por consecutivo" className="h-10 w-full rounded-[8px] border border-line bg-paper pl-9 pr-3 text-sm text-ink placeholder:text-ink2 focus:border-brand-400 focus:outline-none" />
+              placeholder="Buscar por consecutivo o colaborador (nombre/cédula)" className="h-10 w-full rounded-[8px] border border-line bg-paper pl-9 pr-3 text-sm text-ink placeholder:text-ink2 focus:border-brand-400 focus:outline-none" />
           </label>
+          <select value={employeeId} onChange={e => reset(() => setEmployeeId(e.target.value))} className="h-10 max-w-[220px] rounded-[8px] border border-line bg-paper px-3 text-sm text-ink focus:border-brand-400 focus:outline-none">
+            <option value="">Todos los colaboradores</option>
+            {(employees.data ?? []).map(e => <option key={e.id} value={e.id}>{e.fullName}</option>)}
+          </select>
           <select value={type} onChange={e => reset(() => setType(e.target.value))} className="h-10 rounded-[8px] border border-line bg-paper px-3 text-sm text-ink focus:border-brand-400 focus:outline-none">
             <option value="">Todos los tipos</option>
             {TYPE_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}

@@ -29,9 +29,9 @@ public class ItTicketsController : ControllerBase
     public async Task<ActionResult<ApiResponse<PagedResult<ItTicketListDto>>>> GetAll(
         [FromQuery] int page = 1, [FromQuery] int pageSize = 20,
         [FromQuery] ItTicketType? type = null, [FromQuery] ItTicketStatus? status = null,
-        [FromQuery] string? search = null, CancellationToken ct = default)
+        [FromQuery] string? search = null, [FromQuery] Guid? employeeId = null, CancellationToken ct = default)
     {
-        var result = await _tickets.GetPagedAsync(page, pageSize, type, status, search, ct);
+        var result = await _tickets.GetPagedAsync(page, pageSize, type, status, search, employeeId, ct);
         return Ok(ApiResponse<PagedResult<ItTicketListDto>>.Ok(result));
     }
 

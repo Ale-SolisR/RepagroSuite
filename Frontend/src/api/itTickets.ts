@@ -12,6 +12,7 @@ export interface ItTicketListParams {
   type?: string
   status?: string
   search?: string
+  employeeId?: string
 }
 
 export const itTicketsApi = {

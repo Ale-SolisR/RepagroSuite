@@ -29,9 +29,9 @@ public class ItTicketService : IItTicketService
     }
 
     public async Task<PagedResult<ItTicketListDto>> GetPagedAsync(int page, int pageSize, ItTicketType? type,
-        ItTicketStatus? status, string? search, CancellationToken cancellationToken = default)
+        ItTicketStatus? status, string? search, Guid? employeeId, CancellationToken cancellationToken = default)
     {
-        var (items, total) = await _uow.ItTickets.GetPagedAsync(page, pageSize, type, status, search, cancellationToken);
+        var (items, total) = await _uow.ItTickets.GetPagedAsync(page, pageSize, type, status, search, employeeId, cancellationToken);
         return new PagedResult<ItTicketListDto>
         {
             Items = items.Select(MapToListDto),

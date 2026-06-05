@@ -12,7 +12,7 @@ public class ItTicketRepository : GenericRepository<ItTicket>, IItTicketReposito
 
     public async Task<(IReadOnlyList<ItTicket> Items, int Total)> GetPagedAsync(
         int page, int pageSize, ItTicketType? type, ItTicketStatus? status, string? search,
-        CancellationToken cancellationToken = default)
+        Guid? employeeId, CancellationToken cancellationToken = default)
     {
         var query = _dbSet
             .Include(t => t.Employee)
@@ -23,10 +23,14 @@ public class ItTicketRepository : GenericRepository<ItTicket>, IItTicketReposito
 
         if (type.HasValue) query = query.Where(t => t.TicketType == type.Value);
         if (status.HasValue) query = query.Where(t => t.Status == status.Value);
+        if (employeeId.HasValue) query = query.Where(t => t.EmployeeId == employeeId.Value);
         if (!string.IsNullOrWhiteSpace(search))
         {
             var s = search.Trim();
-            query = query.Where(t => t.TicketNumber.Contains(s));
+            query = query.Where(t =>
+                t.TicketNumber.Contains(s) ||
+                (t.Employee != null && t.Employee.FullName.Contains(s)) ||
+                (t.Employee != null && t.Employee.IdentificationNumber.Contains(s)));
         }
 
         var total = await query.CountAsync(cancellationToken);
