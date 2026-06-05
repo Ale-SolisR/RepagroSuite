@@ -62,8 +62,15 @@ function LoginForm({ onSwitchMode }: { onSwitchMode: (mode: Mode) => void }) {
       if (mustChangePassword) {
         navigate('/forced-change-password')
       } else {
-        const isAdmin = user.roles?.includes('ADMINISTRATOR')
-        navigate(isAdmin ? '/dashboard' : '/rooms')
+        // En móvil/tablet (sin sidebar fijo, < lg) mostramos el menú de módulos para que el
+        // usuario elija a dónde entrar, en vez de caer directo en un módulo.
+        const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024
+        if (isMobile) {
+          navigate('/menu')
+        } else {
+          const isAdmin = user.roles?.includes('ADMINISTRATOR')
+          navigate(isAdmin ? '/dashboard' : '/rooms')
+        }
       }
     } catch (err) {
       setGeneralError(extractApiError(err))

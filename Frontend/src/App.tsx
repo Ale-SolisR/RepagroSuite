@@ -18,6 +18,7 @@ const ForgotPasswordPage = lazy(() => import('@/pages/auth/ForgotPasswordPage'))
 const ResetPasswordPage = lazy(() => import('@/pages/auth/ResetPasswordPage'))
 const ForcedChangePasswordPage = lazy(() => import('@/pages/auth/ForcedChangePasswordPage'))
 
+const MenuPage = lazy(() => import('@/pages/menu/MenuPage'))
 const DashboardPage = lazy(() => import('@/pages/dashboard/DashboardPage'))
 const RoomsPage = lazy(() => import('@/pages/rooms/RoomsPage'))
 const MyReservationsPage = lazy(() => import('@/pages/reservations/MyReservationsPage'))
@@ -80,6 +81,7 @@ export default function App() {
             {/* Protected — accesible a cualquier autenticado */}
             <Route element={<ProtectedRoute />}>
               <Route element={<AppLayout />}>
+                <Route path="/menu" element={<MenuPage />} />
                 <Route path="/rooms" element={<RoomsPage />} />
                 <Route path="/reservations" element={<MyReservationsPage />} />
                 <Route path="/calendar" element={<CalendarPage />} />
