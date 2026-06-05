@@ -64,10 +64,10 @@ export default function AssetMovements({ asset: a, showAssetCode = false, onChan
   const isAssigned = a.status === 'Assigned' || a.status === 'Loaned'
   const isAssignable = a.status === 'Available' || a.status === 'Returned'
   const isLive = a.status === 'Available' || isAssigned
-  // Reactivable: estados "detenidos" recuperables. NO incluye Perdido/Robado: un activo dado de
-  // baja por pérdida o robo es definitivo y no puede reactivarse (regla de negocio).
-  const isReactivatable = ['Damaged', 'Inactive', 'Returned', 'UnderReview', 'UnderMaintenance', 'UnderRepair'].includes(a.status)
-  const isLostOrStolen = a.status === 'Lost' || a.status === 'Stolen'
+  // Reactivable: estados "detenidos" recuperables. Incluye Perdido (puede aparecer). NO incluye
+  // Robado: una baja por robo es definitiva y no puede reactivarse (regla de negocio).
+  const isReactivatable = ['Damaged', 'Lost', 'Inactive', 'Returned', 'UnderReview', 'UnderMaintenance', 'UnderRepair'].includes(a.status)
+  const isStolen = a.status === 'Stolen'
   const canAssign = isAssignable && hasPermission('Ti.Assign')
   const canReturn = isAssigned && hasPermission('Ti.Return')
   const canIncident = isLive && hasPermission('Ti.Ticket.Create')
@@ -75,7 +75,7 @@ export default function AssetMovements({ asset: a, showAssetCode = false, onChan
   const hasMovements = canAssign || canReturn || canIncident || canReactivate
 
   // Sin acciones y sin nada que explicar → no renderizamos nada (evita ruido).
-  if (!hasMovements && !isReactivatable && !isLostOrStolen) return null
+  if (!hasMovements && !isReactivatable && !isStolen) return null
 
   // En modo solo-lectura (boleta anulada) los enlaces se vuelven botones inertes con el mismo aspecto.
   const ro = readOnly ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90'
@@ -142,9 +142,9 @@ export default function AssetMovements({ asset: a, showAssetCode = false, onChan
         </p>
       )}
 
-      {isLostOrStolen && (
+      {isStolen && (
         <p className="mt-3 rounded-lg bg-bg p-2.5 text-[12px] text-ink2">
-          Activo dado de baja por {a.status === 'Lost' ? 'pérdida' : 'robo'}. No puede reactivarse.
+          Activo dado de baja por robo. No puede reactivarse.
         </p>
       )}
 

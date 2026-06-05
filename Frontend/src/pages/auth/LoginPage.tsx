@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -13,7 +13,7 @@ import Input from '@/components/ui/Input'
 import BrandPanel from '@/components/auth/BrandPanel'
 import RastreoLoginForm from './RastreoLoginForm'
 import repagroLogoFull from '@/assets/repagro-logo-full.png'
-import { Building2, Sprout, Mail, Lock, ShieldCheck, Check } from 'lucide-react'
+import { Building2, Sprout, Mail, Lock, ShieldCheck, Check, LogOut, ArrowRight } from 'lucide-react'
 import toast from 'react-hot-toast'
 import type { IdentificationResultDto } from '@/types'
 
@@ -460,9 +460,83 @@ function SystemSwitch({ system, onChange }: { system: SystemKey; onChange: (s: S
 }
 
 // ─── Página principal ─────────────────────────────────────────────────────────
+/**
+ * Aviso cuando un usuario CON sesión activa llega a /login (normalmente por el botón "atrás"
+ * del navegador). En vez de mostrar el formulario (que parece que se cerró la sesión), se muestra
+ * un aviso. Para "devolver al login" de verdad hay que dar atrás una segunda vez: el primer atrás
+ * te trajo a este aviso, y un segundo atrás cierra la sesión y muestra el formulario.
+ */
+function AuthedSessionNotice() {
+  const navigate = useNavigate()
+  const user = useAuthStore(s => s.user)
+  const logout = useAuthStore(s => s.logout)
+  const initRef = useRef(false)
+
+  const goToApp = useCallback(() => {
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024
+    const target = isMobile
+      ? '/menu'
+      : (user?.roles?.includes('ADMINISTRATOR') ? '/dashboard' : '/rooms')
+    navigate(target, { replace: true })
+  }, [navigate, user])
+
+  const doLogout = useCallback(async () => {
+    try { await authApi.logout() } catch { /* ignore */ }
+    logout()  // al quedar sin sesión, /login muestra el formulario normal
+  }, [logout])
+
+  useEffect(() => {
+    // Centinela: dejamos una entrada extra en el historial para capturar el SIGUIENTE "atrás".
+    // El primer atrás ya te trajo a este aviso; el segundo atrás dispara el cierre de sesión.
+    if (!initRef.current) {
+      initRef.current = true
+      window.history.pushState({ repagroAuthNotice: true }, '')
+      toast('Tu sesión sigue activa. Presiona «atrás» otra vez para cerrar sesión.',
+        { icon: '⚠️', duration: 6000 })
+    }
+    const onPop = () => { void doLogout() }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [doLogout])
+
+  return (
+    <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-paper px-4 py-10">
+      <div className="w-full max-w-[420px] rounded-2xl border border-line bg-white p-6 sm:p-8 text-center shadow-[0_18px_50px_-20px_rgba(7,61,49,0.28)]">
+        <img src={repagroLogoFull} alt="Repagro App" className="mx-auto h-11 w-auto" />
+        <span className="mx-auto mt-6 flex h-12 w-12 items-center justify-center rounded-full"
+          style={{ background: '#ECFDF5', color: '#0E6B4B' }}>
+          <ShieldCheck className="h-6 w-6" />
+        </span>
+        <h1 className="mt-4 text-[20px] font-semibold tracking-tight text-ink">Tu sesión sigue activa</h1>
+        <p className="mt-2 text-[14px] leading-relaxed text-ink2">
+          Volviste a la pantalla de inicio de sesión{user?.fullName ? `, ${user.fullName.split(' ')[0]}` : ''}.
+          No te preocupes: <span className="font-medium text-ink">no se cerró tu sesión</span>.
+        </p>
+        <button
+          onClick={goToApp}
+          className="mt-6 inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[10px] px-4 text-sm font-semibold text-white transition-opacity hover:opacity-90 touch-manipulation"
+          style={{ background: '#0E6B4B' }}
+        >
+          Volver a la aplicación <ArrowRight className="h-4 w-4" />
+        </button>
+        <button
+          onClick={doLogout}
+          className="mt-2.5 inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[10px] border border-line bg-paper px-4 text-sm font-medium text-ink transition-colors hover:bg-bg touch-manipulation"
+        >
+          <LogOut className="h-4 w-4" /> Cerrar sesión
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function LoginPage() {
+  const isAuthenticated = useAuthStore(s => s.isAuthenticated)
   const [mode, setMode] = useState<Mode>('login')
   const [system, setSystem] = useState<SystemKey>('repagro')
+
+  // Con sesión activa (p. ej. al llegar aquí con el botón "atrás") mostramos un aviso en vez del formulario.
+  if (isAuthenticated) return <AuthedSessionNotice />
 
   return (
     <div className="min-h-[100dvh] grid lg:grid-cols-[35%_65%]">

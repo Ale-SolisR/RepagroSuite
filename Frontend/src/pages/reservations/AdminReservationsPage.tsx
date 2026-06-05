@@ -8,6 +8,7 @@ import {
 import { reservationsApi } from '@/api/reservations'
 import { usersApi } from '@/api/users'
 import { roomsApi } from '@/api/rooms'
+import { useAuthStore } from '@/store/authStore'
 import { formatDate, formatTime, extractApiError, classNames } from '@/utils'
 import { qk, staleTimes, invalidate } from '@/lib/queryKeys'
 import Button from '@/components/ui/Button'
@@ -185,6 +186,9 @@ function GroupRow({ entry, onApprove, onReject, onCancel, onApproveAll, onReject
 
 export default function AdminReservationsPage() {
   const qc = useQueryClient()
+  const { user, hasRole } = useAuthStore()
+  // Solo admin/master ven la auditoría completa y pueden filtrar por usuario; el resto ve solo lo suyo.
+  const canSeeAll = hasRole('ADMINISTRATOR') || (user?.isMaster ?? false)
   const [page, setPage] = useState(1)
   const [activeTab, setActiveTab] = useState('')
   const [userId, setUserId] = useState('')
@@ -211,6 +215,7 @@ export default function AdminReservationsPage() {
     queryKey: qk.users.list,
     queryFn: () => usersApi.getAll({ pageSize: 100 }).then(r => r.data.data?.items ?? []),
     staleTime: staleTimes.users,
+    enabled: canSeeAll,   // la lista de usuarios solo aplica al filtro de admin/master
   })
   const { data: rooms = [] } = useQuery({
     queryKey: qk.rooms.list,
@@ -333,13 +338,15 @@ export default function AdminReservationsPage() {
           <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-ink2/70 uppercase tracking-wider mr-1">
             <ListFilter className="h-3.5 w-3.5" /> Filtros
           </span>
-          <div className="relative">
-            <User className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-ink2/60" />
-            <select value={userId} onChange={e => { setUserId(e.target.value); setPage(1) }} className={SELECT_CLS} aria-label="Filtrar por usuario">
-              <option value="">Todos los usuarios</option>
-              {(users as UserDto[]).map(u => <option key={u.id} value={u.id}>{u.fullName}</option>)}
-            </select>
-          </div>
+          {canSeeAll && (
+            <div className="relative">
+              <User className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-ink2/60" />
+              <select value={userId} onChange={e => { setUserId(e.target.value); setPage(1) }} className={SELECT_CLS} aria-label="Filtrar por usuario">
+                <option value="">Todos los usuarios</option>
+                {(users as UserDto[]).map(u => <option key={u.id} value={u.id}>{u.fullName}</option>)}
+              </select>
+            </div>
+          )}
           <div className="relative">
             <MapPin className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-ink2/60" />
             <select value={roomId} onChange={e => { setRoomId(e.target.value); setPage(1) }} className={SELECT_CLS} aria-label="Filtrar por sala">

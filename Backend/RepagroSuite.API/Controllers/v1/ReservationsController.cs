@@ -18,11 +18,17 @@ public class ReservationsController : ControllerBase
     private readonly IReservationService _reservationService;
     private readonly ICurrentUserService _currentUser;
 
+    private static readonly Guid MasterUserId = new("33333333-3333-3333-3333-333333333333");
+
     public ReservationsController(IReservationService reservationService, ICurrentUserService currentUser)
     {
         _reservationService = reservationService;
         _currentUser = currentUser;
     }
+
+    /// <summary>Solo admin y master ven la auditoría completa; el resto se limita a su propia actividad.</summary>
+    private bool CanSeeAllActivity =>
+        _currentUser.IsInRole("ADMINISTRATOR") || _currentUser.UserId == MasterUserId;
 
     [HttpGet]
     [Authorize(Policy = "Reservations.View")]
@@ -34,7 +40,9 @@ public class ReservationsController : ControllerBase
         [FromQuery] bool sortDescending = true,
         CancellationToken ct = default)
     {
-        var result = await _reservationService.GetPagedAsync(page, pageSize, userId, roomId, status, from, to, sortDescending, ct);
+        // Quien no es admin/master solo ve su propia actividad (se ignora el filtro userId recibido).
+        var scopedUserId = CanSeeAllActivity ? userId : _currentUser.UserId;
+        var result = await _reservationService.GetPagedAsync(page, pageSize, scopedUserId, roomId, status, from, to, sortDescending, ct);
         return Ok(ApiResponse<PagedResult<ReservationDto>>.Ok(result));
     }
 
@@ -48,7 +56,9 @@ public class ReservationsController : ControllerBase
         [FromQuery] bool sortDescending = true,
         CancellationToken ct = default)
     {
-        var result = await _reservationService.GetAuditGroupsAsync(page, pageSize, userId, roomId, status, sortDescending, ct);
+        // Solo admin/master ven toda la auditoría; el resto queda limitado a su propia actividad.
+        var scopedUserId = CanSeeAllActivity ? userId : _currentUser.UserId;
+        var result = await _reservationService.GetAuditGroupsAsync(page, pageSize, scopedUserId, roomId, status, sortDescending, ct);
         return Ok(ApiResponse<PagedResult<ReservationGroupDto>>.Ok(result));
     }
 

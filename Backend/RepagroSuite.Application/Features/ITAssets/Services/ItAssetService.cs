@@ -267,13 +267,13 @@ public class ItAssetService : IItAssetService
             ?? throw new KeyNotFoundException("Activo no encontrado.");
 
         var from = asset.Status;
-        // Pérdida/robo es una baja DEFINITIVA: no puede reactivarse (regla de negocio).
-        if (from is ItAssetStatus.Lost or ItAssetStatus.Stolen)
-            throw new InvalidOperationException("Un activo dado de baja por pérdida o robo no puede reactivarse.");
-        // Reactivable el resto de estados "detenidos" recuperables: dañado/inactivo y estados
-        // heredados sin salida en el flujo de 5 movimientos (devuelto/en revisión/mantenimiento/reparación).
-        var reactivatable = from is ItAssetStatus.Damaged or ItAssetStatus.Inactive or ItAssetStatus.Returned
-            or ItAssetStatus.UnderReview or ItAssetStatus.UnderMaintenance or ItAssetStatus.UnderRepair;
+        // Robo es una baja DEFINITIVA: no puede reactivarse (regla de negocio).
+        if (from is ItAssetStatus.Stolen)
+            throw new InvalidOperationException("Un activo dado de baja por robo no puede reactivarse.");
+        // Reactivable: dañado, perdido (puede aparecer), inactivo y estados heredados sin salida en el
+        // flujo de movimientos (devuelto/en revisión/mantenimiento/reparación).
+        var reactivatable = from is ItAssetStatus.Damaged or ItAssetStatus.Lost or ItAssetStatus.Inactive
+            or ItAssetStatus.Returned or ItAssetStatus.UnderReview or ItAssetStatus.UnderMaintenance or ItAssetStatus.UnderRepair;
         if (!reactivatable)
             throw new InvalidOperationException($"Este activo no requiere reactivación. Estado actual: {StatusName(from)}.");
 
