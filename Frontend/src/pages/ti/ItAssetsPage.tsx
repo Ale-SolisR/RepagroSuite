@@ -157,7 +157,16 @@ export default function ItAssetsPage() {
                       <td className="px-4 py-3 text-ink">{a.assetTypeName}</td>
                       <td className="px-4 py-3 text-ink2">{[a.brandName, a.model].filter(Boolean).join(' · ') || '—'}</td>
                       <td className="px-4 py-3 font-mono text-[12px] text-ink2">{a.serialNumber ?? '—'}</td>
-                      <td className="px-4 py-3 text-ink2">{a.currentHolderName ?? '—'}</td>
+                      <td className="px-4 py-3">
+                        {a.currentHolderEmployeeId ? (
+                          <Link to={`/ti/employees/${a.currentHolderEmployeeId}`}
+                            className="font-medium text-ink hover:underline" style={{ textDecorationColor: BRAND }}>
+                            {a.currentHolderName ?? '—'}
+                          </Link>
+                        ) : (
+                          <span className="text-ink2">{a.currentHolderName ?? '—'}</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3"><Chip variant={statusChipVariant(a.status)} label={a.statusName} /></td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end">

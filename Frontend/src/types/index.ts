@@ -409,6 +409,7 @@ export interface ItAssetListDto {
   locationName?: string
   departmentName?: string
   currentHolderName?: string
+  currentHolderEmployeeId?: string
 }
 
 /** Foto del activo (binario en BD). `url` es una data URL sólo para previsualizar. */

@@ -18,6 +18,7 @@ public class ItAssetListDto
     public string? LocationName { get; set; }
     public string? DepartmentName { get; set; }
     public string? CurrentHolderName { get; set; }
+    public Guid? CurrentHolderEmployeeId { get; set; }   // para enlazar al colaborador desde la lista
 }
 
 /// <summary>Ficha completa del activo (detalle + edición).</summary>
@@ -31,7 +32,6 @@ public class ItAssetDto : ItAssetListDto
     public Guid? LocationId { get; set; }
     public string? LocationDetail { get; set; }
     public Guid? DepartmentId { get; set; }
-    public Guid? CurrentHolderEmployeeId { get; set; }
     public DateTime? PurchaseDate { get; set; }
     public Guid? SupplierId { get; set; }
     public string? SupplierName { get; set; }

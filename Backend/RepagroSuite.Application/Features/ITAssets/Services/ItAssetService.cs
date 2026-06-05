@@ -649,7 +649,8 @@ public class ItAssetService : IItAssetService
         StatusName = StatusName(a.Status),
         LocationName = a.Location?.Name,
         DepartmentName = a.Department?.Name,
-        CurrentHolderName = a.Holder?.FullName
+        CurrentHolderName = a.Holder?.FullName,
+        CurrentHolderEmployeeId = a.CurrentHolderEmployeeId
     };
 
     private static ItAssetDto MapToDto(ItAsset a) => new()
