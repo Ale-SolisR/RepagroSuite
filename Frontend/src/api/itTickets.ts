@@ -26,6 +26,10 @@ export const itTicketsApi = {
   getPdf: (id: string) =>
     api.get(`/ti/tickets/${id}/pdf`, { responseType: 'blob' }),
 
+  // Regenera el PDF de una boleta con el formato actual (cédulas, condición en español…).
+  regeneratePdf: (id: string) =>
+    api.post<ApiResponse<ItTicketDto>>(`/ti/tickets/${id}/regenerate-pdf`),
+
   createAssignment: (data: CreateAssignmentRequest) =>
     api.post<ApiResponse<ItTicketDto>>('/ti/tickets/assignments', data),
 

@@ -51,6 +51,14 @@ public class ItTicketsController : ControllerBase
         return File(bytes, "application/pdf", fileName);
     }
 
+    [HttpPost("{id:guid}/regenerate-pdf")]
+    [Authorize(Policy = "Ti.Ticket.Create")]
+    public async Task<ActionResult<ApiResponse<ItTicketDto>>> RegeneratePdf(Guid id, CancellationToken ct)
+    {
+        var result = await _tickets.RegeneratePdfAsync(id, ct);
+        return Ok(ApiResponse<ItTicketDto>.Ok(result, "PDF regenerado con el formato actual."));
+    }
+
     [HttpPost("assignments")]
     [Authorize(Policy = "Ti.Assign")]
     public async Task<ActionResult<ApiResponse<ItTicketDto>>> CreateAssignment([FromBody] CreateAssignmentDto dto, CancellationToken ct)

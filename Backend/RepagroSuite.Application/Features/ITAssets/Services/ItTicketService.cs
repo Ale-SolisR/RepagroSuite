@@ -100,6 +100,14 @@ public class ItTicketService : IItTicketService
         return (Convert.FromBase64String(t.PdfBase64), PdfFileName(t));
     }
 
+    public async Task<ItTicketDto> RegeneratePdfAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        _ = await _uow.ItTickets.GetByIdAsync(id, cancellationToken)
+            ?? throw new KeyNotFoundException("Boleta no encontrada.");
+        await GeneratePdfAsync(id, cancellationToken);   // recarga con detalles, regenera y guarda PdfBase64 + hash
+        return await GetByIdAsync(id, cancellationToken);
+    }
+
     /// <summary>Nombre de archivo identificativo y seguro: «{N° boleta}_{tipo}_{colaborador}.pdf».
     /// Ej.: TI-PRB-2026-000001_Perdida-robo-de-equipo_SOLIS-ROJAS-LUIS-ALEJANDRO.pdf</summary>
     private static string PdfFileName(ItTicket t)
@@ -581,7 +589,7 @@ public class ItTicketService : IItTicketService
                 TypeName = d.LineType == "ACCESSORY" ? "Accesorio" : null,
                 Description = d.Description,
                 SerialNumber = d.Asset?.SerialNumber,
-                Condition = d.Condition
+                Condition = ConditionEs(d.Condition)
             }).ToList(),
             Signatures = t.Signatures.Select(s => new TicketPdfSignature
             {

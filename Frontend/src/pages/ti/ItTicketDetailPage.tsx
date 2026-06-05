@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Loader2, FileText, Download, Ban, ShieldCheck, Wrench, Link2, CornerUpLeft, CornerDownRight } from 'lucide-react'
+import { ArrowLeft, Loader2, FileText, Download, Ban, ShieldCheck, Wrench, Link2, CornerUpLeft, CornerDownRight, RefreshCw } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -62,6 +62,16 @@ export default function ItTicketDetailPage() {
     onError: (e) => toast.error(extractApiError(e)),
   })
 
+  const regenMut = useMutation({
+    mutationFn: () => itTicketsApi.regeneratePdf(id!).then(r => r.data.data!),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.ti.ticket(id!) })
+      toast.success('PDF regenerado con el formato actual.')
+      pdfMut.mutate()   // descarga el PDF nuevo (con cédulas y condición en español)
+    },
+    onError: (e) => toast.error(extractApiError(e)),
+  })
+
   const voidMut = useMutation({
     mutationFn: (reason: string) => itTicketsApi.void(id!, { reason }).then(r => r.data.data!),
     onSuccess: () => {
@@ -107,6 +117,13 @@ export default function ItTicketDetailPage() {
             <button onClick={() => pdfMut.mutate()} disabled={pdfMut.isPending}
               className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-[8px] px-3 text-sm font-medium text-white transition-colors touch-manipulation hover:opacity-90 disabled:opacity-50 sm:flex-none" style={{ background: BRAND }}>
               {pdfMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} PDF
+            </button>
+          )}
+          {t.hasPdf && hasPermission('Ti.Ticket.Create') && (
+            <button onClick={() => regenMut.mutate()} disabled={regenMut.isPending || pdfMut.isPending}
+              title="Regenerar el PDF con el formato actual (cédulas, condición en español)"
+              className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-[8px] border border-line bg-paper px-3 text-sm font-medium text-ink transition-colors touch-manipulation hover:bg-bg disabled:opacity-50 sm:flex-none">
+              {regenMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Regenerar
             </button>
           )}
           {t.status !== 'Anulada' && hasPermission('Ti.Ticket.Void') && (
