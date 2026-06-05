@@ -148,10 +148,9 @@ export default function ItTicketDetailPage() {
             <div className="grid gap-x-8 sm:grid-cols-2">
               <Field label="Tipo" value={t.ticketTypeName} />
               <Field label="Emitida" value={format(parseISO(t.issuedAt), "d MMM yyyy · HH:mm", { locale: es })} />
+              <Field label="Emitida por" value={t.itResponsibleName} />
               <Field label="Colaborador" value={t.employeeName} />
               <Field label="Cédula colaborador" value={t.employeeIdentification} />
-              <Field label="Responsable TI" value={t.itResponsibleName} />
-              <Field label="Cédula responsable" value={t.itResponsibleIdentification} />
             </div>
             {t.notes && <p className="mt-3 rounded-lg bg-bg p-3 text-[13px] text-ink2">{t.notes}</p>}
             {t.pdfSha256 && <p className="mt-2 break-all font-mono text-[10.5px] text-ink2">SHA-256: {t.pdfSha256}</p>}

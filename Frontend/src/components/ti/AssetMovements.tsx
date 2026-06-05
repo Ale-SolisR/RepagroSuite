@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  Loader2, ClipboardCheck, Undo2, UserMinus, AlertTriangle, Search, ShieldX, RotateCcw,
+  Loader2, ClipboardCheck, Undo2, AlertTriangle, Search, ShieldX, RotateCcw,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -70,10 +70,9 @@ export default function AssetMovements({ asset: a, showAssetCode = false, onChan
   const isLostOrStolen = a.status === 'Lost' || a.status === 'Stolen'
   const canAssign = isAssignable && hasPermission('Ti.Assign')
   const canReturn = isAssigned && hasPermission('Ti.Return')
-  const canDeassign = isAssigned && hasPermission('Ti.Return')
   const canIncident = isLive && hasPermission('Ti.Ticket.Create')
   const canReactivate = isReactivatable && hasPermission('Ti.Asset.Reactivate')
-  const hasMovements = canAssign || canReturn || canDeassign || canIncident || canReactivate
+  const hasMovements = canAssign || canReturn || canIncident || canReactivate
 
   // Sin acciones y sin nada que explicar → no renderizamos nada (evita ruido).
   if (!hasMovements && !isReactivatable && !isLostOrStolen) return null
@@ -112,12 +111,6 @@ export default function AssetMovements({ asset: a, showAssetCode = false, onChan
             <><ClipboardCheck className="h-4 w-4" /> Asignar</>)}
           {canReturn && primaryLink(`/ti/assets/${a.id}/return`,
             <><Undo2 className="h-4 w-4" /> Devolver</>)}
-          {canDeassign && (
-            <button onClick={() => setMovement('deassign')} disabled={readOnly}
-              className={`${ACTION_BASE} w-full border border-line bg-paper font-medium text-ink ${readOnly ? 'cursor-not-allowed' : 'hover:bg-bg'}`}>
-              <UserMinus className="h-4 w-4" style={{ color: BRAND }} /> Desasignar
-            </button>
-          )}
           {canIncident && (
             <div className="grid grid-cols-3 gap-2">
               <button onClick={() => setMovement('damaged')} disabled={readOnly}

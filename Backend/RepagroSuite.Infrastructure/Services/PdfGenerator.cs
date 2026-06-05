@@ -61,7 +61,7 @@ public class PdfGenerator : IPdfGenerator
                         });
                         row.RelativeItem().Column(c =>
                         {
-                            c.Item().Text(t => { t.Span("Responsable TI: ").SemiBold(); t.Span(m.ResponsibleName ?? "—"); });
+                            c.Item().Text(t => { t.Span("Emitida por: ").SemiBold(); t.Span(m.ResponsibleName ?? "—"); });
                             c.Item().Text(t => { t.Span("Cédula: ").SemiBold().FontSize(9).FontColor("#4A5750"); t.Span(m.ResponsibleIdentification ?? "—").FontSize(9).FontColor("#4A5750"); });
                         });
                     });
