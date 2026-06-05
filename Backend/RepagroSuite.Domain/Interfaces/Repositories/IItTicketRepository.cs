@@ -14,4 +14,10 @@ public interface IItTicketRepository : IGenericRepository<ItTicket>
 
     /// <summary>Asignación activa de un activo (la única posible), o null.</summary>
     Task<ItAssignment?> GetActiveAssignmentAsync(Guid assetId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Asignaciones ligadas a una boleta (sea su entrega o su cierre), con activo y contrapartes,
+    /// para construir la cadena de trazabilidad Entrega ↔ Devolución/Desasignación/Incidente.
+    /// </summary>
+    Task<IReadOnlyList<ItAssignment>> GetChainAssignmentsAsync(Guid ticketId, CancellationToken cancellationToken = default);
 }

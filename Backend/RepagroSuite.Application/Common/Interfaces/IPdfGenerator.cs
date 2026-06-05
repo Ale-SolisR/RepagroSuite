@@ -15,6 +15,7 @@ public class TicketPdfSignature
 {
     public string Label { get; set; } = string.Empty;
     public string? SignerName { get; set; }
+    public string? SignerIdentification { get; set; }
     public string ImageBase64 { get; set; } = string.Empty;
     public string SignedAt { get; set; } = string.Empty;
 }
@@ -25,7 +26,9 @@ public class TicketPdfModel
     public string TypeName { get; set; } = string.Empty;
     public string IssuedAt { get; set; } = string.Empty;
     public string? EmployeeName { get; set; }
+    public string? EmployeeIdentification { get; set; }
     public string? ResponsibleName { get; set; }
+    public string? ResponsibleIdentification { get; set; }
     public string? Accessories { get; set; }
     public string? Notes { get; set; }
     public List<TicketPdfLine> Lines { get; set; } = [];

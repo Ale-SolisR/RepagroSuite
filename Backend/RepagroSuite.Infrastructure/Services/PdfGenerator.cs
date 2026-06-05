@@ -54,8 +54,16 @@ public class PdfGenerator : IPdfGenerator
 
                     col.Item().Row(row =>
                     {
-                        row.RelativeItem().Text(t => { t.Span("Colaborador: ").SemiBold(); t.Span(m.EmployeeName ?? "—"); });
-                        row.RelativeItem().Text(t => { t.Span("Responsable TI: ").SemiBold(); t.Span(m.ResponsibleName ?? "—"); });
+                        row.RelativeItem().Column(c =>
+                        {
+                            c.Item().Text(t => { t.Span("Colaborador: ").SemiBold(); t.Span(m.EmployeeName ?? "—"); });
+                            c.Item().Text(t => { t.Span("Cédula: ").SemiBold().FontSize(9).FontColor("#4A5750"); t.Span(m.EmployeeIdentification ?? "—").FontSize(9).FontColor("#4A5750"); });
+                        });
+                        row.RelativeItem().Column(c =>
+                        {
+                            c.Item().Text(t => { t.Span("Responsable TI: ").SemiBold(); t.Span(m.ResponsibleName ?? "—"); });
+                            c.Item().Text(t => { t.Span("Cédula: ").SemiBold().FontSize(9).FontColor("#4A5750"); t.Span(m.ResponsibleIdentification ?? "—").FontSize(9).FontColor("#4A5750"); });
+                        });
                     });
 
                     if (m.Lines.Count > 0)
@@ -104,6 +112,7 @@ public class PdfGenerator : IPdfGenerator
                                     c.Item().LineHorizontal(0.5f).LineColor("#94A3A0");
                                     c.Item().Text(s.Label).SemiBold().FontSize(9);
                                     c.Item().Text(s.SignerName ?? "—").FontSize(9);
+                                    c.Item().Text($"Cédula: {(string.IsNullOrWhiteSpace(s.SignerIdentification) ? "—" : s.SignerIdentification)}").FontSize(8).FontColor("#4A5750");
                                     c.Item().Text(s.SignedAt).FontSize(8).FontColor("#4A5750");
                                 });
                             }

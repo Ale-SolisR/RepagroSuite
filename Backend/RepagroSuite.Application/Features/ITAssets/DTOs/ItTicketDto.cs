@@ -43,8 +43,27 @@ public class ItTicketPhotoDto
     public string ImageBase64 { get; set; } = string.Empty;
 }
 
+/// <summary>
+/// Eslabón de la cadena de trazabilidad de una boleta: la entrega que la origina
+/// (Relation = "Origen") o la boleta que la cierra (Relation = "Cierre"). Enlaza por activo.
+/// </summary>
+public class ItTicketChainLinkDto
+{
+    public Guid TicketId { get; set; }
+    public string TicketNumber { get; set; } = string.Empty;
+    public ItTicketType TicketType { get; set; }
+    public string TicketTypeName { get; set; } = string.Empty;
+    public ItTicketStatus Status { get; set; }
+    public string StatusName { get; set; } = string.Empty;
+    public DateTime IssuedAt { get; set; }
+    public string Relation { get; set; } = string.Empty;   // "Origen" | "Cierre"
+    public string? AssetCode { get; set; }
+}
+
 public class ItTicketDto : ItTicketListDto
 {
+    public string? EmployeeIdentification { get; set; }      // cédula del colaborador
+    public string? ItResponsibleIdentification { get; set; } // cédula del responsable de TI
     public string? Notes { get; set; }
     public string? PdfSha256 { get; set; }
     public bool HasPdf { get; set; }
@@ -53,6 +72,7 @@ public class ItTicketDto : ItTicketListDto
     public List<ItTicketLineDto> Lines { get; set; } = [];
     public List<ItTicketPhotoDto> Photos { get; set; } = [];
     public List<ItTicketSignatureDto> Signatures { get; set; } = [];
+    public List<ItTicketChainLinkDto> Chain { get; set; } = [];
 }
 
 // ─── Escritura ──────────────────────────────────────────────────────────────────

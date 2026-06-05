@@ -11,6 +11,7 @@ import { useRealtime } from '@/hooks/useRealtime'
 import { qk, staleTimes, invalidate } from '@/lib/queryKeys'
 import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 import RoomForm from './RoomForm'
 import RoomAvailabilityPanel from './RoomAvailabilityPanel'
 import toast from 'react-hot-toast'
@@ -259,6 +260,7 @@ function CardSkeleton() {
 export default function RoomsPage() {
   const qc = useQueryClient()
   const { hasPermission } = useAuthStore()
+  const confirm = useConfirm()
   const [editRoom, setEditRoom] = useState<RoomDto | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [availRoom, setAvailRoom] = useState<RoomDto | null>(null)
@@ -287,8 +289,13 @@ export default function RoomsPage() {
   })
 
   async function handleDelete(room: RoomDto) {
-    if (!confirm(`¿Eliminar la sala "${room.name}"? Esta acción no se puede deshacer.`)) return
-    deleteMutation.mutate(room.id)
+    const ok = await confirm({
+      title: 'Eliminar sala',
+      message: <>Vas a eliminar la sala <span className="font-semibold text-ink">«{room.name}»</span>. Esta acción no se puede deshacer.</>,
+      variant: 'danger',
+      confirmText: 'Eliminar',
+    })
+    if (ok) deleteMutation.mutate(room.id)
   }
 
   // Filtros locales en la página actual

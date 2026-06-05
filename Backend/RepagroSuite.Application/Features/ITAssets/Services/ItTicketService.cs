@@ -45,16 +45,90 @@ public class ItTicketService : IItTicketService
     {
         var t = await _uow.ItTickets.GetWithDetailsAsync(id, cancellationToken)
             ?? throw new KeyNotFoundException("Boleta no encontrada.");
-        return MapToDto(t);
+        var dto = MapToDto(t);
+        dto.Chain = await BuildChainAsync(id, cancellationToken);
+        return dto;
     }
 
-    public async Task<byte[]> GetPdfAsync(Guid id, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Cadena de trazabilidad de una boleta vía las asignaciones: si es una entrega, lista las
+    /// boletas que la cerraron (Relation="Cierre"); si es un cierre (devolución/desasignación/incidente),
+    /// lista la entrega que respalda (Relation="Origen"). Sin duplicados.
+    /// </summary>
+    private async Task<List<ItTicketChainLinkDto>> BuildChainAsync(Guid ticketId, CancellationToken ct)
     {
-        var t = await _uow.ItTickets.GetByIdAsync(id, cancellationToken)
+        var assignments = await _uow.ItTickets.GetChainAssignmentsAsync(ticketId, ct);
+        var links = new List<ItTicketChainLinkDto>();
+
+        foreach (var a in assignments)
+        {
+            // Esta boleta es la ENTREGA → su cierre es ReturnTicket.
+            if (a.AssignedTicketId == ticketId && a.ReturnTicket is { } close)
+                links.Add(ToChainLink(close, "Cierre", a.Asset?.InternalCode));
+            // Esta boleta es el CIERRE → su origen es AssignedTicket.
+            if (a.ReturnTicketId == ticketId && a.AssignedTicket is { } origin)
+                links.Add(ToChainLink(origin, "Origen", a.Asset?.InternalCode));
+        }
+
+        return links
+            .GroupBy(l => new { l.TicketId, l.AssetCode })
+            .Select(g => g.First())
+            .OrderBy(l => l.IssuedAt)
+            .ToList();
+    }
+
+    private static ItTicketChainLinkDto ToChainLink(ItTicket t, string relation, string? assetCode) => new()
+    {
+        TicketId = t.Id,
+        TicketNumber = t.TicketNumber,
+        TicketType = t.TicketType,
+        TicketTypeName = TicketTypeName(t.TicketType),
+        Status = t.Status,
+        StatusName = TicketStatusName(t.Status),
+        IssuedAt = t.IssuedAt,
+        Relation = relation,
+        AssetCode = assetCode,
+    };
+
+    public async Task<(byte[] Bytes, string FileName)> GetPdfAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        // Con detalles para incluir el colaborador en el nombre del archivo.
+        var t = await _uow.ItTickets.GetWithDetailsAsync(id, cancellationToken)
             ?? throw new KeyNotFoundException("Boleta no encontrada.");
         if (string.IsNullOrEmpty(t.PdfBase64))
             throw new InvalidOperationException("La boleta no tiene PDF generado.");
-        return Convert.FromBase64String(t.PdfBase64);
+        return (Convert.FromBase64String(t.PdfBase64), PdfFileName(t));
+    }
+
+    /// <summary>Nombre de archivo identificativo y seguro: «{N° boleta}_{tipo}_{colaborador}.pdf».
+    /// Ej.: TI-PRB-2026-000001_Perdida-robo-de-equipo_SOLIS-ROJAS-LUIS-ALEJANDRO.pdf</summary>
+    private static string PdfFileName(ItTicket t)
+    {
+        var parts = new List<string> { Slug(t.TicketNumber) };
+        var type = Slug(TicketTypeName(t.TicketType));
+        if (!string.IsNullOrEmpty(type)) parts.Add(type);
+        var emp = Slug(t.Employee?.FullName);
+        if (!string.IsNullOrEmpty(emp)) parts.Add(emp);
+        var name = string.Join("_", parts.Where(p => !string.IsNullOrEmpty(p)));
+        return (string.IsNullOrEmpty(name) ? $"boleta-{t.TicketNumber}" : name) + ".pdf";
+    }
+
+    /// <summary>Quita tildes y caracteres no válidos para usar el texto como nombre de archivo.</summary>
+    private static string Slug(string? s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return string.Empty;
+        var normalized = s.Trim().Normalize(NormalizationForm.FormD);
+        var sb = new StringBuilder(normalized.Length);
+        foreach (var ch in normalized)
+        {
+            if (System.Globalization.CharUnicodeInfo.GetUnicodeCategory(ch) == System.Globalization.UnicodeCategory.NonSpacingMark)
+                continue;
+            if (char.IsLetterOrDigit(ch)) sb.Append(ch);
+            else if (ch is ' ' or '-' or '_' or '/' or '\\' or '.' or ',' or ':') sb.Append('-');
+        }
+        var result = sb.ToString();
+        while (result.Contains("--")) result = result.Replace("--", "-");
+        return result.Trim('-');
     }
 
     public async Task<ItTicketDto> CreateAssignmentAsync(CreateAssignmentDto dto, Guid actorUserId, CancellationToken cancellationToken = default)
@@ -497,7 +571,9 @@ public class ItTicketService : IItTicketService
             TypeName = TicketTypeName(t.TicketType),
             IssuedAt = t.IssuedAt.ToString("dd/MM/yyyy HH:mm"),
             EmployeeName = t.Employee?.FullName,
+            EmployeeIdentification = t.Employee?.IdentificationNumber,
             ResponsibleName = t.ItResponsible?.FullName,
+            ResponsibleIdentification = t.ItResponsible?.IdentificationNumber,
             Notes = t.Notes,
             Lines = t.Details.Select(d => new TicketPdfLine
             {
@@ -511,6 +587,10 @@ public class ItTicketService : IItTicketService
             {
                 Label = s.SignerType == "ResponsableTI" ? "Responsable TI" : "Colaborador",
                 SignerName = s.SignerName,
+                // La cédula del firmante se toma de su persona según el tipo de firma.
+                SignerIdentification = s.SignerType == "ResponsableTI"
+                    ? t.ItResponsible?.IdentificationNumber
+                    : t.Employee?.IdentificationNumber,
                 ImageBase64 = s.ImageBase64,
                 SignedAt = s.SignedAt.ToString("dd/MM/yyyy HH:mm")
             }).ToList(),
@@ -592,6 +672,23 @@ public class ItTicketService : IItTicketService
         AssetCount = t.Details?.Count ?? 0
     };
 
+    // Traduce la condición física almacenada (nombre del enum, p. ej. "Good") a español para mostrar.
+    private static string? ConditionEs(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return raw;
+        return Enum.TryParse<PhysicalCondition>(raw, out var c)
+            ? c switch
+            {
+                PhysicalCondition.New => "Nuevo",
+                PhysicalCondition.Good => "Bueno",
+                PhysicalCondition.Fair => "Regular",
+                PhysicalCondition.Poor => "Malo",
+                PhysicalCondition.Unusable => "Inservible",
+                _ => raw,
+            }
+            : raw;
+    }
+
     private static ItTicketDto MapToDto(ItTicket t) => new()
     {
         Id = t.Id,
@@ -602,7 +699,9 @@ public class ItTicketService : IItTicketService
         StatusName = TicketStatusName(t.Status),
         IssuedAt = t.IssuedAt,
         EmployeeName = t.Employee?.FullName,
+        EmployeeIdentification = t.Employee?.IdentificationNumber,
         ItResponsibleName = t.ItResponsible?.FullName,
+        ItResponsibleIdentification = t.ItResponsible?.IdentificationNumber,
         AssetCount = t.Details.Count,
         Notes = t.Notes,
         PdfSha256 = t.PdfSha256,
@@ -617,7 +716,7 @@ public class ItTicketService : IItTicketService
             TypeName = d.Asset?.AssetType?.Name,
             Description = d.Description,
             SerialNumber = d.Asset?.SerialNumber,
-            Condition = d.Condition
+            Condition = ConditionEs(d.Condition)
         }).ToList(),
         Photos = t.Photos.Select(p => new ItTicketPhotoDto { Id = p.Id, ImageBase64 = p.ImageBase64 }).ToList(),
         Signatures = t.Signatures.Select(s => new ItTicketSignatureDto

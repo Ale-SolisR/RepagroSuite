@@ -22,6 +22,7 @@ export const itTicketsApi = {
     api.get<ApiResponse<ItTicketDto>>(`/ti/tickets/${id}`),
 
   // PDF como blob para descarga / vista en nueva pestaña.
+  // Se devuelve la respuesta completa para leer el nombre del Content-Disposition.
   getPdf: (id: string) =>
     api.get(`/ti/tickets/${id}/pdf`, { responseType: 'blob' }),
 

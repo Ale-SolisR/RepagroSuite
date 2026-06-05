@@ -10,6 +10,7 @@ import { qk, staleTimes, invalidate } from '@/lib/queryKeys'
 import { extractApiError } from '@/utils'
 import Button from '@/components/ui/Button'
 import Spinner from '@/components/ui/Spinner'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 import toast from 'react-hot-toast'
 import type { SettingDto } from '@/types'
 import { useAuthStore } from '@/store/authStore'
@@ -394,6 +395,7 @@ function groupSettings(settings: SettingDto[]) {
 
 export default function SettingsPage() {
   const qc = useQueryClient()
+  const confirm = useConfirm()
   const { user } = useAuthStore()
   const isMaster = user?.isMaster ?? false
   const [values, setValues] = useState<Record<string, string>>({})
@@ -474,9 +476,15 @@ export default function SettingsPage() {
     })
   }
 
-  function handleToggleEditMode() {
+  async function handleToggleEditMode() {
     if (editMode && modified.size > 0) {
-      const confirmed = window.confirm(`Tienes ${modified.size} cambio(s) sin guardar. ¿Deseas descartarlos?`)
+      const confirmed = await confirm({
+        title: 'Descartar cambios',
+        message: `Tienes ${modified.size} cambio(s) sin guardar. Si continúas se perderán.`,
+        variant: 'danger',
+        confirmText: 'Descartar',
+        cancelText: 'Seguir editando',
+      })
       if (!confirmed) return
       // Revert to original values
       if (settings) {

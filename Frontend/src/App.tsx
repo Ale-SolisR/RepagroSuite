@@ -6,6 +6,7 @@ import { Toaster } from 'react-hot-toast'
 import AppLayout from '@/components/layout/AppLayout'
 import ProtectedRoute from '@/components/layout/ProtectedRoute'
 import Spinner from '@/components/ui/Spinner'
+import { ConfirmDialogProvider } from '@/components/ui/ConfirmDialog'
 
 // Páginas de auth — pequeñas y críticas para el primer paint, eager.
 import LoginPage from '@/pages/auth/LoginPage'
@@ -65,6 +66,7 @@ const qc = new QueryClient({
 export default function App() {
   return (
     <QueryClientProvider client={qc}>
+      <ConfirmDialogProvider>
       <BrowserRouter>
         <Suspense fallback={<PageLoader />}>
           <Routes>
@@ -130,6 +132,7 @@ export default function App() {
       </BrowserRouter>
 
       <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
+      </ConfirmDialogProvider>
     </QueryClientProvider>
   )
 }

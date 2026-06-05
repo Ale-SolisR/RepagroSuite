@@ -9,7 +9,9 @@ public interface IItTicketService
     Task<PagedResult<ItTicketListDto>> GetPagedAsync(int page, int pageSize, ItTicketType? type,
         ItTicketStatus? status, string? search, CancellationToken cancellationToken = default);
     Task<ItTicketDto> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
-    Task<byte[]> GetPdfAsync(Guid id, CancellationToken cancellationToken = default);
+    /// <summary>Devuelve el PDF de la boleta junto con un nombre de archivo identificativo
+    /// (número de boleta + tipo + colaborador), seguro para descarga.</summary>
+    Task<(byte[] Bytes, string FileName)> GetPdfAsync(Guid id, CancellationToken cancellationToken = default);
 
     Task<ItTicketDto> CreateAssignmentAsync(CreateAssignmentDto dto, Guid actorUserId, CancellationToken cancellationToken = default);
     Task<ItTicketDto> CreateReturnAsync(CreateReturnDto dto, Guid actorUserId, CancellationToken cancellationToken = default);

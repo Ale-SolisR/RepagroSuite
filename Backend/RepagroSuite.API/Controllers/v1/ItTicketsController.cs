@@ -47,8 +47,8 @@ public class ItTicketsController : ControllerBase
     [Authorize(Policy = "Ti.Inventory.View")]
     public async Task<IActionResult> GetPdf(Guid id, CancellationToken ct)
     {
-        var bytes = await _tickets.GetPdfAsync(id, ct);
-        return File(bytes, "application/pdf", $"boleta-{id}.pdf");
+        var (bytes, fileName) = await _tickets.GetPdfAsync(id, ct);
+        return File(bytes, "application/pdf", fileName);
     }
 
     [HttpPost("assignments")]

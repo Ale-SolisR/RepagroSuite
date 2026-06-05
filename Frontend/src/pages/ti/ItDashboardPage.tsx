@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import {
@@ -6,7 +6,7 @@ import {
   Boxes, CheckCircle2, Wrench, AlertTriangle, Clock, Lightbulb,
 } from 'lucide-react'
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
+  BarChart, Bar, XAxis, YAxis, Tooltip, Cell,
   PieChart, Pie, AreaChart, Area, CartesianGrid, LabelList,
 } from 'recharts'
 import toast from 'react-hot-toast'
@@ -31,6 +31,25 @@ function useItDashboard() {
 }
 
 const tooltipStyle = { fontSize: 12, borderRadius: 8, border: '1px solid #D9DEE5', boxShadow: '0 4px 12px rgba(0,0,0,.06)' }
+
+// Mide el ancho del contenedor con ResizeObserver y entrega dimensiones en píxeles al gráfico.
+// Evita ResponsiveContainer de recharts (que reporta tamaño -1 en el primer render → warnings).
+function ChartBox({ height, children }: { height: number; children: (w: number, h: number) => React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [w, setW] = useState(0)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    setW(el.clientWidth)
+    const ro = new ResizeObserver(entries => {
+      const cw = entries[0]?.contentRect.width ?? 0
+      if (cw > 0) setW(cw)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  return <div ref={ref} style={{ width: '100%', height }}>{w > 0 ? children(w, height) : null}</div>
+}
 
 // ─── Wrapper de panel con insight en vivo ───────────────────────────────────────
 function Panel({ title, insight, children, action }: {
@@ -57,9 +76,9 @@ function Panel({ title, insight, children, action }: {
 function HBars({ data, height = 200 }: { data: ItCountByLabelDto[]; height?: number }) {
   if (!data.length) return <Empty h={height} />
   return (
-    <div style={{ height }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} layout="vertical" margin={{ top: 0, right: 28, left: 8, bottom: 0 }}>
+    <ChartBox height={height}>
+      {(w, h) => (
+        <BarChart width={w} height={h} data={data} layout="vertical" margin={{ top: 0, right: 28, left: 8, bottom: 0 }}>
           <XAxis type="number" hide domain={[0, 'dataMax + 1']} />
           <YAxis type="category" dataKey="label" width={120}
             tick={{ fontSize: 11, fill: '#4A5750' }} axisLine={false} tickLine={false} />
@@ -69,8 +88,8 @@ function HBars({ data, height = 200 }: { data: ItCountByLabelDto[]; height?: num
             {data.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
           </Bar>
         </BarChart>
-      </ResponsiveContainer>
-    </div>
+      )}
+    </ChartBox>
   )
 }
 
@@ -131,9 +150,9 @@ function ValueBars({ data }: { data: ItValueByLabelDto[] }) {
 
   const height = rows.length * 46 + 12
   return (
-    <div style={{ height }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={rows} layout="vertical" barCategoryGap="22%" margin={{ top: 4, right: 96, left: 8, bottom: 4 }}>
+    <ChartBox height={height}>
+      {(w, h) => (
+        <BarChart width={w} height={h} data={rows} layout="vertical" barCategoryGap="22%" margin={{ top: 4, right: 96, left: 8, bottom: 4 }}>
           <defs>
             <linearGradient id="valGrad" x1="0" y1="0" x2="1" y2="0">
               <stop offset="0%" stopColor="#0E6B4B" />
@@ -149,8 +168,8 @@ function ValueBars({ data }: { data: ItValueByLabelDto[] }) {
             <LabelList dataKey="valueLabel" position="right" style={{ fontSize: 11, fontWeight: 600, fill: '#13211C' }} />
           </Bar>
         </BarChart>
-      </ResponsiveContainer>
-    </div>
+      )}
+    </ChartBox>
   )
 }
 
@@ -160,15 +179,13 @@ function Donut({ data, total }: { data: ItCountByLabelDto[]; total: number }) {
   return (
     <div className="flex items-center gap-4">
       <div className="relative" style={{ width: 160, height: 160 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie data={data} dataKey="count" nameKey="label" cx="50%" cy="50%"
-              innerRadius={52} outerRadius={76} paddingAngle={2} stroke="none">
-              {data.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
-            </Pie>
-            <Tooltip contentStyle={tooltipStyle} />
-          </PieChart>
-        </ResponsiveContainer>
+        <PieChart width={160} height={160}>
+          <Pie data={data} dataKey="count" nameKey="label" cx="50%" cy="50%"
+            innerRadius={52} outerRadius={76} paddingAngle={2} stroke="none">
+            {data.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
+          </Pie>
+          <Tooltip contentStyle={tooltipStyle} />
+        </PieChart>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
           <span className="font-mono text-2xl font-semibold leading-none text-ink">{total}</span>
           <span className="text-[10px] text-ink2">activos</span>
@@ -237,40 +254,44 @@ export default function ItDashboardPage() {
 
   return (
     <div className="flex min-h-full flex-col">
-      <header className="sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b border-line bg-paper px-4 sm:px-6 py-3" style={{ minHeight: 64 }}>
+      <header className="sticky top-0 z-10 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line bg-paper px-4 sm:px-6 py-2.5">
         <div className="min-w-0 flex-1">
-          <p className="font-mono text-[12px] text-ink2 mb-0.5 leading-none">TI / Dashboard</p>
-          <h1 className="text-[18px] font-semibold text-ink leading-tight tracking-tight flex items-center gap-2">
-            <Cpu className="h-4.5 w-4.5" style={{ color: BRAND }} /> Inventario tecnológico
+          <p className="font-mono text-[11px] text-ink2 mb-0.5 leading-none">TI / Dashboard</p>
+          <h1 className="flex items-center gap-1.5 text-[16px] font-semibold leading-tight tracking-tight text-ink sm:text-[18px]">
+            <Cpu className="h-4 w-4 shrink-0 sm:h-[18px] sm:w-[18px]" style={{ color: BRAND }} />
+            <span className="truncate">Inventario tecnológico</span>
           </h1>
         </div>
         {data?.generatedAt && (
-          <span className="hidden font-mono text-[11px] text-ink2 sm:inline">Actualizado {data.generatedAt}</span>
+          <span className="hidden font-mono text-[11px] text-ink2 lg:inline">Actualizado {data.generatedAt}</span>
         )}
-        <button
-          onClick={() => refetch()}
-          className="inline-flex items-center gap-1.5 rounded-[8px] border border-line bg-paper px-3 py-2 text-sm font-medium text-ink transition-colors hover:bg-bg"
-          title="Actualizar"
-        >
-          <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
-        </button>
-        <button
-          onClick={exportPdf}
-          disabled={exporting || !data}
-          className="inline-flex items-center gap-1.5 rounded-[8px] border border-line bg-paper px-3.5 py-2 text-sm font-medium text-ink transition-colors hover:bg-bg disabled:opacity-50"
-        >
-          <FileDown className="h-4 w-4" /> {exporting ? 'Generando…' : 'Exportar PDF'}
-        </button>
-        <Link
-          to="/ti/assets/new"
-          className="inline-flex items-center gap-1.5 rounded-[8px] px-3.5 py-2 text-sm font-medium text-white transition-colors hover:opacity-90"
-          style={{ background: BRAND }}
-        >
-          <Plus className="h-4 w-4" /> Nuevo activo
-        </Link>
+        {/* Acciones: fila propia a todo el ancho en móvil, en línea a la derecha en ≥sm */}
+        <div className="flex w-full items-center gap-2 sm:w-auto sm:shrink-0">
+          <button
+            onClick={() => refetch()}
+            className="inline-flex min-h-[44px] shrink-0 items-center justify-center gap-1.5 rounded-[8px] border border-line bg-paper px-3 text-sm font-medium text-ink transition-colors touch-manipulation hover:bg-bg"
+            title="Actualizar" aria-label="Actualizar"
+          >
+            <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+          </button>
+          <button
+            onClick={exportPdf}
+            disabled={exporting || !data}
+            className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-[8px] border border-line bg-paper px-3.5 text-sm font-medium text-ink transition-colors touch-manipulation hover:bg-bg disabled:opacity-50 sm:flex-none"
+          >
+            <FileDown className="h-4 w-4 shrink-0" /> <span className="truncate">{exporting ? 'Generando…' : 'Exportar PDF'}</span>
+          </button>
+          <Link
+            to="/ti/assets/new"
+            className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-[8px] px-3.5 text-sm font-medium text-white transition-colors touch-manipulation hover:opacity-90 sm:flex-none"
+            style={{ background: BRAND }}
+          >
+            <Plus className="h-4 w-4 shrink-0" /> <span className="truncate">Nuevo activo</span>
+          </Link>
+        </div>
       </header>
 
-      <div className="flex-1 space-y-4 bg-bg p-6">
+      <div className="flex-1 space-y-4 bg-bg p-4 sm:p-6">
         {error && (
           <div className="flex items-center gap-3 rounded-[10px] border p-4" style={{ background: '#FEF2F2', borderColor: '#FECACA' }} role="alert">
             <AlertCircle className="h-5 w-5 shrink-0" style={{ color: '#B42318' }} />
@@ -313,9 +334,9 @@ export default function ItDashboardPage() {
               </Panel>
 
               <Panel title="Tendencia de adquisiciones (12 meses)" insight={insights.trend}>
-                <div style={{ height: 220 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={data.acquisitionTrend} margin={{ top: 8, right: 12, left: -18, bottom: 0 }}>
+                <ChartBox height={220}>
+                  {(w, h) => (
+                    <AreaChart width={w} height={h} data={data.acquisitionTrend} margin={{ top: 8, right: 12, left: -18, bottom: 0 }}>
                       <defs>
                         <linearGradient id="gTrend" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor={BRAND} stopOpacity={0.35} />
@@ -328,8 +349,8 @@ export default function ItDashboardPage() {
                       <Tooltip contentStyle={tooltipStyle} />
                       <Area type="monotone" dataKey="count" stroke={BRAND} strokeWidth={2} fill="url(#gTrend)" name="Adquiridos" />
                     </AreaChart>
-                  </ResponsiveContainer>
-                </div>
+                  )}
+                </ChartBox>
               </Panel>
             </div>
 

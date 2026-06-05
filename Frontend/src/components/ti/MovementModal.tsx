@@ -8,8 +8,7 @@ import { invalidate } from '@/lib/queryKeys'
 import { extractApiError } from '@/utils'
 import PhotoCapture from '@/components/ti/PhotoCapture'
 import SignaturePad from '@/components/ti/SignaturePad'
-import { CONDITION_OPTIONS } from '@/components/ti/itStatus'
-import type { ItAssetDto, ItTicketDto, PhysicalCondition, SignatureInput } from '@/types'
+import type { ItAssetDto, ItTicketDto, SignatureInput } from '@/types'
 
 const BRAND = '#0E6B4B'
 
@@ -61,7 +60,6 @@ export default function MovementModal({ open, onClose, asset, kind, onDone }: Mo
   const Icon = meta.icon
 
   const [reason, setReason] = useState('')
-  const [condition, setCondition] = useState<PhysicalCondition | ''>('')
   const [photos, setPhotos] = useState<string[]>([])
   const [sigEmployee, setSigEmployee] = useState<string | null>(null)
   const [sigIt, setSigIt] = useState<string | null>(null)
@@ -70,7 +68,7 @@ export default function MovementModal({ open, onClose, asset, kind, onDone }: Mo
   // Reset al abrir/cerrar o cambiar de tipo.
   useEffect(() => {
     if (open) {
-      setReason(''); setCondition(''); setPhotos([])
+      setReason(''); setPhotos([])
       setSigEmployee(null); setSigIt(null); submittingRef.current = false
     }
   }, [open, kind])
@@ -97,7 +95,7 @@ export default function MovementModal({ open, onClose, asset, kind, onDone }: Mo
       const targetStatus = kind === 'damaged' ? 'Damaged' : kind === 'lost' ? 'Lost' : 'Stolen'
       return itTicketsApi.createIncident({
         assetId: asset.id, targetStatus, reason: reason.trim(),
-        condition: condition || undefined, photos, signatures,
+        photos, signatures,
       }).then(r => r.data.data!)
     },
     onSuccess: (ticket) => {
@@ -154,20 +152,6 @@ export default function MovementModal({ open, onClose, asset, kind, onDone }: Mo
             {asset.assetTypeName}{asset.brandName ? ` · ${asset.brandName}` : ''} ·
             Responsable actual: <span className="font-medium text-ink">{asset.currentHolderName ?? '—'}</span>
           </div>
-
-          {kind === 'damaged' && (
-            <div>
-              <label className="mb-1 block text-[12px] font-medium text-ink2">Estado físico resultante</label>
-              <select
-                className="h-11 w-full rounded-[8px] border border-line bg-paper px-3 text-sm text-ink focus:border-brand-400 focus:outline-none"
-                value={condition}
-                onChange={e => setCondition(e.target.value as PhysicalCondition | '')}
-              >
-                <option value="">Sin cambios</option>
-                {CONDITION_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </div>
-          )}
 
           <div>
             <label className="mb-1 block text-[12px] font-medium text-ink2">{reasonLabel}</label>

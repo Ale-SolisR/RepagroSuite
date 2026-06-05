@@ -710,7 +710,21 @@ export interface ItTicketPhotoDto {
   imageBase64: string
 }
 
+export interface ItTicketChainLinkDto {
+  ticketId: string
+  ticketNumber: string
+  ticketType: ItTicketType
+  ticketTypeName: string
+  status: ItTicketStatus
+  statusName: string
+  issuedAt: string
+  relation: 'Origen' | 'Cierre'
+  assetCode?: string
+}
+
 export interface ItTicketDto extends ItTicketListDto {
+  employeeIdentification?: string
+  itResponsibleIdentification?: string
   notes?: string
   pdfSha256?: string
   hasPdf: boolean
@@ -719,6 +733,7 @@ export interface ItTicketDto extends ItTicketListDto {
   lines: ItTicketLineDto[]
   photos: ItTicketPhotoDto[]
   signatures: ItTicketSignatureDto[]
+  chain: ItTicketChainLinkDto[]
 }
 
 export interface SignatureInput {

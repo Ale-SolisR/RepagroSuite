@@ -53,4 +53,13 @@ public class ItTicketRepository : GenericRepository<ItTicket>, IItTicketReposito
             .Include(a => a.Asset)
             .Include(a => a.Employee)
             .FirstOrDefaultAsync(a => a.AssetId == assetId && a.Status == AssignmentStatus.Activa, cancellationToken);
+
+    public async Task<IReadOnlyList<ItAssignment>> GetChainAssignmentsAsync(Guid ticketId, CancellationToken cancellationToken = default)
+        => await _context.ItAssignments
+            .AsNoTracking()
+            .Include(a => a.Asset)
+            .Include(a => a.AssignedTicket)
+            .Include(a => a.ReturnTicket)
+            .Where(a => a.AssignedTicketId == ticketId || a.ReturnTicketId == ticketId)
+            .ToListAsync(cancellationToken);
 }

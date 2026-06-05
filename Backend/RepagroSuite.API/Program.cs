@@ -77,6 +77,8 @@ builder.Services.AddCors(options =>
               })
               .AllowAnyHeader()
               .AllowAnyMethod()
+              // Permite que el frontend lea el nombre de archivo en descargas (PDF de boletas, Excel).
+              .WithExposedHeaders("Content-Disposition")
               .AllowCredentials());
 });
 

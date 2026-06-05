@@ -16,6 +16,9 @@ type NavItem = {
   icon: React.ElementType
   permission: string | null
   role: string | null
+  // Coincidencia exacta de ruta (NavLink `end`): úsalo cuando `to` es prefijo de otras rutas
+  // del menú (p. ej. /ti vs /ti/assets) para que no quede activo en las subrutas.
+  end?: boolean
   // Módulo aún no desarrollado: se muestra deshabilitado con badge "Próximamente".
   comingSoon?: boolean
 }
@@ -39,7 +42,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
   {
     label: 'TI',
     items: [
-      { to: '/ti',         label: 'Dashboard TI', icon: LayoutDashboard, permission: 'Ti.Dashboard.View', role: null },
+      { to: '/ti',         label: 'Dashboard TI', icon: LayoutDashboard, permission: 'Ti.Dashboard.View', role: null, end: true },
       { to: '/ti/assets',    label: 'Inventario',    icon: Cpu,        permission: 'Ti.Inventory.View',  role: null },
       { to: '/ti/tickets',   label: 'Boletas',       icon: FileText,   permission: 'Ti.Inventory.View',  role: null },
       { to: '/ti/employees', label: 'Colaboradores', icon: UsersRound, permission: 'Ti.Inventory.View',  role: null },
@@ -192,7 +195,7 @@ function SidebarContent({
                 <div className="mx-auto h-px w-6 bg-white/10 mb-2" />
               )}
               <ul className="space-y-0.5">
-                {visibleItems.map(({ to, label, icon: Icon, comingSoon }) => (
+                {visibleItems.map(({ to, label, icon: Icon, comingSoon, end }) => (
                   <li key={`${group.label}-${to}-${label}`}>
                     {comingSoon ? (
                       <div
@@ -228,6 +231,7 @@ function SidebarContent({
                     ) : (
                       <NavLink
                         to={to}
+                        end={end}
                         onClick={onClose}
                         title={collapsed ? label : undefined}
                         className={({ isActive }) =>
