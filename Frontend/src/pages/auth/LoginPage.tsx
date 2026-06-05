@@ -6,13 +6,18 @@ import { useNavigate, Link } from 'react-router-dom'
 import { Eye, EyeOff, AlertCircle, ArrowLeft, CheckCircle2, XCircle } from 'lucide-react'
 import { authApi } from '@/api/auth'
 import { useAuthStore } from '@/store/authStore'
-import { extractApiError } from '@/utils'
+import { extractApiError, classNames } from '@/utils'
 import api from '@/api/client'
 import { usersApi } from '@/api/users'
 import Input from '@/components/ui/Input'
 import BrandPanel from '@/components/auth/BrandPanel'
+import RastreoLoginForm from './RastreoLoginForm'
+import repagroLogoFull from '@/assets/repagro-logo-full.png'
+import { Building2, Sprout, Mail, Lock, ShieldCheck, Check } from 'lucide-react'
 import toast from 'react-hot-toast'
 import type { IdentificationResultDto } from '@/types'
+
+type SystemKey = 'repagro' | 'rastreo'
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 const loginSchema = z.object({
@@ -70,7 +75,7 @@ function LoginForm({ onSwitchMode }: { onSwitchMode: (mode: Mode) => void }) {
       {/* Encabezado */}
       <div className="mb-8">
         <h2
-          className="text-[32px] font-semibold tracking-tight leading-tight"
+          className="text-[26px] sm:text-[32px] font-semibold tracking-tight leading-tight"
           style={{ color: '#13211C' }}
         >
           Iniciar sesión
@@ -99,16 +104,20 @@ function LoginForm({ onSwitchMode }: { onSwitchMode: (mode: Mode) => void }) {
           <label htmlFor="email" className="text-[13px] font-medium" style={{ color: '#13211C' }}>
             Correo
           </label>
-          <input
-            id="email"
-            type="email"
-            placeholder="tu.nombre@repagro.com"
-            autoComplete="email"
-            aria-invalid={errors.email ? 'true' : 'false'}
-            aria-describedby={errors.email ? 'email-err' : undefined}
-            {...register('email')}
-            className="form-input"
-          />
+          <div className="relative">
+            <Mail className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-ink2/50" strokeWidth={1.75} aria-hidden="true" />
+            <input
+              id="email"
+              type="email"
+              placeholder="tu.nombre@repagro.com"
+              autoComplete="email"
+              aria-invalid={errors.email ? 'true' : 'false'}
+              aria-describedby={errors.email ? 'email-err' : undefined}
+              {...register('email')}
+              className="form-input"
+              style={{ paddingLeft: '2.75rem' }}
+            />
+          </div>
           {errors.email && (
             <p id="email-err" className="text-[13px]" style={{ color: '#B42318' }}>
               {errors.email.message}
@@ -131,6 +140,7 @@ function LoginForm({ onSwitchMode }: { onSwitchMode: (mode: Mode) => void }) {
             </Link>
           </div>
           <div className="relative">
+            <Lock className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-ink2/50" strokeWidth={1.75} aria-hidden="true" />
             <input
               id="password"
               type={showPassword ? 'text' : 'password'}
@@ -140,7 +150,7 @@ function LoginForm({ onSwitchMode }: { onSwitchMode: (mode: Mode) => void }) {
               aria-describedby={errors.password ? 'password-err' : undefined}
               {...register('password')}
               className="form-input"
-              style={{ paddingRight: '2.75rem' }}
+              style={{ paddingLeft: '2.75rem', paddingRight: '2.75rem' }}
             />
             <button
               type="button"
@@ -269,7 +279,7 @@ function RegisterForm({ onSwitchMode }: { onSwitchMode: (mode: Mode) => void }) 
           Volver a iniciar sesión
         </button>
         <h2
-          className="text-[32px] font-semibold tracking-tight leading-tight"
+          className="text-[26px] sm:text-[32px] font-semibold tracking-tight leading-tight"
           style={{ color: '#13211C' }}
         >
           Solicitar acceso
@@ -389,21 +399,94 @@ function RegisterForm({ onSwitchMode }: { onSwitchMode: (mode: Mode) => void }) 
 }
 
 
+// ─── Selector de sistema ────────────────────────────────────────────────────
+function SystemSwitch({ system, onChange }: { system: SystemKey; onChange: (s: SystemKey) => void }) {
+  const opts: { key: SystemKey; label: string; sub: string; icon: typeof Building2; accent: string }[] = [
+    { key: 'repagro', label: 'Repagro App', sub: 'Salas · TI · Inventario', icon: Building2, accent: '#0E6B4B' },
+    { key: 'rastreo', label: 'Rastreo', sub: 'Granjas · Registros', icon: Sprout, accent: '#0f766e' },
+  ]
+  return (
+    <div className="mb-7">
+      <p className="mb-2.5 text-[13px] font-medium" style={{ color: '#4A5750' }}>Selecciona el sistema</p>
+      <div role="radiogroup" aria-label="Sistema" className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        {opts.map(o => {
+          const active = system === o.key
+          const Icon = o.icon
+          return (
+            <button
+              key={o.key}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              onClick={() => onChange(o.key)}
+              className={classNames(
+                'group relative flex items-center gap-3 rounded-xl border p-3.5 text-left transition-all duration-150',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
+                active
+                  ? 'border-brand-600 bg-brand-50/60'
+                  : 'border-line bg-white hover:border-brand-300 hover:bg-bg/50',
+              )}
+              style={{
+                boxShadow: active ? `0 0 0 1px ${o.accent}` : undefined,
+                ['--tw-ring-color' as string]: o.accent,
+              }}
+            >
+              <span
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors"
+                style={{ background: active ? o.accent : '#F1F5F9', color: active ? '#fff' : '#64748B' }}
+              >
+                <Icon className="h-[18px] w-[18px]" strokeWidth={1.9} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center gap-1.5">
+                  <span className="block text-[14px] font-semibold leading-tight" style={{ color: '#13211C' }}>{o.label}</span>
+                  {active && <Check className="h-3.5 w-3.5 shrink-0" style={{ color: o.accent }} strokeWidth={2.5} />}
+                </span>
+                <span className="block text-[12px] mt-0.5" style={{ color: '#64748B' }}>{o.sub}</span>
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // ─── Página principal ─────────────────────────────────────────────────────────
 export default function LoginPage() {
   const [mode, setMode] = useState<Mode>('login')
+  const [system, setSystem] = useState<SystemKey>('repagro')
 
   return (
-    <div className="min-h-screen grid lg:grid-cols-2">
+    <div className="min-h-[100dvh] grid lg:grid-cols-[35%_65%]">
       <BrandPanel />
 
-      {/* Panel del formulario */}
-      <div className="flex flex-col items-center justify-center bg-paper px-6 py-12">
-        <div className="w-full" style={{ maxWidth: 460 }}>
-          {mode === 'login'
-            ? <LoginForm onSwitchMode={setMode} />
-            : <RegisterForm onSwitchMode={setMode} />
-          }
+      {/* Panel del formulario — mobile-first, centrado y con scroll si el contenido crece */}
+      <div className="flex flex-col items-center justify-center bg-paper px-4 py-8 sm:px-6 sm:py-12">
+        <div className="w-full max-w-[460px]">
+          {/* Encabezado de marca compacto — solo móvil/tablet (en escritorio está el BrandPanel) */}
+          <div className="lg:hidden mb-6 flex flex-col items-center text-center">
+            <img src={repagroLogoFull} alt="Repagro App" className="h-12 w-auto" />
+          </div>
+
+          {/* Card principal */}
+          <div className="rounded-2xl border border-line bg-white p-6 sm:p-8 shadow-[0_18px_50px_-20px_rgba(7,61,49,0.28)]">
+            {/* El selector solo se muestra en modo login (no en "solicitar acceso" de Repagro). */}
+            {mode === 'login' && <SystemSwitch system={system} onChange={setSystem} />}
+
+            {system === 'rastreo'
+              ? <RastreoLoginForm />
+              : mode === 'login'
+                ? <LoginForm onSwitchMode={setMode} />
+                : <RegisterForm onSwitchMode={setMode} />
+            }
+          </div>
+
+          {/* Sello de seguridad / confianza */}
+          <div className="mt-6 flex items-center justify-center gap-2 text-[12px] text-ink2/70">
+            <ShieldCheck className="h-3.5 w-3.5 text-brand-600 shrink-0" strokeWidth={1.9} />
+            <span>Acceso seguro · Control de acceso corporativo</span>
+          </div>
         </div>
       </div>
     </div>

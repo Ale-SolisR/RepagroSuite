@@ -60,6 +60,7 @@ public class ItTicketService : IItTicketService
     public async Task<ItTicketDto> CreateAssignmentAsync(CreateAssignmentDto dto, Guid actorUserId, CancellationToken cancellationToken = default)
     {
         if (dto.AssetIds.Count == 0) throw new InvalidOperationException("Seleccione al menos un activo.");
+        EnsureSignatures(dto.Signatures, requireEmployee: true);
 
         var ticketId = await _uow.ExecuteInTransactionAsync(async ct =>
         {
@@ -84,8 +85,26 @@ public class ItTicketService : IItTicketService
             {
                 var asset = await _uow.ItAssets.GetByIdAsync(assetId, ct)
                     ?? throw new InvalidOperationException("Activo no encontrado.");
-                if (asset.Status != ItAssetStatus.Available)
+                // Disponible o Devuelto (heredado) se pueden asignar; cualquier otro estado no.
+                if (asset.Status is not (ItAssetStatus.Available or ItAssetStatus.Returned))
                     throw new InvalidOperationException($"El activo {asset.InternalCode} no está disponible (estado actual: {ItAssetService.StatusName(asset.Status)}).");
+
+                // Cierra asignaciones colgantes del activo (datos heredados: estado cambiado sin cerrar
+                // la asignación) para no chocar con el índice único de "una asignación activa por activo".
+                var asgRepo = _uow.Repository<ItAssignment>();
+                var dangling = (await asgRepo.FindAsync(x => x.AssetId == asset.Id && x.Status == AssignmentStatus.Activa, ct)).ToList();
+                if (dangling.Count > 0)
+                {
+                    foreach (var d in dangling)
+                    {
+                        d.Status = AssignmentStatus.Cerrada;
+                        d.ReturnedAt = BusinessClock.Now;
+                        d.ClosedReason = "Normalizacion";
+                        d.UpdatedBy = actorUserId;
+                        asgRepo.Update(d);
+                    }
+                    await _uow.SaveChangesAsync(ct);
+                }
 
                 ticket.Details.Add(new ItTicketDetail
                 {
@@ -105,7 +124,7 @@ public class ItTicketService : IItTicketService
                 asset.CurrentHolderEmployeeId = employee.Id;
                 asset.UpdatedBy = actorUserId;
                 _uow.ItAssets.Update(asset);
-                await AddHistoryAsync(asset.Id, from, ItAssetStatus.Assigned, $"Asignado a {employee.FullName} ({number}).", actorUserId, ct);
+                await AddHistoryAsync(asset.Id, from, ItAssetStatus.Assigned, $"Asignado a {employee.FullName} ({number}).", actorUserId, ct, ticket.Id);
             }
 
             AttachEvidence(ticket, dto.Photos, dto.Signatures, actorUserId);
@@ -125,6 +144,7 @@ public class ItTicketService : IItTicketService
         var validResults = new[] { ItAssetStatus.Available, ItAssetStatus.UnderReview, ItAssetStatus.UnderRepair, ItAssetStatus.Damaged, ItAssetStatus.Disposed };
         if (!validResults.Contains(dto.ResultingStatus))
             throw new InvalidOperationException("Estado resultante de devolución inválido.");
+        EnsureSignatures(dto.Signatures, requireEmployee: true);
 
         var ticketId = await _uow.ExecuteInTransactionAsync(async ct =>
         {
@@ -163,6 +183,7 @@ public class ItTicketService : IItTicketService
             assignment.ConditionIn = dto.ConditionIn;
             assignment.ReturnTicketId = ticket.Id;
             assignment.ReturnNotes = dto.ReturnNotes?.Trim();
+            assignment.ClosedReason = nameof(ItTicketType.Devolucion);
             assignment.UpdatedBy = actorUserId;
             _uow.Repository<ItAssignment>().Update(assignment);
 
@@ -172,7 +193,7 @@ public class ItTicketService : IItTicketService
             asset.PhysicalCondition = dto.ConditionIn;
             asset.UpdatedBy = actorUserId;
             _uow.ItAssets.Update(asset);
-            await AddHistoryAsync(asset.Id, from, dto.ResultingStatus, $"Devuelto ({number}).", actorUserId, ct);
+            await AddHistoryAsync(asset.Id, from, dto.ResultingStatus, $"Devuelto ({number}).", actorUserId, ct, ticket.Id);
 
             await _uow.SaveChangesAsync(ct);
             return ticket.Id;
@@ -181,6 +202,132 @@ public class ItTicketService : IItTicketService
         await GeneratePdfAsync(ticketId, cancellationToken);
         await _audit.LogAsync(actorUserId, "TI_TICKET_RETURN", entityName: "ItTicket", entityId: ticketId.ToString(),
             module: "TI", cancellationToken: cancellationToken);
+        return await GetByIdAsync(ticketId, cancellationToken);
+    }
+
+    public async Task<ItTicketDto> CreateDeassignmentAsync(CreateDeassignmentDto dto, Guid actorUserId, CancellationToken cancellationToken = default)
+    {
+        EnsureSignatures(dto.Signatures, requireEmployee: true);
+
+        var ticketId = await _uow.ExecuteInTransactionAsync(async ct =>
+        {
+            var assignment = await _uow.ItTickets.GetActiveAssignmentAsync(dto.AssetId, ct)
+                ?? throw new InvalidOperationException("El activo no tiene una asignación activa.");
+            var asset = await _uow.ItAssets.GetByIdAsync(dto.AssetId, ct)
+                ?? throw new InvalidOperationException("Activo no encontrado.");
+
+            if (!ItAsset.CanTransition(asset.Status, ItAssetStatus.Available))
+                throw new InvalidOperationException($"No se puede desasignar desde el estado {ItAssetService.StatusName(asset.Status)}.");
+
+            var number = await _sequence.NextTicketNumberAsync(ItTicket.TypeCode(ItTicketType.Desasignacion), ct);
+            var ticket = new ItTicket
+            {
+                TicketNumber = number,
+                TicketType = ItTicketType.Desasignacion,
+                Status = ItTicketStatus.Emitida,
+                EmployeeId = assignment.EmployeeId,
+                ItResponsibleUserId = actorUserId,
+                Notes = dto.Notes?.Trim(),
+                CreatedBy = actorUserId
+            };
+            ticket.Details.Add(new ItTicketDetail { AssetId = asset.Id, LineType = "ASSET", Description = asset.Model, CreatedBy = actorUserId });
+            AttachEvidence(ticket, dto.Photos, dto.Signatures, actorUserId);
+            await _uow.ItTickets.AddAsync(ticket, ct);
+            await _uow.SaveChangesAsync(ct);
+
+            assignment.Status = AssignmentStatus.Cerrada;
+            assignment.ReturnedAt = BusinessClock.Now;
+            assignment.ReturnTicketId = ticket.Id;
+            assignment.ReturnNotes = dto.Notes?.Trim();
+            assignment.ClosedReason = nameof(ItTicketType.Desasignacion);
+            assignment.UpdatedBy = actorUserId;
+            _uow.Repository<ItAssignment>().Update(assignment);
+
+            var from = asset.Status;
+            asset.Status = ItAssetStatus.Available;
+            asset.CurrentHolderEmployeeId = null;
+            asset.UpdatedBy = actorUserId;
+            _uow.ItAssets.Update(asset);
+            await AddHistoryAsync(asset.Id, from, ItAssetStatus.Available, $"Desasignado ({number}).", actorUserId, ct, ticket.Id);
+
+            await _uow.SaveChangesAsync(ct);
+            return ticket.Id;
+        }, cancellationToken);
+
+        await GeneratePdfAsync(ticketId, cancellationToken);
+        await _audit.LogAsync(actorUserId, "TI_TICKET_DEASSIGNMENT", entityName: "ItTicket", entityId: ticketId.ToString(),
+            module: "TI", cancellationToken: cancellationToken);
+        return await GetByIdAsync(ticketId, cancellationToken);
+    }
+
+    public async Task<ItTicketDto> CreateIncidentAsync(CreateIncidentDto dto, Guid actorUserId, CancellationToken cancellationToken = default)
+    {
+        if (dto.TargetStatus is not (ItAssetStatus.Damaged or ItAssetStatus.Lost or ItAssetStatus.Stolen))
+            throw new InvalidOperationException("Estado de incidente inválido (use Dañado, Perdido o Robado).");
+        if (string.IsNullOrWhiteSpace(dto.Reason))
+            throw new InvalidOperationException("El incidente requiere un motivo.");
+        // En incidentes la firma del colaborador es opcional (puede no estar presente); la de TI es obligatoria.
+        EnsureSignatures(dto.Signatures, requireEmployee: false);
+
+        var ticketType = dto.TargetStatus == ItAssetStatus.Damaged ? ItTicketType.Deterioro : ItTicketType.PerdidaRobo;
+
+        var ticketId = await _uow.ExecuteInTransactionAsync(async ct =>
+        {
+            var asset = await _uow.ItAssets.GetByIdAsync(dto.AssetId, ct)
+                ?? throw new InvalidOperationException("Activo no encontrado.");
+            if (!ItAsset.CanTransition(asset.Status, dto.TargetStatus))
+                throw new InvalidOperationException($"Transición no permitida: {ItAssetService.StatusName(asset.Status)} → {ItAssetService.StatusName(dto.TargetStatus)}.");
+
+            var assignment = await _uow.ItTickets.GetActiveAssignmentAsync(dto.AssetId, ct);
+
+            var number = await _sequence.NextTicketNumberAsync(ItTicket.TypeCode(ticketType), ct);
+            var ticket = new ItTicket
+            {
+                TicketNumber = number,
+                TicketType = ticketType,
+                Status = ItTicketStatus.Emitida,
+                EmployeeId = assignment?.EmployeeId,
+                ItResponsibleUserId = actorUserId,
+                Notes = dto.Reason.Trim(),
+                CreatedBy = actorUserId
+            };
+            ticket.Details.Add(new ItTicketDetail
+            {
+                AssetId = asset.Id, LineType = "ASSET", Description = asset.Model,
+                Condition = dto.Condition?.ToString(), CreatedBy = actorUserId
+            });
+            AttachEvidence(ticket, dto.Photos, dto.Signatures, actorUserId);
+            await _uow.ItTickets.AddAsync(ticket, ct);
+            await _uow.SaveChangesAsync(ct);
+
+            // Si estaba asignado, cierra la asignación y limpia el responsable (estado coherente).
+            if (assignment is not null)
+            {
+                assignment.Status = AssignmentStatus.Cerrada;
+                assignment.ReturnedAt = BusinessClock.Now;
+                assignment.ReturnTicketId = ticket.Id;
+                assignment.ReturnNotes = dto.Reason.Trim();
+                assignment.ClosedReason = ticketType.ToString();
+                assignment.UpdatedBy = actorUserId;
+                _uow.Repository<ItAssignment>().Update(assignment);
+            }
+
+            var from = asset.Status;
+            asset.Status = dto.TargetStatus;
+            asset.CurrentHolderEmployeeId = null;
+            if (dto.Condition.HasValue) asset.PhysicalCondition = dto.Condition.Value;
+            asset.UpdatedBy = actorUserId;
+            _uow.ItAssets.Update(asset);
+            await AddHistoryAsync(asset.Id, from, dto.TargetStatus,
+                $"{ItTicketService.TicketTypeName(ticketType)} ({number}). {dto.Reason.Trim()}", actorUserId, ct, ticket.Id);
+
+            await _uow.SaveChangesAsync(ct);
+            return ticket.Id;
+        }, cancellationToken);
+
+        await GeneratePdfAsync(ticketId, cancellationToken);
+        await _audit.LogAsync(actorUserId, ticketType == ItTicketType.Deterioro ? "TI_TICKET_DAMAGE" : "TI_TICKET_LOSSTHEFT",
+            entityName: "ItTicket", entityId: ticketId.ToString(), module: "TI", cancellationToken: cancellationToken);
         return await GetByIdAsync(ticketId, cancellationToken);
     }
 
@@ -244,18 +391,53 @@ public class ItTicketService : IItTicketService
         if (string.IsNullOrWhiteSpace(dto.Reason))
             throw new InvalidOperationException("La anulación requiere un motivo.");
 
-        var ticket = await _uow.ItTickets.GetByIdAsync(id, cancellationToken)
-            ?? throw new KeyNotFoundException("Boleta no encontrada.");
-        if (ticket.Status == ItTicketStatus.Anulada)
-            throw new InvalidOperationException("La boleta ya está anulada.");
+        await _uow.ExecuteInTransactionAsync(async ct =>
+        {
+            var ticket = await _uow.ItTickets.GetByIdAsync(id, ct)
+                ?? throw new KeyNotFoundException("Boleta no encontrada.");
+            if (ticket.Status == ItTicketStatus.Anulada)
+                throw new InvalidOperationException("La boleta ya esta anulada.");
 
-        ticket.Status = ItTicketStatus.Anulada;
-        ticket.VoidedBy = actorUserId;
-        ticket.VoidedAt = BusinessClock.Now;
-        ticket.VoidReason = dto.Reason.Trim();
-        ticket.UpdatedBy = actorUserId;
-        _uow.ItTickets.Update(ticket);
-        await _uow.SaveChangesAsync(cancellationToken);
+            var reason = dto.Reason.Trim();
+            ticket.Status = ItTicketStatus.Anulada;
+            ticket.VoidedBy = actorUserId;
+            ticket.VoidedAt = BusinessClock.Now;
+            ticket.VoidReason = reason;
+            ticket.UpdatedBy = actorUserId;
+            _uow.ItTickets.Update(ticket);
+
+            if (ticket.TicketType == ItTicketType.Entrega)
+            {
+                var assignmentRepo = _uow.Repository<ItAssignment>();
+                var assignments = (await assignmentRepo.FindAsync(
+                    a => a.AssignedTicketId == id && a.Status == AssignmentStatus.Activa, ct)).ToList();
+
+                foreach (var assignment in assignments)
+                {
+                    var asset = await _uow.ItAssets.GetByIdAsync(assignment.AssetId, ct)
+                        ?? throw new InvalidOperationException("Activo no encontrado.");
+
+                    assignment.Status = AssignmentStatus.Cerrada;
+                    assignment.ReturnedAt = BusinessClock.Now;
+                    assignment.ClosedReason = "Anulacion";
+                    assignment.ReturnNotes = reason;
+                    assignment.UpdatedBy = actorUserId;
+                    assignmentRepo.Update(assignment);
+
+                    var from = asset.Status;
+                    asset.Status = ItAssetStatus.Available;
+                    asset.CurrentHolderEmployeeId = null;
+                    asset.UpdatedBy = actorUserId;
+                    _uow.ItAssets.Update(asset);
+
+                    await AddHistoryAsync(asset.Id, from, ItAssetStatus.Available,
+                        $"Asignacion anulada por boleta {ticket.TicketNumber}. {reason}", actorUserId, ct, ticket.Id);
+                }
+            }
+
+            await _uow.SaveChangesAsync(ct);
+            return true;
+        }, cancellationToken);
 
         await _audit.LogAsync(actorUserId, "TI_TICKET_VOIDED", entityName: "ItTicket", entityId: id.ToString(),
             newValues: new { dto.Reason }, module: "TI", cancellationToken: cancellationToken);
@@ -264,12 +446,27 @@ public class ItTicketService : IItTicketService
 
     // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-    private async Task AddHistoryAsync(Guid assetId, ItAssetStatus from, ItAssetStatus to, string desc, Guid by, CancellationToken ct)
+    private async Task AddHistoryAsync(Guid assetId, ItAssetStatus from, ItAssetStatus to, string desc, Guid by, CancellationToken ct, Guid? ticketId = null)
         => await _uow.Repository<ItAssetHistory>().AddAsync(new ItAssetHistory
         {
             AssetId = assetId, EventType = "STATUS_CHANGED", FromStatus = from, ToStatus = to,
-            Description = desc, PerformedBy = by, CreatedBy = by
+            Description = desc, PerformedBy = by, CreatedBy = by, TicketId = ticketId
         }, ct);
+
+    /// <summary>
+    /// Valida que la boleta traiga las firmas requeridas (propuesta §9). La firma del responsable TI
+    /// es SIEMPRE obligatoria. La del colaborador es obligatoria salvo en incidentes (deterioro/pérdida-robo),
+    /// donde puede no estar presente.
+    /// </summary>
+    private static void EnsureSignatures(List<SignatureInputDto> signatures, bool requireEmployee)
+    {
+        bool hasIt = signatures.Any(s => s.SignerType == "ResponsableTI" && !string.IsNullOrWhiteSpace(s.ImageBase64));
+        bool hasEmployee = signatures.Any(s => s.SignerType == "Colaborador" && !string.IsNullOrWhiteSpace(s.ImageBase64));
+        if (!hasIt)
+            throw new InvalidOperationException("Falta la firma del responsable de TI.");
+        if (requireEmployee && !hasEmployee)
+            throw new InvalidOperationException("Falta la firma del colaborador.");
+    }
 
     private void AttachEvidence(ItTicket ticket, List<string> photos, List<SignatureInputDto> signatures, Guid by)
     {
@@ -365,6 +562,9 @@ public class ItTicketService : IItTicketService
         ItTicketType.CambioResponsable => "Cambio de responsable",
         ItTicketType.AsignacionAccesorios => "Asignación de accesorios",
         ItTicketType.Baja => "Baja de activo",
+        ItTicketType.Desasignacion => "Desasignación de equipo",
+        ItTicketType.Deterioro => "Deterioro de equipo",
+        ItTicketType.PerdidaRobo => "Pérdida / robo de equipo",
         _ => t.ToString()
     };
 

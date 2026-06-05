@@ -10,7 +10,7 @@ import { es } from 'date-fns/locale'
 import {
   ChevronLeft, ChevronRight, Plus, Clock,
   CalendarDays, CalendarRange, Filter, CheckCircle2, AlertCircle,
-  Sparkles, Users, DoorOpen, User, Check, X,
+  Sparkles, Users, DoorOpen, User, Check, X, SlidersHorizontal,
 } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -20,6 +20,7 @@ import { reservationsApi } from '@/api/reservations'
 import { roomsApi } from '@/api/rooms'
 import { classNames, extractApiError } from '@/utils'
 import { useRealtime } from '@/hooks/useRealtime'
+import { useIsMobile } from '@/hooks/useMediaQuery'
 import { useAuthStore } from '@/store/authStore'
 import { qk, staleTimes, invalidate } from '@/lib/queryKeys'
 import Modal from '@/components/ui/Modal'
@@ -382,11 +383,120 @@ function MiniCalendar({ anchor, view, onSelectDay }: { anchor: Date; view: ViewM
   )
 }
 
+// ─── CalendarSidebar — herramientas (mini-cal, filtros, resumen) ──────────────
+// Reutilizado en el aside de escritorio y en la hoja inferior de móvil/tablet.
+function CalendarSidebar({
+  anchor, view, onSelectDay, rooms, selectedRooms, setSelectedRooms, stats, showHints = true,
+}: {
+  anchor: Date
+  view: ViewMode
+  onSelectDay: (d: Date) => void
+  rooms: RoomDto[]
+  selectedRooms: string[]
+  setSelectedRooms: React.Dispatch<React.SetStateAction<string[]>>
+  stats: { total: number; approved: number; pending: number }
+  showHints?: boolean
+}) {
+  return (
+    <>
+      {/* Mini calendar */}
+      <MiniCalendar anchor={anchor} view={view} onSelectDay={onSelectDay} />
+
+      {/* Filtros por sala */}
+      {rooms.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-[11px] font-semibold text-ink2/70 uppercase tracking-wider flex items-center gap-1.5">
+              <Filter className="h-3 w-3" /> Salas
+            </h3>
+            {selectedRooms.length > 0 && (
+              <button
+                onClick={() => setSelectedRooms([])}
+                className="text-[10px] font-medium text-brand-700 hover:underline cursor-pointer"
+              >
+                Limpiar
+              </button>
+            )}
+          </div>
+          <div className="space-y-0.5">
+            {rooms.map(r => {
+              const palette = paletteForRoom(r.id)
+              const selected = selectedRooms.includes(r.id)
+              const isActive = selectedRooms.length === 0 || selected
+              return (
+                <button
+                  key={r.id}
+                  onClick={() => setSelectedRooms(s => s.includes(r.id) ? s.filter(x => x !== r.id) : [...s, r.id])}
+                  className={classNames(
+                    'w-full flex items-center gap-2 rounded-md px-2 py-2 text-left transition-colors cursor-pointer',
+                    selected ? 'bg-brand-50' : 'hover:bg-bg',
+                  )}
+                >
+                  <span className={classNames('h-2.5 w-2.5 rounded-full shrink-0', palette.dot, !isActive && 'opacity-30')} />
+                  <span className={classNames('text-[13px] truncate flex-1', isActive ? 'text-ink' : 'text-ink2/50')}>
+                    {r.name}
+                  </span>
+                  {selected && <CheckCircle2 className="h-3.5 w-3.5 text-brand-600 shrink-0" />}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Resumen */}
+      <div className="rounded-[10px] border border-line bg-bg/40 p-3">
+        <h3 className="text-[11px] font-semibold text-ink2/70 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+          <Sparkles className="h-3 w-3" /> {view === 'week' ? 'Esta semana' : 'Este día'}
+        </h3>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-[13px]">
+            <span className="text-ink2">Total reservas</span>
+            <span className="font-mono font-semibold text-ink tabular-nums">{stats.total}</span>
+          </div>
+          <div className="flex items-center justify-between text-[13px]">
+            <span className="text-ink2 flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-ok" /> Aprobadas
+            </span>
+            <span className="font-mono font-semibold text-brand-700 tabular-nums">{stats.approved}</span>
+          </div>
+          <div className="flex items-center justify-between text-[13px]">
+            <span className="text-ink2 flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-warn" /> Pendientes
+            </span>
+            <span className="font-mono font-semibold text-amber-700 tabular-nums">{stats.pending}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Keyboard hints (solo escritorio) */}
+      {showHints && (
+        <div className="mt-auto rounded-[10px] border border-line bg-bg/40 px-3 py-2.5 text-[11px] text-ink2 space-y-1">
+          <p className="font-semibold text-ink2/80 mb-1.5">Atajos de teclado</p>
+          {[
+            { k: 'J / L', d: 'Anterior / Siguiente' },
+            { k: 'T', d: 'Hoy' },
+            { k: 'W / D', d: 'Semana / Día' },
+            { k: 'N', d: 'Nueva reserva' },
+          ].map(s => (
+            <div key={s.k} className="flex items-center justify-between">
+              <span>{s.d}</span>
+              <kbd className="px-1.5 py-0.5 rounded bg-paper border border-line font-mono text-[10px] text-ink">{s.k}</kbd>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  )
+}
+
 // ─── CalendarPage ─────────────────────────────────────────────────────────────
 export default function CalendarPage() {
   const qc = useQueryClient()
   const [anchor, setAnchor] = useState(() => startOfDay(new Date()))
-  const [view, setView] = useState<ViewMode>('week')
+  const [view, setView] = useState<ViewMode>(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches ? 'day' : 'week'
+  )
   const [selectedRooms, setSelectedRooms] = useState<string[]>([])
   const [detailEvent, setDetailEvent] = useState<CalendarEventDto | null>(null)
   const [approveTarget, setApproveTarget] = useState<CalendarEventDto | null>(null)
@@ -396,6 +506,11 @@ export default function CalendarPage() {
   const { hasPermission } = useAuthStore()
   const canApprove = hasPermission('Reservations.Approve')
   const canReject = hasPermission('Reservations.Reject')
+
+  // En móvil/tablet la grilla semanal de 7 columnas es inusable: se fuerza vista de día.
+  const isMobile = useIsMobile()
+  const [toolsOpen, setToolsOpen] = useState(false)  // hoja inferior con mini-cal + filtros (móvil)
+  useEffect(() => { if (isMobile) setView('day') }, [isMobile])
 
   const approveMutation = useMutation({
     mutationFn: ({ id, comment }: { id: string; comment?: string }) =>
@@ -639,18 +754,33 @@ export default function CalendarPage() {
     <div className="flex flex-col h-full bg-bg">
 
       {/* ─── Toolbar superior ─── */}
-      <header className="flex flex-wrap items-center justify-between gap-3 px-6 py-3 border-b border-line bg-paper shrink-0">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 shadow-sh1 shrink-0">
+      <header className="flex flex-wrap items-center justify-between gap-2 sm:gap-3 px-3 sm:px-6 py-2.5 sm:py-3 border-b border-line bg-paper shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <div className="hidden sm:flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 shadow-sh1 shrink-0">
             <CalendarDays className="h-5 w-5 text-white" strokeWidth={1.75} />
           </div>
           <div className="min-w-0">
             <p className="text-[11px] font-medium text-ink2/70 tracking-wide capitalize">{headerEyebrow}</p>
-            <h1 className="text-[17px] font-semibold text-ink leading-tight capitalize truncate">{headerLabel}</h1>
+            <h1 className="text-[15px] sm:text-[17px] font-semibold text-ink leading-tight capitalize truncate">{headerLabel}</h1>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+          {/* Herramientas (mini-cal + filtros) — solo móvil/tablet, donde el aside se oculta */}
+          <button
+            onClick={() => setToolsOpen(true)}
+            className="lg:hidden flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-paper text-ink2 hover:text-ink hover:bg-bg transition-colors cursor-pointer relative"
+            title="Calendario y filtros"
+            aria-label="Calendario y filtros"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            {selectedRooms.length > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-600 px-1 text-[9px] font-bold text-white">
+                {selectedRooms.length}
+              </span>
+            )}
+          </button>
+
           {/* Stats chips */}
           {stats.total > 0 && (
             <div className="hidden xl:flex items-center gap-1.5 mr-1">
@@ -665,8 +795,8 @@ export default function CalendarPage() {
             </div>
           )}
 
-          {/* View toggle: Semana / Día */}
-          <div className="flex items-center rounded-lg border border-line bg-bg p-0.5">
+          {/* View toggle: Semana / Día — oculto en móvil (allí siempre es vista de día) */}
+          <div className="hidden sm:flex items-center rounded-lg border border-line bg-bg p-0.5">
             {([
               { v: 'week' as const, label: 'Semana', Icon: CalendarRange },
               { v: 'day' as const, label: 'Día', Icon: CalendarDays },
@@ -712,7 +842,7 @@ export default function CalendarPage() {
           </div>
 
           <Button size="sm" onClick={() => openNewRes()} title="Nueva reserva (N)" className="cursor-pointer">
-            <Plus className="h-4 w-4" /> Nueva reserva
+            <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Nueva reserva</span><span className="sm:hidden">Nueva</span>
           </Button>
         </div>
       </header>
@@ -720,93 +850,12 @@ export default function CalendarPage() {
       {/* ─── Body — Sidebar + Calendar grid ─── */}
       <div className="flex-1 flex overflow-hidden">
 
-        {/* Sidebar izquierdo */}
+        {/* Sidebar izquierdo (escritorio) */}
         <aside className="hidden lg:flex w-64 shrink-0 flex-col gap-5 border-r border-line bg-paper p-4 overflow-y-auto">
-          {/* Mini calendar */}
-          <MiniCalendar anchor={anchor} view={view} onSelectDay={handleSelectDayFromMini} />
-
-          {/* Filtros por sala */}
-          {rooms.length > 0 && (
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-[11px] font-semibold text-ink2/70 uppercase tracking-wider flex items-center gap-1.5">
-                  <Filter className="h-3 w-3" /> Salas
-                </h3>
-                {selectedRooms.length > 0 && (
-                  <button
-                    onClick={() => setSelectedRooms([])}
-                    className="text-[10px] font-medium text-brand-700 hover:underline cursor-pointer"
-                  >
-                    Limpiar
-                  </button>
-                )}
-              </div>
-              <div className="space-y-0.5">
-                {rooms.map(r => {
-                  const palette = paletteForRoom(r.id)
-                  const selected = selectedRooms.includes(r.id)
-                  const isActive = selectedRooms.length === 0 || selected
-                  return (
-                    <button
-                      key={r.id}
-                      onClick={() => setSelectedRooms(s => s.includes(r.id) ? s.filter(x => x !== r.id) : [...s, r.id])}
-                      className={classNames(
-                        'w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors cursor-pointer',
-                        selected ? 'bg-brand-50' : 'hover:bg-bg',
-                      )}
-                    >
-                      <span className={classNames('h-2.5 w-2.5 rounded-full shrink-0', palette.dot, !isActive && 'opacity-30')} />
-                      <span className={classNames('text-[13px] truncate flex-1', isActive ? 'text-ink' : 'text-ink2/50')}>
-                        {r.name}
-                      </span>
-                      {selected && <CheckCircle2 className="h-3.5 w-3.5 text-brand-600 shrink-0" />}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Resumen */}
-          <div className="rounded-[10px] border border-line bg-bg/40 p-3">
-            <h3 className="text-[11px] font-semibold text-ink2/70 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-              <Sparkles className="h-3 w-3" /> {view === 'week' ? 'Esta semana' : 'Este día'}
-            </h3>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-[13px]">
-                <span className="text-ink2">Total reservas</span>
-                <span className="font-mono font-semibold text-ink tabular-nums">{stats.total}</span>
-              </div>
-              <div className="flex items-center justify-between text-[13px]">
-                <span className="text-ink2 flex items-center gap-1.5">
-                  <span className="h-1.5 w-1.5 rounded-full bg-ok" /> Aprobadas
-                </span>
-                <span className="font-mono font-semibold text-brand-700 tabular-nums">{stats.approved}</span>
-              </div>
-              <div className="flex items-center justify-between text-[13px]">
-                <span className="text-ink2 flex items-center gap-1.5">
-                  <span className="h-1.5 w-1.5 rounded-full bg-warn" /> Pendientes
-                </span>
-                <span className="font-mono font-semibold text-amber-700 tabular-nums">{stats.pending}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Keyboard hints */}
-          <div className="mt-auto rounded-[10px] border border-line bg-bg/40 px-3 py-2.5 text-[11px] text-ink2 space-y-1">
-            <p className="font-semibold text-ink2/80 mb-1.5">Atajos de teclado</p>
-            {[
-              { k: 'J / L', d: 'Anterior / Siguiente' },
-              { k: 'T', d: 'Hoy' },
-              { k: 'W / D', d: 'Semana / Día' },
-              { k: 'N', d: 'Nueva reserva' },
-            ].map(s => (
-              <div key={s.k} className="flex items-center justify-between">
-                <span>{s.d}</span>
-                <kbd className="px-1.5 py-0.5 rounded bg-paper border border-line font-mono text-[10px] text-ink">{s.k}</kbd>
-              </div>
-            ))}
-          </div>
+          <CalendarSidebar
+            anchor={anchor} view={view} onSelectDay={handleSelectDayFromMini}
+            rooms={rooms} selectedRooms={selectedRooms} setSelectedRooms={setSelectedRooms} stats={stats}
+          />
         </aside>
 
         {/* Main calendar area */}
@@ -1138,6 +1187,18 @@ export default function CalendarPage() {
             initialEndTime={newRes.endTime}
           />
         )}
+      </Modal>
+
+      {/* ── Herramientas en móvil/tablet: mini-cal + filtros (aside oculto en <lg) ── */}
+      <Modal open={toolsOpen} onClose={() => setToolsOpen(false)} title="Calendario y filtros" size="sm">
+        <div className="flex flex-col gap-5">
+          <CalendarSidebar
+            anchor={anchor} view={view}
+            onSelectDay={(d) => { handleSelectDayFromMini(d); setToolsOpen(false) }}
+            rooms={rooms} selectedRooms={selectedRooms} setSelectedRooms={setSelectedRooms}
+            stats={stats} showHints={false}
+          />
+        </div>
       </Modal>
     </div>
   )

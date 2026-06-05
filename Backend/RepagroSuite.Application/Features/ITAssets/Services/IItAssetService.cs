@@ -13,7 +13,8 @@ public interface IItAssetService
     Task<IEnumerable<ItAssetHistoryDto>> GetHistoryAsync(Guid id, CancellationToken cancellationToken = default);
     Task<ItAssetDto> CreateAsync(CreateItAssetDto dto, Guid createdBy, CancellationToken cancellationToken = default);
     Task<ItAssetDto> UpdateAsync(Guid id, UpdateItAssetDto dto, Guid updatedBy, CancellationToken cancellationToken = default);
-    Task<ItAssetDto> ChangeStatusAsync(Guid id, ChangeItAssetStatusDto dto, Guid updatedBy, CancellationToken cancellationToken = default);
+    /// <summary>Reactiva un activo inactivo (Dañado/Perdido/Robado/Inactivo) → Disponible. Solo admin (propuesta §13).</summary>
+    Task<ItAssetDto> ReactivateAsync(Guid id, ReactivateAssetDto dto, Guid updatedBy, CancellationToken cancellationToken = default);
     Task DeleteAsync(Guid id, Guid deletedBy, CancellationToken cancellationToken = default);
     Task<ItDashboardDto> GetDashboardAsync(CancellationToken cancellationToken = default);
     Task<byte[]> ExportInventoryExcelAsync(CancellationToken cancellationToken = default);

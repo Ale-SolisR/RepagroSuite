@@ -229,7 +229,7 @@ function EmailSection({
               onChange={set('EMAIL.FROM_NAME')}
               disabled={!editMode}
               modified={modified.has('EMAIL.FROM_NAME')}
-              placeholder="RepagroSuite"
+              placeholder="Repagro App"
             />
           </div>
           <div>
@@ -520,7 +520,7 @@ export default function SettingsPage() {
   const CurrentIcon = currentMeta.icon
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto">
 
       {/* Header con título, edit toggle y guardar */}
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">

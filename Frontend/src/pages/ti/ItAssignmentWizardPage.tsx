@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Loader2, ClipboardCheck, Cpu } from 'lucide-react'
+import { ArrowLeft, Loader2, ClipboardCheck, Cpu, Search } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 import { itAssetsApi } from '@/api/itAssets'
@@ -29,6 +29,7 @@ export default function ItAssignmentWizardPage() {
   const [employeeId, setEmployeeId] = useState('')
   const [empModal, setEmpModal] = useState(false)
   const [assetIds, setAssetIds] = useState<string[]>(preAsset ? [preAsset] : [])
+  const [assetSearch, setAssetSearch] = useState('')
   const [condition, setCondition] = useState<PhysicalCondition>('Good')
   const [accessories, setAccessories] = useState('')
   const [notes, setNotes] = useState('')
@@ -48,9 +49,35 @@ export default function ItAssignmentWizardPage() {
     staleTime: staleTimes.ti,
   })
 
+  // Activo preseleccionado (viene de la ficha con ?assetId=). Puede no estar en la lista de
+  // "Disponibles" (p. ej. estaba "Devuelto"): lo cargamos aparte para mostrarlo marcado.
+  const preAssetQuery = useQuery({
+    queryKey: qk.ti.asset(preAsset ?? ''),
+    queryFn: () => itAssetsApi.getById(preAsset!).then(r => r.data.data!),
+    enabled: !!preAsset,
+    staleTime: staleTimes.ti,
+  })
+
   function toggleAsset(id: string) {
     setAssetIds(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id])
   }
+
+  // Lista base = disponibles + el preseleccionado (si no estuviera ya), siempre de primero.
+  const baseAssets = (() => {
+    const list = (assets.data ?? []).slice()
+    const pa = preAssetQuery.data
+    if (pa && !list.some(a => a.id === pa.id)) list.unshift(pa)
+    return list
+  })()
+
+  // Filtro instantáneo por nombre/código/modelo/serie. La lista ya llega del servidor
+  // ordenada por fecha de creación (más recientes primero); el filtro conserva ese orden.
+  const term = assetSearch.trim().toLowerCase()
+  const visibleAssets = baseAssets.filter(a => {
+    if (!term) return true
+    return [a.internalCode, a.assetTypeName, a.model, a.serialNumber, a.brandName]
+      .some(v => v?.toLowerCase().includes(term))
+  })
 
   const mutation = useMutation({
     mutationFn: () => {
@@ -74,12 +101,13 @@ export default function ItAssignmentWizardPage() {
     if (!employeeId) return toast.error('Seleccione el colaborador.')
     if (assetIds.length === 0) return toast.error('Seleccione al menos un activo.')
     if (!sigEmployee) return toast.error('Falta la firma del colaborador.')
+    if (!sigIt) return toast.error('Falta la firma del responsable de TI.')
     mutation.mutate()
   }
 
   return (
     <div className="flex min-h-full flex-col">
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-line bg-paper px-6 py-3" style={{ minHeight: 64 }}>
+      <header className="sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b border-line bg-paper px-4 sm:px-6 py-3" style={{ minHeight: 64 }}>
         <button onClick={() => navigate(-1)} className="rounded p-1.5 text-ink2 hover:bg-bg hover:text-ink" aria-label="Volver"><ArrowLeft className="h-5 w-5" /></button>
         <div className="min-w-0 flex-1">
           <p className="font-mono text-[12px] text-ink2 mb-0.5 leading-none">TI / Boletas / Asignación</p>
@@ -89,7 +117,7 @@ export default function ItAssignmentWizardPage() {
         </div>
       </header>
 
-      <div className="flex-1 p-6 bg-bg">
+      <div className="flex-1 p-4 sm:p-6 bg-bg">
         <div className="mx-auto grid max-w-5xl gap-3.5 lg:grid-cols-2">
           {/* Colaborador + activos */}
           <section className="rounded-[10px] border border-line bg-paper p-5 shadow-sh1">
@@ -107,12 +135,24 @@ export default function ItAssignmentWizardPage() {
             </div>
 
             <label className="mb-1 block text-[12px] font-medium text-ink2">Activos disponibles *</label>
+            <label className="relative mb-2 flex items-center">
+              <Search className="pointer-events-none absolute left-3 h-4 w-4 text-ink2" />
+              <input
+                type="search"
+                value={assetSearch}
+                onChange={e => setAssetSearch(e.target.value)}
+                placeholder="Buscar por código, tipo, modelo o serie"
+                className="h-10 w-full rounded-[8px] border border-line bg-paper pl-9 pr-3 text-sm text-ink placeholder:text-ink2 focus:border-brand-400 focus:outline-none"
+              />
+            </label>
             <div className="max-h-64 overflow-y-auto rounded-[8px] border border-line">
-              {assets.isLoading ? (
+              {assets.isLoading || preAssetQuery.isLoading ? (
                 <div className="p-4 text-sm text-ink2">Cargando…</div>
-              ) : (assets.data ?? []).length === 0 ? (
+              ) : baseAssets.length === 0 ? (
                 <div className="p-4 text-sm text-ink2">No hay activos disponibles.</div>
-              ) : (assets.data ?? []).map(a => (
+              ) : visibleAssets.length === 0 ? (
+                <div className="p-4 text-sm text-ink2">Ningún activo coincide con «{assetSearch.trim()}».</div>
+              ) : visibleAssets.map(a => (
                 <label key={a.id} className="flex cursor-pointer items-center gap-3 border-b border-line px-3 py-2 last:border-0 hover:bg-bg">
                   <input type="checkbox" checked={assetIds.includes(a.id)} onChange={() => toggleAsset(a.id)} className="h-4 w-4" />
                   <Cpu className="h-4 w-4 text-ink2" />
@@ -123,7 +163,10 @@ export default function ItAssignmentWizardPage() {
                 </label>
               ))}
             </div>
-            <p className="mt-2 text-[12px] text-ink2">{assetIds.length} seleccionado(s)</p>
+            <p className="mt-2 text-[12px] text-ink2">
+              {assetIds.length} seleccionado(s)
+              {term && ` · ${visibleAssets.length} resultado(s)`}
+            </p>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <div>

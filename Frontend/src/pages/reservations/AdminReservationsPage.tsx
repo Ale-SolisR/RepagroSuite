@@ -296,7 +296,7 @@ export default function AdminReservationsPage() {
   const clearFilters = () => { setUserId(''); setRoomId(''); setActiveTab(''); setPage(1) }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="mb-6 flex items-center gap-3">
         <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-600 shadow-sh1 shrink-0">

@@ -1,6 +1,5 @@
 import type { ItAssetStatus, PhysicalCondition } from '@/types'
-
-type ChipVariant = 'ok' | 'warn' | 'danger' | 'brand' | 'gray'
+import type { ChipVariant } from '@/components/ui/Chip'
 
 export const STATUS_LABELS: Record<ItAssetStatus, string> = {
   Available: 'Disponible',
@@ -19,20 +18,27 @@ export const STATUS_LABELS: Record<ItAssetStatus, string> = {
 
 export function statusChipVariant(status: ItAssetStatus): ChipVariant {
   switch (status) {
-    case 'Available': return 'ok'
-    case 'Assigned':
-    case 'Loaned': return 'brand'
-    case 'UnderReview':
-    case 'UnderMaintenance':
-    case 'UnderRepair': return 'warn'
-    case 'Damaged':
-    case 'Lost':
-    case 'Stolen': return 'danger'
+    case 'Available': return 'available'
+    case 'Assigned': return 'assigned'
+    case 'Loaned': return 'loaned'
+    case 'UnderReview': return 'review'
+    case 'UnderMaintenance': return 'maintenance'
+    case 'UnderRepair': return 'repair'
+    case 'Returned': return 'returned'
+    case 'Damaged': return 'damaged'
+    case 'Lost': return 'lost'
+    case 'Stolen': return 'stolen'
+    case 'Disposed': return 'disposed'
+    case 'Inactive': return 'inactive'
     default: return 'gray'
   }
 }
 
-export const STATUS_OPTIONS = (Object.keys(STATUS_LABELS) as ItAssetStatus[])
+// Estados vigentes del flujo de 5 movimientos (filtro de inventario).
+// STATUS_LABELS se mantiene completo para renderizar estados heredados en chips/historial.
+const ACTIVE_STATUSES: ItAssetStatus[] = ['Available', 'Assigned', 'Damaged', 'Lost', 'Stolen']
+
+export const STATUS_OPTIONS = ACTIVE_STATUSES
   .map(value => ({ value, label: STATUS_LABELS[value] }))
 
 export const CONDITION_LABELS: Record<PhysicalCondition, string> = {
@@ -50,18 +56,17 @@ import type { ItTicketStatus } from '@/types'
 
 export function ticketStatusChipVariant(status: ItTicketStatus): ChipVariant {
   switch (status) {
-    case 'Emitida': return 'ok'
-    case 'Firmada': return 'brand'
-    case 'PendienteFirma': return 'warn'
-    case 'Anulada': return 'danger'
+    case 'Borrador': return 'draft'
+    case 'PendienteFirma': return 'pendingSignature'
+    case 'Firmada': return 'signed'
+    case 'Emitida': return 'issued'
+    case 'Anulada': return 'voided'
     default: return 'gray'
   }
 }
 
-// Estados a los que puede quedar un activo tras una devolución (propuesta §5).
+// Estados a los que puede quedar un activo tras una devolución (flujo de 5 movimientos).
 export const RETURN_RESULT_OPTIONS: { value: ItAssetStatus; label: string }[] = [
   { value: 'Available', label: 'Disponible' },
-  { value: 'UnderReview', label: 'En revisión' },
-  { value: 'UnderRepair', label: 'En reparación' },
   { value: 'Damaged', label: 'Dañado' },
 ]

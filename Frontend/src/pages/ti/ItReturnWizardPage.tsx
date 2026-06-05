@@ -55,12 +55,13 @@ export default function ItReturnWizardPage() {
 
   function submit() {
     if (!sigEmployee) return toast.error('Falta la firma del colaborador.')
+    if (!sigIt) return toast.error('Falta la firma del responsable de TI.')
     mutation.mutate()
   }
 
   return (
     <div className="flex min-h-full flex-col">
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-line bg-paper px-6 py-3" style={{ minHeight: 64 }}>
+      <header className="sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b border-line bg-paper px-4 sm:px-6 py-3" style={{ minHeight: 64 }}>
         <button onClick={() => navigate(-1)} className="rounded p-1.5 text-ink2 hover:bg-bg hover:text-ink" aria-label="Volver"><ArrowLeft className="h-5 w-5" /></button>
         <div className="min-w-0 flex-1">
           <p className="font-mono text-[12px] text-ink2 mb-0.5 leading-none">TI / Boletas / Devolución</p>
@@ -71,7 +72,7 @@ export default function ItReturnWizardPage() {
         </div>
       </header>
 
-      <div className="flex-1 p-6 bg-bg">
+      <div className="flex-1 p-4 sm:p-6 bg-bg">
         <div className="mx-auto grid max-w-5xl gap-3.5 lg:grid-cols-2">
           <section className="rounded-[10px] border border-line bg-paper p-5 shadow-sh1">
             <h2 className="mb-3 text-sm font-semibold text-ink">Recepción</h2>

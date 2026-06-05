@@ -19,15 +19,31 @@ public class CreateRastreoUserDto
     public string Correo { get; set; } = string.Empty;
     /// <summary><c>ADMIN</c> o <c>USUARIO</c>.</summary>
     public string Rol { get; set; } = "USUARIO";
-    /// <summary>Contraseña inicial en texto plano (solo viaja en la petición; se almacena hasheada con BCrypt).</summary>
-    public string Password { get; set; } = string.Empty;
+    /// <summary>Contraseña inicial opcional (texto plano sólo en la petición; se guarda hasheada con BCrypt). Si viene vacía o <see cref="Generate"/> es true, el sistema genera una segura.</summary>
+    public string? Password { get; set; }
+    /// <summary>Si es true, ignora <see cref="Password"/> y genera una contraseña segura aleatoria.</summary>
+    public bool Generate { get; set; }
 }
 
 public class ResetRastreoUserPasswordDto
 {
-    public string NewPassword { get; set; } = string.Empty;
+    /// <summary>Nueva contraseña opcional. Si viene vacía o <see cref="Generate"/> es true, el sistema genera una segura.</summary>
+    public string? NewPassword { get; set; }
+    /// <summary>Si es true, ignora <see cref="NewPassword"/> y genera una contraseña segura aleatoria.</summary>
+    public bool Generate { get; set; }
     /// <summary>Si es true, invalida la sesión activa del usuario para forzar un nuevo inicio de sesión.</summary>
     public bool CloseActiveSession { get; set; } = true;
+}
+
+/// <summary>
+/// Resultado de crear/restablecer: incluye la contraseña EFECTIVA en texto plano para mostrarla
+/// UNA sola vez al administrador (no se guarda legible; sólo su hash). El frontend debe mostrarla
+/// en un modal de "copiar y entregar" y nunca volver a pedirla.
+/// </summary>
+public class RastreoUserPasswordResultDto
+{
+    public RastreoUserDto? User { get; set; }
+    public string Password { get; set; } = string.Empty;
 }
 
 public class UpdateRastreoUserRoleDto

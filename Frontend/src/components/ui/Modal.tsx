@@ -28,18 +28,18 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div
-        className={`relative w-full ${sizes[size]} max-h-[92vh] rounded-xl bg-white shadow-2xl flex flex-col`}
+        className={`relative w-full ${sizes[size]} max-h-[92dvh] rounded-t-2xl sm:rounded-xl bg-white shadow-2xl flex flex-col`}
       >
-        <div className="flex items-center justify-between border-b px-6 py-4 shrink-0">
-          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
-          <Button variant="ghost" size="sm" onClick={onClose} className="!p-1.5">
+        <div className="flex items-center justify-between border-b px-4 py-3 sm:px-6 sm:py-4 shrink-0">
+          <h2 className="text-base sm:text-lg font-semibold text-gray-900 truncate pr-2">{title}</h2>
+          <Button variant="ghost" size="sm" onClick={onClose} className="!p-1.5 shrink-0">
             <X className="h-4 w-4" />
           </Button>
         </div>
-        <div className="p-6 overflow-y-auto flex-1 min-h-0">{children}</div>
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1 min-h-0">{children}</div>
       </div>
     </div>
   )

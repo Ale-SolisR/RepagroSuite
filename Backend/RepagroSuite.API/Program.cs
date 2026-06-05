@@ -15,9 +15,13 @@ using Microsoft.OpenApi.Models;
 using RepagroSuite.Application.Extensions;
 using RepagroSuite.Infrastructure.Data;
 using RepagroSuite.Infrastructure.Extensions;
+using Rastreo.Api;   // Módulo de Rastreo integrado en el host único (Opción B)
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Licencia QuestPDF (Community) — la usan tanto Repagro como el módulo de Rastreo. Idempotente.
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
 // Serilog
 Log.Logger = new LoggerConfiguration()
@@ -27,6 +31,8 @@ builder.Host.UseSerilog();
 
 // Controllers + JSON
 builder.Services.AddControllers()
+    // Descubre los controladores del módulo de Rastreo (ensamblado RepagroSuite.Rastreo).
+    .AddApplicationPart(typeof(Rastreo.Api.RastreoModule).Assembly)
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
@@ -128,7 +134,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 return context.Response.WriteAsync(result);
             }
         };
-    });
+    })
+    // 2.º esquema JWT, exclusivo del módulo de Rastreo (clave/issuer/audience propios → aislado).
+    .AddRastreoJwt(builder.Configuration);
 
 builder.Services.AddAuthorization(options =>
 {
@@ -148,6 +156,7 @@ builder.Services.AddAuthorization(options =>
         "Ti.Inventory.View", "Ti.Inventory.Create", "Ti.Inventory.Update", "Ti.Inventory.Delete",
         "Ti.Catalog.Manage", "Ti.Dashboard.View",
         "Ti.Assign", "Ti.Return", "Ti.Ticket.Create", "Ti.Ticket.Void", "Ti.Employee.Manage",
+        "Ti.Asset.Reactivate",
         // Administración de usuarios del Sistema de Rastreo (esquema RASTREO, independientes de Repagro)
         "RastreoUsers.View", "RastreoUsers.Create", "RastreoUsers.ResetPassword",
         "RastreoUsers.ManageRole", "RastreoUsers.ManageStatus"
@@ -266,6 +275,9 @@ builder.Services.AddScoped<RepagroSuite.Application.Common.Interfaces.IRealtimeN
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
+// Módulo de Rastreo (DbContext del esquema RASTREO + servicios propios). Identidad y datos aislados.
+builder.Services.AddRastreoModule(builder.Configuration);
+
 // Auto-aprobación de reservas pendientes dentro de la ventana de 30 min (proceso en segundo plano).
 builder.Services.AddHostedService<RepagroSuite.API.BackgroundServices.ReservationAutoApprovalService>();
 
@@ -301,7 +313,11 @@ if (args.Contains("import-ti"))
 // problemas con réplicas / blue-green (dos instancias intentando migrar a la vez).
 var runMigrationsOnStartup = builder.Configuration.GetValue("Database:RunMigrationsOnStartup", app.Environment.IsDevelopment());
 if (runMigrationsOnStartup)
+{
     await app.Services.ApplyMigrationsAsync();
+    // Migraciones (con baseline legacy) + seed del módulo de Rastreo, en su esquema RASTREO aislado.
+    app.Services.InitializeRastreoModule();
+}
 
 // Correlation ID PRIMERO para que aparezca en todos los logs subsiguientes.
 app.UseMiddleware<RepagroSuite.API.Middleware.CorrelationIdMiddleware>();
@@ -332,6 +348,9 @@ else
 app.UseResponseCompression();
 app.UseHttpsRedirection();
 app.UseCors("DefaultCors");
+
+// Fotos legacy del módulo de Rastreo servidas bajo /uploads (las nuevas viven en BD como binario).
+app.UseRastreoUploads();
 
 // Global error middleware
 app.UseMiddleware<RepagroSuite.API.Middleware.GlobalExceptionMiddleware>();

@@ -21,6 +21,7 @@ public static class ApplicationExtensions
 
         // Módulo TI / Inventario
         services.AddScoped<IItAssetService, ItAssetService>();
+        services.AddScoped<IItAssetCredentialService, ItAssetCredentialService>();
         services.AddScoped<IItCatalogService, ItCatalogService>();
         services.AddScoped<IItTicketService, ItTicketService>();
         services.AddScoped<IItEmployeeService, ItEmployeeService>();

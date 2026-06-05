@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Search, Sprout, ShieldCheck, UserCog, KeyRound, Power, PowerOff,
   ChevronLeft, ChevronRight, ChevronRight as ChevronR, Eye, EyeOff, Wand2,
-  CheckCircle, Mail, CalendarDays, ShieldAlert, Info,
+  CheckCircle, Mail, CalendarDays, ShieldAlert, Info, Copy,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { rastreoUsersApi } from '@/api/rastreoUsers'
@@ -113,6 +113,23 @@ function PasswordField({
   )
 }
 
+// Fila de credencial con botón de copiar (para el modal "mostrar una vez").
+function CredRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-[11px] uppercase tracking-wider text-gray-400 font-medium">{label}</span>
+      <div className="flex items-center gap-2">
+        <code className={`flex-1 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 break-all ${mono ? 'font-mono' : ''}`}>{value}</code>
+        <button type="button" title="Copiar"
+          onClick={() => { navigator.clipboard?.writeText(value); toast.success('Copiado') }}
+          className="shrink-0 rounded-md border border-gray-200 p-2 text-gray-500 hover:bg-gray-50 hover:text-teal-600 transition-colors">
+          <Copy className="h-4 w-4" strokeWidth={1.75} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function ActionItem({ icon: Icon, label, description, tone, onClick, loading }: {
   icon: LucideIcon; label: string; description: string
   tone: 'primary' | 'warning' | 'danger' | 'success'; onClick: () => void; loading?: boolean
@@ -154,6 +171,8 @@ export default function RastreoUsersPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [selected, setSelected] = useState<RastreoUserDto | null>(null)
   const [view, setView] = useState<ModalView>('menu')
+  // Credenciales a mostrar UNA sola vez tras crear/restablecer (no se vuelven a ver).
+  const [cred, setCred] = useState<{ correo?: string; password: string } | null>(null)
 
   const activeOnly = activeTab === 'active' ? true : activeTab === 'inactive' ? false : undefined
 
@@ -169,14 +188,24 @@ export default function RastreoUsersPage() {
 
   const createMutation = useMutation({
     mutationFn: (d: CreateForm) => rastreoUsersApi.create({ nombre: d.nombre, correo: d.correo, rol: d.rol, password: d.password }),
-    onSuccess: () => { invalidate.rastreoUsers(qc); toast.success('Usuario de rastreo creado. Comparte la contraseña por un canal seguro.'); setCreateOpen(false) },
+    onSuccess: (res, vars) => {
+      invalidate.rastreoUsers(qc)
+      setCreateOpen(false)
+      const r = res.data.data
+      setCred({ correo: r?.user?.correo ?? vars.correo, password: r?.password ?? vars.password })
+    },
     onError: (e) => toast.error(extractApiError(e)),
   })
 
   const resetMutation = useMutation({
     mutationFn: ({ id, d }: { id: number; d: ResetForm }) =>
       rastreoUsersApi.resetPassword(id, { newPassword: d.newPassword, closeActiveSession: d.closeActiveSession }),
-    onSuccess: () => { invalidate.rastreoUsers(qc); toast.success('Contraseña actualizada correctamente.'); closeMenu() },
+    onSuccess: (res, vars) => {
+      invalidate.rastreoUsers(qc)
+      const correo = selected?.correo
+      closeMenu()
+      setCred({ correo, password: res.data.data?.password ?? vars.d.newPassword })
+    },
     onError: (e) => toast.error(extractApiError(e)),
   })
 
@@ -212,7 +241,7 @@ export default function RastreoUsersPage() {
       <form onSubmit={handleSubmit(d => createMutation.mutate(d))} className="space-y-4">
         <div className="flex items-start gap-2.5 rounded-lg border border-teal-200 bg-teal-50 px-3.5 py-3 text-[13px] text-teal-800">
           <Sprout className="h-4 w-4 mt-0.5 shrink-0 text-teal-600" strokeWidth={2} />
-          <p>Este usuario accederá <strong>únicamente al Sistema de Rastreo</strong>, no a Repagro Suite.</p>
+          <p>Este usuario accederá <strong>únicamente al Sistema de Rastreo</strong>, no a Repagro App.</p>
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -372,7 +401,7 @@ export default function RastreoUsersPage() {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="mb-4">
         <p className="text-xs text-gray-400 tracking-wide mb-1">Administración / Usuarios de Rastreo</p>
@@ -394,7 +423,7 @@ export default function RastreoUsersPage() {
         <Info className="h-4 w-4 mt-0.5 shrink-0 text-teal-600" strokeWidth={2} />
         <p className="text-[13px] text-teal-800">
           Estás administrando accesos del <strong>Sistema de Rastreo</strong>. Estos usuarios son
-          independientes de los usuarios de Repagro Suite y <strong>no tienen acceso a Repagro Suite</strong>.
+          independientes de los usuarios de Repagro App y <strong>no tienen acceso a Repagro App</strong>.
         </p>
       </div>
 
@@ -546,6 +575,30 @@ export default function RastreoUsersPage() {
         {selected && view === 'reset' && <ResetForm />}
         {selected && view === 'role' && <RoleForm />}
         {selected && view === 'status' && <StatusForm />}
+      </Modal>
+
+      {/* Credenciales (mostrar UNA sola vez) */}
+      <Modal open={!!cred} onClose={() => setCred(null)} title="Credenciales del usuario" size="md">
+        {cred && (
+          <div className="space-y-4">
+            <div className="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-3 text-[13px] text-amber-800">
+              <ShieldAlert className="h-4 w-4 mt-0.5 shrink-0 text-amber-600" strokeWidth={2} />
+              <p>Copia estas credenciales y entrégalas al usuario por un canal seguro.
+                <strong> No se volverán a mostrar</strong> (la contraseña se guarda cifrada).</p>
+            </div>
+            {cred.correo && <CredRow label="Usuario (correo)" value={cred.correo} />}
+            <CredRow label="Contraseña" value={cred.password} mono />
+            <div className="flex justify-end gap-2 pt-1">
+              <Button type="button" variant="ghost" onClick={() => setCred(null)}>Listo</Button>
+              <Button type="button" onClick={() => {
+                navigator.clipboard?.writeText(`Usuario: ${cred.correo ?? ''}\nContraseña: ${cred.password}`)
+                toast.success('Credenciales copiadas')
+              }}>
+                <Copy className="h-4 w-4" /> Copiar todo
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   )

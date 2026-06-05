@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Plus, Search, Cpu, ChevronLeft, ChevronRight, FileSpreadsheet } from 'lucide-react'
+import { Plus, Search, Cpu, ChevronLeft, ChevronRight, FileSpreadsheet, KeyRound } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 import { itAssetsApi, itCatalogsApi } from '@/api/itAssets'
@@ -10,7 +10,9 @@ import { downloadBlob } from '@/lib/download'
 import { extractApiError } from '@/utils'
 import { useAuthStore } from '@/store/authStore'
 import Chip from '@/components/ui/Chip'
+import AssetCredentialsModal from '@/components/ti/AssetCredentialsModal'
 import { statusChipVariant, STATUS_OPTIONS } from '@/components/ti/itStatus'
+import type { ItAssetListDto } from '@/types'
 
 const BRAND = '#0E6B4B'
 const PAGE_SIZE = 20
@@ -18,12 +20,14 @@ const PAGE_SIZE = 20
 export default function ItAssetsPage() {
   const { hasPermission } = useAuthStore()
   const canCreate = hasPermission('Ti.Inventory.Create')
+  const canManageCredentials = hasPermission('Ti.Inventory.Update')
 
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
   const [typeId, setTypeId] = useState('')
   const [exporting, setExporting] = useState(false)
+  const [credentialAsset, setCredentialAsset] = useState<ItAssetListDto | null>(null)
 
   async function exportExcel() {
     setExporting(true)
@@ -63,7 +67,7 @@ export default function ItAssetsPage() {
 
   return (
     <div className="flex min-h-full flex-col">
-      <header className="sticky top-0 z-10 flex items-center gap-4 border-b border-line bg-paper px-6 py-3" style={{ minHeight: 64 }}>
+      <header className="sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b border-line bg-paper px-4 sm:px-6 py-3" style={{ minHeight: 64 }}>
         <div className="min-w-0 flex-1">
           <p className="font-mono text-[12px] text-ink2 mb-0.5 leading-none">TI / Inventario</p>
           <h1 className="text-[18px] font-semibold text-ink leading-tight tracking-tight flex items-center gap-2">
@@ -84,7 +88,15 @@ export default function ItAssetsPage() {
         )}
       </header>
 
-      <div className="flex-1 p-6 bg-bg space-y-3.5">
+      <AssetCredentialsModal
+        open={!!credentialAsset}
+        onClose={() => setCredentialAsset(null)}
+        assetId={credentialAsset?.id ?? ''}
+        assetCode={credentialAsset?.internalCode}
+        canManage={canManageCredentials}
+      />
+
+      <div className="flex-1 p-4 sm:p-6 bg-bg space-y-3.5">
         {/* Filtros */}
         <div className="flex flex-wrap items-center gap-2.5">
           <label className="relative flex flex-1 min-w-[220px] items-center">
@@ -120,17 +132,18 @@ export default function ItAssetsPage() {
                   <th className="px-4 py-3 font-medium">Serie</th>
                   <th className="px-4 py-3 font-medium">Responsable</th>
                   <th className="px-4 py-3 font-medium">Estado</th>
+                  <th className="px-4 py-3 text-right font-medium">Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {isLoading ? (
                   Array.from({ length: 6 }).map((_, i) => (
                     <tr key={i} className="border-b border-line last:border-0">
-                      <td colSpan={6} className="px-4 py-3"><div className="h-5 animate-pulse rounded bg-gray-100" /></td>
+                      <td colSpan={7} className="px-4 py-3"><div className="h-5 animate-pulse rounded bg-gray-100" /></td>
                     </tr>
                   ))
                 ) : items.length === 0 ? (
-                  <tr><td colSpan={6} className="px-4 py-12 text-center text-ink2">
+                  <tr><td colSpan={7} className="px-4 py-12 text-center text-ink2">
                     No hay activos que coincidan. {canCreate && <Link to="/ti/assets/new" className="font-medium" style={{ color: BRAND }}>Registrar el primero →</Link>}
                   </td></tr>
                 ) : (
@@ -146,6 +159,20 @@ export default function ItAssetsPage() {
                       <td className="px-4 py-3 font-mono text-[12px] text-ink2">{a.serialNumber ?? '—'}</td>
                       <td className="px-4 py-3 text-ink2">{a.currentHolderName ?? '—'}</td>
                       <td className="px-4 py-3"><Chip variant={statusChipVariant(a.status)} label={a.statusName} /></td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => setCredentialAsset(a)}
+                            title="Credenciales"
+                            aria-label={`Credenciales de ${a.internalCode}`}
+                            className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-line bg-paper px-2.5 text-[12px] font-medium text-ink transition-colors hover:bg-bg"
+                          >
+                            <KeyRound className="h-3.5 w-3.5" style={{ color: BRAND }} />
+                            Credenciales
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))
                 )}

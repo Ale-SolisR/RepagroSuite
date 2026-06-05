@@ -46,18 +46,21 @@ public class RastreoUsersController : ControllerBase
 
     [HttpPost]
     [Authorize(Policy = "RastreoUsers.Create")]
-    public async Task<ActionResult<ApiResponse<RastreoUserDto>>> Create([FromBody] CreateRastreoUserDto dto, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<RastreoUserPasswordResultDto>>> Create([FromBody] CreateRastreoUserDto dto, CancellationToken ct)
     {
         var result = await _service.CreateAsync(dto, _currentUser.UserId!.Value, ct);
-        return Created(string.Empty, ApiResponse<RastreoUserDto>.Ok(result, "Usuario de rastreo creado. Comparte la contraseña por un canal seguro."));
+        // La contraseña viaja en el body para mostrarla UNA vez al admin; no se almacena legible.
+        return Created(string.Empty, ApiResponse<RastreoUserPasswordResultDto>.Ok(result,
+            "Usuario de rastreo creado. Copia la contraseña y entrégala por un canal seguro: no se volverá a mostrar."));
     }
 
     [HttpPost("{id:int}/reset-password")]
     [Authorize(Policy = "RastreoUsers.ResetPassword")]
-    public async Task<ActionResult<ApiResponse<object>>> ResetPassword(int id, [FromBody] ResetRastreoUserPasswordDto dto, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<RastreoUserPasswordResultDto>>> ResetPassword(int id, [FromBody] ResetRastreoUserPasswordDto dto, CancellationToken ct)
     {
-        await _service.ResetPasswordAsync(id, dto, _currentUser.UserId!.Value, ct);
-        return Ok(ApiResponse<object>.Ok(null!, "Contraseña actualizada correctamente."));
+        var password = await _service.ResetPasswordAsync(id, dto, _currentUser.UserId!.Value, ct);
+        return Ok(ApiResponse<RastreoUserPasswordResultDto>.Ok(new RastreoUserPasswordResultDto { Password = password },
+            "Contraseña restablecida. Copia y entrégala al usuario: no se volverá a mostrar."));
     }
 
     [HttpPatch("{id:int}/role")]

@@ -29,4 +29,11 @@ public class ItAssignment : BaseEntity
     public AssignmentStatus Status { get; set; } = AssignmentStatus.Activa;
     public string? Accessories { get; set; }
     public string? ReturnNotes { get; set; }
+
+    /// <summary>
+    /// Motivo por el que se cerró la asignación: Devolucion | Desasignacion | Deterioro | PerdidaRobo.
+    /// Permite distinguir el tipo de cierre sin sobrescribir historial. El consecutivo de la boleta
+    /// de cierre se guarda en <see cref="ReturnTicketId"/> (reutilizado para todos los cierres).
+    /// </summary>
+    public string? ClosedReason { get; set; }
 }

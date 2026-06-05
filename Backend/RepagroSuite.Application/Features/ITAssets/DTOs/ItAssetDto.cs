@@ -39,6 +39,7 @@ public class ItAssetDto : ItAssetListDto
     public string? Currency { get; set; }
     public bool HasWarranty { get; set; }
     public DateTime? WarrantyEndDate { get; set; }
+    public string? InvoiceNumber { get; set; }
     public string? Notes { get; set; }
     public ItAssetSpecDto? Spec { get; set; }
     public List<ItAssetPhotoDto> Photos { get; set; } = [];   // Galería completa (binario en BD).
@@ -90,6 +91,7 @@ public class ItAssetHistoryDto
     public ItAssetStatus? ToStatus { get; set; }
     public string? Description { get; set; }
     public DateTime OccurredAt { get; set; }
+    public Guid? TicketId { get; set; }
 }
 
 // ─── Escritura ──────────────────────────────────────────────────────────────────
@@ -113,10 +115,14 @@ public class CreateItAssetDto
     public string? Currency { get; set; }
     public bool HasWarranty { get; set; }
     public DateTime? WarrantyEndDate { get; set; }
+    public string? InvoiceNumber { get; set; }
     public string? Notes { get; set; }
     /// <summary>Galería de fotos a guardar (hasta 5 data URLs base64; el servidor las almacena como binario). Si viene, reemplaza las fotos del activo.</summary>
     public List<string>? Photos { get; set; }
     public ItAssetSpecDto? Spec { get; set; }
+    /// <summary>Contraseña de AnyDesk (write-only). Si viene con valor, se guarda CIFRADA como credencial
+    /// tipo AnyDesk en la bóveda del activo. Vacío = no se modifica. Nunca se devuelve en la ficha.</summary>
+    public string? AnyDeskPassword { get; set; }
 }
 
 public class UpdateItAssetDto : CreateItAssetDto

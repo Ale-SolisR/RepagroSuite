@@ -47,6 +47,11 @@ public class ItEmployeesController : ControllerBase
     public async Task<ActionResult<ApiResponse<ItEmployeeDto>>> GetById(Guid id, CancellationToken ct)
         => Ok(ApiResponse<ItEmployeeDto>.Ok(await _employees.GetByIdAsync(id, ct)));
 
+    [HttpGet("{id:guid}/history")]
+    [Authorize(Policy = "Ti.Inventory.View")]
+    public async Task<ActionResult<ApiResponse<ItEmployeeHistoryDto>>> GetHistory(Guid id, CancellationToken ct)
+        => Ok(ApiResponse<ItEmployeeHistoryDto>.Ok(await _employees.GetHistoryAsync(id, ct)));
+
     [HttpPost]
     [Authorize(Policy = "Ti.Employee.Manage")]
     public async Task<ActionResult<ApiResponse<ItEmployeeDto>>> Create([FromBody] CreateItEmployeeDto dto, CancellationToken ct)

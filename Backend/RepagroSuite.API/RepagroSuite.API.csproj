@@ -24,6 +24,7 @@
   <ItemGroup>
     <ProjectReference Include="..\RepagroSuite.Application\RepagroSuite.Application.csproj" />
     <ProjectReference Include="..\RepagroSuite.Infrastructure\RepagroSuite.Infrastructure.csproj" />
+    <ProjectReference Include="..\RepagroSuite.Rastreo\RepagroSuite.Rastreo.csproj" />
   </ItemGroup>
 
 </Project>

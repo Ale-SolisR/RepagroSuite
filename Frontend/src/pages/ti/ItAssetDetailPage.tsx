@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  ArrowLeft, Pencil, Trash2, Loader2, Cpu, History, ShieldAlert, ClipboardCheck, Undo2,
-  Download, X, ChevronLeft, ChevronRight, ImageOff,
+  ArrowLeft, Pencil, Trash2, Loader2, Cpu, History, ClipboardCheck, Undo2,
+  Download, X, ChevronLeft, ChevronRight, ImageOff, KeyRound,
+  UserMinus, AlertTriangle, Search, ShieldX, RotateCcw, FileText,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format, parseISO } from 'date-fns'
@@ -14,8 +15,9 @@ import { qk, staleTimes, invalidate } from '@/lib/queryKeys'
 import { useAuthStore } from '@/store/authStore'
 import { extractApiError } from '@/utils'
 import Chip from '@/components/ui/Chip'
-import { statusChipVariant, STATUS_LABELS, STATUS_OPTIONS } from '@/components/ti/itStatus'
-import type { ItAssetStatus } from '@/types'
+import AssetCredentialsModal from '@/components/ti/AssetCredentialsModal'
+import MovementModal, { type MovementKind } from '@/components/ti/MovementModal'
+import { statusChipVariant, STATUS_LABELS } from '@/components/ti/itStatus'
 
 const BRAND = '#0E6B4B'
 
@@ -33,10 +35,12 @@ export default function ItAssetDetailPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const { hasPermission } = useAuthStore()
-  const [newStatus, setNewStatus] = useState<ItAssetStatus | ''>('')
-  const [reason, setReason] = useState('')
   const [lightbox, setLightbox] = useState<number | null>(null)   // índice de foto en grande
   const [downloading, setDownloading] = useState<string | null>(null)
+  const [credsOpen, setCredsOpen] = useState(false)
+  const [movement, setMovement] = useState<MovementKind | null>(null)
+  const [reactivateOpen, setReactivateOpen] = useState(false)
+  const [reactivateReason, setReactivateReason] = useState('')
 
   const { data: a, isLoading } = useQuery({
     queryKey: qk.ti.asset(id ?? ''),
@@ -52,25 +56,29 @@ export default function ItAssetDetailPage() {
     staleTime: staleTimes.ti,
   })
 
-  const statusMut = useMutation({
-    mutationFn: () => itAssetsApi.changeStatus(id!, { status: newStatus as ItAssetStatus, reason: reason || undefined }).then(r => r.data.data!),
-    onSuccess: () => {
-      invalidate.ti(qc)
-      qc.invalidateQueries({ queryKey: qk.ti.asset(id!) })
-      qc.invalidateQueries({ queryKey: qk.ti.history(id!) })
-      toast.success('Estado actualizado.')
-      setNewStatus(''); setReason('')
-    },
-    onError: (e) => toast.error(extractApiError(e)),
-  })
-
   const deleteMut = useMutation({
     mutationFn: () => itAssetsApi.delete(id!),
     onSuccess: () => { invalidate.ti(qc); toast.success('Activo eliminado.'); navigate('/ti/assets') },
     onError: (e) => toast.error(extractApiError(e)),
   })
 
-  const needsReason = newStatus === 'Stolen' || newStatus === 'Lost' || newStatus === 'Disposed'
+  const reactivateMut = useMutation({
+    mutationFn: () => itAssetsApi.reactivate(id!, { reason: reactivateReason.trim() }).then(r => r.data.data!),
+    onSuccess: () => {
+      invalidate.ti(qc)
+      qc.invalidateQueries({ queryKey: qk.ti.asset(id!) })
+      qc.invalidateQueries({ queryKey: qk.ti.history(id!) })
+      toast.success('Activo reactivado y disponible.')
+      setReactivateOpen(false); setReactivateReason('')
+    },
+    onError: (e) => toast.error(extractApiError(e)),
+  })
+
+  function onMovementDone() {
+    setMovement(null)
+    qc.invalidateQueries({ queryKey: qk.ti.asset(id!) })
+    qc.invalidateQueries({ queryKey: qk.ti.history(id!) })
+  }
 
   async function downloadPhoto(photoId: string, fileName?: string) {
     if (!id) return
@@ -97,9 +105,24 @@ export default function ItAssetDetailPage() {
 
   const photos = a.photos ?? []
 
+  // Estado del activo → acciones de movimiento disponibles (propuesta §4/§14).
+  const isAssigned = a.status === 'Assigned' || a.status === 'Loaned'
+  // Disponible o Devuelto (heredado) → asignable.
+  const isAssignable = a.status === 'Available' || a.status === 'Returned'
+  const isLive = a.status === 'Available' || isAssigned   // operable, puede sufrir incidente
+  // Estados "detenidos" que un admin puede normalizar a Disponible (incidentes + heredados sin salida).
+  // "Devuelto" se incluye para poder liberarlo del todo (limpia responsable + cierra asignación colgante).
+  const isStuck = ['Damaged', 'Lost', 'Stolen', 'Inactive', 'UnderReview', 'UnderMaintenance', 'UnderRepair', 'Returned'].includes(a.status)
+  const canAssign = isAssignable && hasPermission('Ti.Assign')
+  const canReturn = isAssigned && hasPermission('Ti.Return')
+  const canDeassign = isAssigned && hasPermission('Ti.Return')
+  const canIncident = isLive && hasPermission('Ti.Ticket.Create')
+  const canReactivate = isStuck && hasPermission('Ti.Asset.Reactivate')
+  const hasMovements = canAssign || canReturn || canDeassign || canIncident || canReactivate
+
   return (
     <div className="flex min-h-full flex-col">
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-line bg-paper px-6 py-3" style={{ minHeight: 64 }}>
+      <header className="sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b border-line bg-paper px-4 sm:px-6 py-3" style={{ minHeight: 64 }}>
         <button onClick={() => navigate(-1)} className="rounded p-1.5 text-ink2 hover:bg-bg hover:text-ink" aria-label="Volver">
           <ArrowLeft className="h-5 w-5" />
         </button>
@@ -112,16 +135,10 @@ export default function ItAssetDetailPage() {
           </h1>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {a.status === 'Available' && hasPermission('Ti.Assign') && (
-            <Link to={`/ti/assignments/new?assetId=${a.id}`} className="inline-flex items-center gap-1.5 rounded-[8px] px-3 py-2 text-sm font-medium text-white hover:opacity-90" style={{ background: BRAND }}>
-              <ClipboardCheck className="h-4 w-4" /> Asignar
-            </Link>
-          )}
-          {(a.status === 'Assigned' || a.status === 'Loaned') && hasPermission('Ti.Return') && (
-            <Link to={`/ti/assets/${a.id}/return`} className="inline-flex items-center gap-1.5 rounded-[8px] px-3 py-2 text-sm font-medium text-white hover:opacity-90" style={{ background: BRAND }}>
-              <Undo2 className="h-4 w-4" /> Devolver
-            </Link>
-          )}
+          <button onClick={() => setCredsOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-[8px] border border-line bg-paper px-3 py-2 text-sm font-medium text-ink hover:bg-bg">
+            <KeyRound className="h-4 w-4" style={{ color: BRAND }} /> Credenciales
+          </button>
           {hasPermission('Ti.Inventory.Update') && (
             <Link to={`/ti/assets/${a.id}/edit`} className="inline-flex items-center gap-1.5 rounded-[8px] border border-line bg-paper px-3 py-2 text-sm font-medium text-ink hover:bg-bg">
               <Pencil className="h-4 w-4" /> Editar
@@ -137,7 +154,15 @@ export default function ItAssetDetailPage() {
         </div>
       </header>
 
-      <div className="flex-1 p-6 bg-bg">
+      <AssetCredentialsModal
+        open={credsOpen}
+        onClose={() => setCredsOpen(false)}
+        assetId={a.id}
+        assetCode={a.internalCode}
+        canManage={hasPermission('Ti.Inventory.Update')}
+      />
+
+      <div className="flex-1 p-4 sm:p-6 bg-bg">
         <div className="grid gap-3.5 lg:grid-cols-3">
           {/* Columna principal */}
           <div className="space-y-3.5 lg:col-span-2">
@@ -157,6 +182,7 @@ export default function ItAssetDetailPage() {
                 <Row label="Compra" value={a.purchaseDate ? format(parseISO(a.purchaseDate), 'd MMM yyyy', { locale: es }) : undefined} />
                 <Row label="Proveedor" value={a.supplierName} />
                 <Row label="Costo" value={a.cost != null ? `${a.currency ?? ''} ${a.cost.toLocaleString('es-CR')}`.trim() : undefined} />
+                <Row label="N.º de factura" value={a.invoiceNumber} />
                 <Row label="Garantía" value={a.hasWarranty ? (a.warrantyEndDate ? `Hasta ${format(parseISO(a.warrantyEndDate), 'd MMM yyyy', { locale: es })}` : 'Sí') : 'No'} />
               </div>
               {a.notes && <p className="mt-3 rounded-lg bg-bg p-3 text-[13px] text-ink2">{a.notes}</p>}
@@ -170,9 +196,6 @@ export default function ItAssetDetailPage() {
                   <Row label="Procesador" value={a.spec.processor} />
                   <Row label="RAM" value={a.spec.ramGb ? `${a.spec.ramGb} GB` : undefined} />
                   <Row label="Disco" value={a.spec.diskGb ? `${a.spec.diskGb} GB` : undefined} />
-                  <Row label="MAC Ethernet" value={a.spec.macEthernet} />
-                  <Row label="MAC WiFi" value={a.spec.macWifi} />
-                  <Row label="IP" value={a.spec.ipAddress} />
                   <Row label="Nombre en dominio" value={a.spec.domainName} />
                   <Row label="AnyDesk ID" value={a.spec.anyDeskId} />
                   <Row label="Usuario M365" value={a.spec.microsoft365User} />
@@ -195,12 +218,20 @@ export default function ItAssetDetailPage() {
                       <span className="absolute -left-[5px] mt-1 h-2.5 w-2.5 rounded-full" style={{ background: BRAND }} />
                       <p className="text-[13px] font-medium text-ink">
                         {h.eventType === 'CREATED' ? 'Activo registrado'
+                          : h.eventType === 'REACTIVATED' ? 'Activo reactivado'
                           : h.eventType === 'STATUS_CHANGED'
                             ? `Estado: ${h.fromStatus ? STATUS_LABELS[h.fromStatus] : '—'} → ${h.toStatus ? STATUS_LABELS[h.toStatus] : '—'}`
                             : h.eventType}
                       </p>
                       {h.description && <p className="text-[12px] text-ink2">{h.description}</p>}
-                      <p className="font-mono text-[11px] text-ink2">{format(parseISO(h.occurredAt), "d MMM yyyy · HH:mm", { locale: es })}</p>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                        <p className="font-mono text-[11px] text-ink2">{format(parseISO(h.occurredAt), "d MMM yyyy · HH:mm", { locale: es })}</p>
+                        {h.ticketId && (
+                          <Link to={`/ti/tickets/${h.ticketId}`} className="inline-flex items-center gap-1 text-[11px] font-medium hover:underline" style={{ color: BRAND }}>
+                            <FileText className="h-3 w-3" /> Ver boleta
+                          </Link>
+                        )}
+                      </div>
                     </li>
                   ))}
                 </ol>
@@ -248,35 +279,111 @@ export default function ItAssetDetailPage() {
               )}
             </section>
 
-            {hasPermission('Ti.Inventory.Update') && (
+            {hasMovements && (
               <section className="rounded-[10px] border border-line bg-paper p-5 shadow-sh1">
-                <h2 className="mb-3 text-sm font-semibold text-ink">Cambiar estado</h2>
-                <select className="mb-2 h-10 w-full rounded-[8px] border border-line bg-paper px-3 text-sm text-ink focus:border-brand-400 focus:outline-none"
-                  value={newStatus} onChange={e => setNewStatus(e.target.value as ItAssetStatus | '')}>
-                  <option value="">Seleccione nuevo estado…</option>
-                  {STATUS_OPTIONS.filter(o => o.value !== a.status).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-                {needsReason && (
-                  <div className="mb-2 flex items-start gap-2 rounded-lg p-2" style={{ background: '#FFFBEB' }}>
-                    <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" style={{ color: '#92400E' }} />
-                    <textarea className="h-16 w-full rounded border border-line bg-paper px-2 py-1 text-[13px] text-ink focus:outline-none"
-                      placeholder="Motivo obligatorio para este cambio…" value={reason} onChange={e => setReason(e.target.value)} />
-                  </div>
+                <h2 className="mb-1 text-sm font-semibold text-ink">Movimientos</h2>
+                <p className="mb-3 text-[11px] text-ink2">Cada movimiento emite una boleta firmada y queda auditado.</p>
+                <div className="space-y-2">
+                  {canAssign && (
+                    <Link to={`/ti/assignments/new?assetId=${a.id}`}
+                      className="flex w-full items-center justify-center gap-2 rounded-[8px] px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                      style={{ background: BRAND }}>
+                      <ClipboardCheck className="h-4 w-4" /> Asignar
+                    </Link>
+                  )}
+                  {canReturn && (
+                    <Link to={`/ti/assets/${a.id}/return`}
+                      className="flex w-full items-center justify-center gap-2 rounded-[8px] px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                      style={{ background: BRAND }}>
+                      <Undo2 className="h-4 w-4" /> Devolver
+                    </Link>
+                  )}
+                  {canDeassign && (
+                    <button onClick={() => setMovement('deassign')}
+                      className="flex w-full items-center justify-center gap-2 rounded-[8px] border border-line bg-paper px-4 py-2.5 text-sm font-medium text-ink transition-colors hover:bg-bg">
+                      <UserMinus className="h-4 w-4" style={{ color: BRAND }} /> Desasignar
+                    </button>
+                  )}
+                  {canIncident && (
+                    <div className="grid grid-cols-3 gap-2">
+                      <button onClick={() => setMovement('damaged')}
+                        className="flex items-center justify-center gap-1.5 rounded-[8px] border px-3 py-2.5 text-sm font-semibold transition-colors hover:bg-rose-50"
+                        style={{ borderColor: '#FDA4AF', color: '#BE123C' }}>
+                        <AlertTriangle className="h-4 w-4" /> Dañado
+                      </button>
+                      <button onClick={() => setMovement('lost')}
+                        className="flex items-center justify-center gap-1.5 rounded-[8px] border px-3 py-2.5 text-sm font-semibold transition-colors hover:bg-red-50"
+                        style={{ borderColor: '#FCA5A5', color: '#B91C1C' }}>
+                        <Search className="h-4 w-4" /> Perdido
+                      </button>
+                      <button onClick={() => setMovement('stolen')}
+                        className="flex items-center justify-center gap-1.5 rounded-[8px] border px-3 py-2.5 text-sm font-semibold transition-colors hover:bg-pink-50"
+                        style={{ borderColor: '#FBCFE8', color: '#BE185D' }}>
+                        <ShieldX className="h-4 w-4" /> Robado
+                      </button>
+                    </div>
+                  )}
+                  {canReactivate && (
+                    <button onClick={() => setReactivateOpen(true)}
+                      className="flex w-full items-center justify-center gap-2 rounded-[8px] px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                      style={{ background: BRAND }}>
+                      <RotateCcw className="h-4 w-4" /> Reactivar activo
+                    </button>
+                  )}
+                </div>
+                {isStuck && !canReactivate && (
+                  <p className="mt-3 rounded-lg bg-bg p-2.5 text-[12px] text-ink2">
+                    Activo inactivo. Solo un administrador puede reactivarlo.
+                  </p>
                 )}
-                <button
-                  onClick={() => statusMut.mutate()}
-                  disabled={!newStatus || statusMut.isPending || (needsReason && !reason.trim())}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-[8px] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:opacity-90 disabled:opacity-40"
-                  style={{ background: BRAND }}>
-                  {statusMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                  Aplicar cambio
-                </button>
-                <p className="mt-2 text-[11px] text-ink2">Las transiciones inválidas se bloquean en el servidor. Todo cambio queda auditado.</p>
               </section>
             )}
           </div>
         </div>
       </div>
+
+      {movement && (
+        <MovementModal open={!!movement} kind={movement} asset={a} onClose={() => setMovement(null)} onDone={onMovementDone} />
+      )}
+
+      {/* Reactivación (solo admin) */}
+      {reactivateOpen && (
+        <div className="fixed inset-0 z-[1000] flex items-end justify-center bg-black/55 sm:items-center sm:p-4"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setReactivateOpen(false) }}
+          role="dialog" aria-modal="true" aria-label="Reactivar activo">
+          <div className="w-full rounded-t-2xl bg-paper p-5 shadow-xl sm:max-w-md sm:rounded-2xl">
+            <div className="mb-3 flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full" style={{ background: '#ECFDF5', color: BRAND }}>
+                <RotateCcw className="h-5 w-5" />
+              </span>
+              <div>
+                <h2 className="text-[15px] font-semibold text-ink">Reactivar activo</h2>
+                <p className="font-mono text-[12px] text-ink2">{a.internalCode}</p>
+              </div>
+            </div>
+            <p className="mb-3 rounded-lg bg-bg p-2.5 text-[12px] text-ink2">
+              El activo volverá a <span className="font-medium text-ink">Disponible</span>. La acción queda auditada con su motivo.
+            </p>
+            <label className="mb-1 block text-[12px] font-medium text-ink2">Motivo de la reactivación *</label>
+            <textarea
+              className="mb-4 min-h-[80px] w-full rounded-[8px] border border-line bg-paper px-3 py-2 text-sm text-ink focus:border-brand-400 focus:outline-none"
+              value={reactivateReason} onChange={e => setReactivateReason(e.target.value)}
+              placeholder="Ej.: equipo reparado y verificado; aparición del equipo extraviado…"
+            />
+            <div className="flex items-center gap-2.5">
+              <button onClick={() => setReactivateOpen(false)}
+                className="rounded-[8px] border border-line bg-paper px-4 py-2.5 text-sm font-medium text-ink hover:bg-bg">Cancelar</button>
+              <button onClick={() => reactivateMut.mutate()}
+                disabled={!reactivateReason.trim() || reactivateMut.isPending}
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-[8px] px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                style={{ background: BRAND }}>
+                {reactivateMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+                Reactivar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Lightbox: foto en grande al tocar */}
       {lightbox !== null && photos[lightbox] && (

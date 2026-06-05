@@ -84,6 +84,7 @@ public class ItAssignmentConfiguration : IEntityTypeConfiguration<ItAssignment>
         builder.Property(x => x.Status).HasColumnName("Estado");
         builder.Property(x => x.Accessories).HasColumnName("Accesorios").HasMaxLength(500);
         builder.Property(x => x.ReturnNotes).HasColumnName("ObservacionesDevolucion").HasMaxLength(1000);
+        builder.Property(x => x.ClosedReason).HasColumnName("MotivoCierre").HasMaxLength(30);
 
         // Una sola asignación activa por activo (Estado Activa = 0).
         builder.HasIndex(x => x.AssetId).IsUnique().HasFilter("[Estado] = 0 AND [EliminadoLogico] = 0");

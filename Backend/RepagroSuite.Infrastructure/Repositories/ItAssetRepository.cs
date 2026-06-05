@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using RepagroSuite.Domain.Common;
 using RepagroSuite.Domain.Entities;
 using RepagroSuite.Domain.Enums;
 using RepagroSuite.Domain.Interfaces.Repositories;
@@ -57,6 +58,72 @@ public class ItAssetRepository : GenericRepository<ItAsset>, IItAssetRepository
             .Include(a => a.Spec)
             .Include(a => a.Photos)
             .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
+
+    public async Task<ItAsset?> GetForUpdateAsync(Guid id, CancellationToken cancellationToken = default)
+        => await _dbSet
+            .Include(a => a.Spec)
+            .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
+
+    public async Task ReplacePhotosAsync(Guid assetId, IEnumerable<ItAssetPhoto> photos, CancellationToken cancellationToken = default)
+    {
+        await _context.Set<ItAssetPhoto>()
+            .Where(p => p.AssetId == assetId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        var list = photos.ToList();
+        if (list.Count > 0)
+            await _context.Set<ItAssetPhoto>().AddRangeAsync(list, cancellationToken);
+    }
+
+    public async Task<int> ReleaseAssetsFromVoidedAssignmentsAsync(CancellationToken cancellationToken = default)
+    {
+        var assignments = await _context.ItAssignments
+            .Include(a => a.Asset)
+            .Include(a => a.AssignedTicket)
+            .Where(a => a.Status == AssignmentStatus.Activa
+                && a.AssignedTicket != null
+                && a.AssignedTicket.Status == ItTicketStatus.Anulada)
+            .ToListAsync(cancellationToken);
+
+        foreach (var assignment in assignments)
+        {
+            var ticket = assignment.AssignedTicket!;
+            var actor = ticket.VoidedBy ?? assignment.UpdatedBy ?? assignment.CreatedBy;
+            var closedAt = ticket.VoidedAt ?? BusinessClock.Now;
+
+            assignment.Status = AssignmentStatus.Cerrada;
+            assignment.ReturnedAt = closedAt;
+            assignment.ClosedReason = "Anulacion";
+            assignment.ReturnNotes = ticket.VoidReason;
+            assignment.UpdatedAt = BusinessClock.Now;
+            assignment.UpdatedBy = actor;
+
+            if (assignment.Asset is { } asset
+                && (asset.Status == ItAssetStatus.Assigned || asset.CurrentHolderEmployeeId == assignment.EmployeeId))
+            {
+                var from = asset.Status;
+                asset.Status = ItAssetStatus.Available;
+                asset.CurrentHolderEmployeeId = null;
+                asset.UpdatedAt = BusinessClock.Now;
+                asset.UpdatedBy = actor;
+
+                _context.ItAssetHistory.Add(new ItAssetHistory
+                {
+                    AssetId = asset.Id,
+                    EventType = "STATUS_CHANGED",
+                    FromStatus = from,
+                    ToStatus = ItAssetStatus.Available,
+                    Description = $"Liberado por anulacion de boleta {ticket.TicketNumber}.",
+                    OccurredAt = closedAt,
+                    PerformedBy = actor,
+                    TicketId = ticket.Id,
+                    CreatedBy = actor
+                });
+            }
+        }
+
+        return assignments.Count;
+    }
 
     public async Task<IReadOnlyList<ItAssetHistory>> GetHistoryAsync(Guid assetId, CancellationToken cancellationToken = default)
         => await _context.ItAssetHistory

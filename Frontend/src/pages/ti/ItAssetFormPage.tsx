@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Loader2, ArrowLeft, Save, Cpu, Settings2 } from 'lucide-react'
@@ -27,7 +27,7 @@ const EMPTY: FormState = {
   internalCode: '', assetTypeId: '', brandId: '', model: '', serialNumber: '', assetTag: '',
   physicalCondition: 'Good', locationId: '', locationDetail: '', departmentId: '',
   currentHolderEmployeeId: '', purchaseDate: '', supplierId: '', cost: undefined, currency: '',
-  hasWarranty: false, warrantyEndDate: '', notes: '', photos: [], spec: {},
+  hasWarranty: false, warrantyEndDate: '', invoiceNumber: '', anyDeskPassword: '', notes: '', photos: [], spec: {},
 }
 
 const inputCls = 'h-10 w-full rounded-[8px] border border-line bg-paper px-3 text-sm text-ink placeholder:text-ink2 focus:border-brand-400 focus:outline-none'
@@ -60,6 +60,15 @@ export default function ItAssetFormPage() {
   const setSpec = (k: keyof ItAssetSpecDto, v: string | number | undefined) =>
     setForm(f => ({ ...f, spec: { ...f.spec, [k]: v } }))
 
+  // Atajo de garantía: activa "tiene garantía" y fija el vencimiento a N meses desde la
+  // fecha de compra (o desde hoy si no se ha indicado). Formato local para evitar desfases de zona.
+  const setWarrantyMonths = (months: number) => {
+    const base = form.purchaseDate ? new Date(`${form.purchaseDate}T00:00:00`) : new Date()
+    base.setMonth(base.getMonth() + months)
+    const end = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}-${String(base.getDate()).padStart(2, '0')}`
+    setForm(f => ({ ...f, hasWarranty: true, warrantyEndDate: end }))
+  }
+
   const catalogs = useQuery({
     queryKey: qk.ti.catalogs,
     queryFn: () => itCatalogsApi.getAll().then(r => r.data.data!),
@@ -73,15 +82,20 @@ export default function ItAssetFormPage() {
     staleTime: staleTimes.ti,
   })
 
+  // Al editar SIEMPRE traemos la versión fresca para no enviar un rowVersion viejo (evita 409 falsos).
   const existing = useQuery({
     queryKey: qk.ti.asset(id ?? ''),
     queryFn: () => itAssetsApi.getById(id!).then(r => r.data.data!),
     enabled: isEdit,
-    staleTime: staleTimes.ti,
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
 
+  // El formulario se inicializa UNA sola vez (un refetch en segundo plano no debe borrar lo que el usuario escribió).
+  const initialized = useRef(false)
   useEffect(() => {
-    if (!existing.data) return
+    if (!existing.data || initialized.current) return
+    initialized.current = true
     const a = existing.data
     setForm({
       internalCode: a.internalCode, assetTypeId: a.assetTypeId, brandId: a.brandId ?? '',
@@ -90,6 +104,7 @@ export default function ItAssetFormPage() {
       departmentId: a.departmentId ?? '', currentHolderEmployeeId: a.currentHolderEmployeeId ?? '',
       purchaseDate: a.purchaseDate?.slice(0, 10) ?? '', supplierId: a.supplierId ?? '', cost: a.cost,
       currency: a.currency ?? '', hasWarranty: a.hasWarranty, warrantyEndDate: a.warrantyEndDate?.slice(0, 10) ?? '',
+      invoiceNumber: a.invoiceNumber ?? '',
       notes: a.notes ?? '', photos: (a.photos ?? []).map(p => p.url), spec: a.spec ?? {},
     })
     setRowVersion(a.rowVersion)
@@ -121,6 +136,8 @@ export default function ItAssetFormPage() {
       currency: clean(form.currency),
       hasWarranty: form.hasWarranty,
       warrantyEndDate: clean(form.warrantyEndDate),
+      invoiceNumber: clean(form.invoiceNumber),
+      anyDeskPassword: clean(form.anyDeskPassword),
       notes: clean(form.notes),
       photos: form.photos,
       spec: specEmpty ? undefined : form.spec,
@@ -138,7 +155,21 @@ export default function ItAssetFormPage() {
       toast.success(isEdit ? 'Activo actualizado.' : 'Activo registrado.')
       navigate(`/ti/assets/${asset.id}`)
     },
-    onError: (e) => toast.error(extractApiError(e)),
+    onError: async (e) => {
+      const status = (e as { response?: { status?: number } })?.response?.status
+      // Conflicto de versión: el activo cambió en el servidor. Sincronizamos el rowVersion
+      // (sin tocar lo que el usuario escribió) para que pueda guardar de nuevo al instante.
+      if (status === 409 && isEdit) {
+        try {
+          const fresh = await itAssetsApi.getById(id!).then(r => r.data.data!)
+          setRowVersion(fresh.rowVersion)
+          qc.setQueryData(qk.ti.asset(id!), fresh)
+          toast.error('El activo cambió en el servidor. Actualicé la versión: revisa y pulsa Guardar de nuevo.')
+          return
+        } catch { /* cae al mensaje genérico */ }
+      }
+      toast.error(extractApiError(e))
+    },
   })
 
   function submit(e: React.FormEvent) {
@@ -154,7 +185,7 @@ export default function ItAssetFormPage() {
 
   return (
     <div className="flex min-h-full flex-col">
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-line bg-paper px-6 py-3" style={{ minHeight: 64 }}>
+      <header className="sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b border-line bg-paper px-4 sm:px-6 py-3" style={{ minHeight: 64 }}>
         <button onClick={() => navigate(-1)} className="rounded p-1.5 text-ink2 hover:bg-bg hover:text-ink" aria-label="Volver">
           <ArrowLeft className="h-5 w-5" />
         </button>
@@ -169,7 +200,7 @@ export default function ItAssetFormPage() {
       {loadingExisting ? (
         <div className="flex flex-1 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-ink2" /></div>
       ) : (
-        <form onSubmit={submit} className="flex-1 p-6 bg-bg">
+        <form onSubmit={submit} className="flex-1 p-4 sm:p-6 bg-bg">
           <div className="mx-auto max-w-3xl space-y-3.5">
 
             {/* Identificación */}
@@ -289,15 +320,40 @@ export default function ItAssetFormPage() {
                     <option value="USD">USD ($)</option>
                   </select>
                 </Field>
-                <div className="flex items-center gap-2 pt-6">
-                  <input id="hasWarranty" type="checkbox" checked={form.hasWarranty} onChange={e => set('hasWarranty', e.target.checked)} className="h-4 w-4 rounded border-line" />
-                  <label htmlFor="hasWarranty" className="text-sm text-ink">Tiene garantía</label>
+                <Field label="N.º de factura (opcional)">
+                  <input className={inputCls} value={form.invoiceNumber ?? ''} onChange={e => set('invoiceNumber', e.target.value)} placeholder="Ej. F-001234" />
+                </Field>
+
+                {/* Garantía — checkbox + atajos rápidos + fecha de vencimiento */}
+                <div className="sm:col-span-2">
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-2.5">
+                    <div className="flex items-center gap-2">
+                      <input id="hasWarranty" type="checkbox" checked={form.hasWarranty} onChange={e => set('hasWarranty', e.target.checked)} className="h-4 w-4 rounded border-line" />
+                      <label htmlFor="hasWarranty" className="text-sm text-ink">Tiene garantía</label>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[12px] text-ink2">Garantía rápida:</span>
+                      {[{ m: 1, l: '1 mes' }, { m: 6, l: '6 meses' }, { m: 12, l: '1 año' }].map(b => (
+                        <button
+                          key={b.m}
+                          type="button"
+                          onClick={() => setWarrantyMonths(b.m)}
+                          className="rounded-[8px] border border-line bg-paper px-2.5 py-1 text-[12px] font-medium text-ink transition-colors hover:border-brand-400 hover:bg-bg"
+                        >
+                          {b.l}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {form.hasWarranty && (
+                    <div className="mt-3 max-w-xs">
+                      <Field label="Vencimiento de garantía">
+                        <input type="date" className={inputCls} value={form.warrantyEndDate} onChange={e => set('warrantyEndDate', e.target.value)} />
+                      </Field>
+                      <p className="mt-1 text-[11px] text-ink2">Los atajos cuentan desde la fecha de compra{form.purchaseDate ? '' : ' (o desde hoy si no la indicas)'}.</p>
+                    </div>
+                  )}
                 </div>
-                {form.hasWarranty && (
-                  <Field label="Vencimiento de garantía">
-                    <input type="date" className={inputCls} value={form.warrantyEndDate} onChange={e => set('warrantyEndDate', e.target.value)} />
-                  </Field>
-                )}
               </div>
             </section>
 
@@ -305,17 +361,18 @@ export default function ItAssetFormPage() {
             {selectedType?.hasComputeSpecs && (
               <section className="rounded-[10px] border border-line bg-paper p-5 shadow-sh1">
                 <h2 className="mb-1 text-sm font-semibold text-ink">Especificaciones técnicas</h2>
-                <p className="mb-4 text-[11px] text-ink2">El AnyDesk ID es sólo identificador — nunca se guardan contraseñas.</p>
+                <p className="mb-4 text-[11px] text-ink2">La contraseña de AnyDesk se guarda <b>cifrada</b>. Para más cuentas (Windows, correo…) usa <b>Credenciales</b> en la ficha del equipo.</p>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="Sistema operativo"><input className={inputCls} value={form.spec.operatingSystem ?? ''} onChange={e => setSpec('operatingSystem', e.target.value)} /></Field>
                   <Field label="Procesador"><input className={inputCls} value={form.spec.processor ?? ''} onChange={e => setSpec('processor', e.target.value)} /></Field>
                   <Field label="RAM (GB)"><input type="number" min="0" className={inputCls} value={form.spec.ramGb ?? ''} onChange={e => setSpec('ramGb', e.target.value === '' ? undefined : Number(e.target.value))} /></Field>
                   <Field label="Disco (GB)"><input type="number" min="0" className={inputCls} value={form.spec.diskGb ?? ''} onChange={e => setSpec('diskGb', e.target.value === '' ? undefined : Number(e.target.value))} /></Field>
-                  <Field label="MAC Ethernet"><input className={inputCls} value={form.spec.macEthernet ?? ''} onChange={e => setSpec('macEthernet', e.target.value)} /></Field>
-                  <Field label="MAC WiFi"><input className={inputCls} value={form.spec.macWifi ?? ''} onChange={e => setSpec('macWifi', e.target.value)} /></Field>
-                  <Field label="Dirección IP"><input className={inputCls} value={form.spec.ipAddress ?? ''} onChange={e => setSpec('ipAddress', e.target.value)} /></Field>
                   <Field label="Nombre en dominio"><input className={inputCls} value={form.spec.domainName ?? ''} onChange={e => setSpec('domainName', e.target.value)} /></Field>
                   <Field label="AnyDesk ID"><input className={inputCls} value={form.spec.anyDeskId ?? ''} onChange={e => setSpec('anyDeskId', e.target.value)} /></Field>
+                  <Field label="AnyDesk: contraseña">
+                    <input type="password" className={inputCls} value={form.anyDeskPassword ?? ''} onChange={e => set('anyDeskPassword', e.target.value)} autoComplete="new-password"
+                      placeholder={isEdit ? '•••• (vacío = sin cambios)' : ''} />
+                  </Field>
                   <Field label="Usuario Microsoft 365"><input className={inputCls} value={form.spec.microsoft365User ?? ''} onChange={e => setSpec('microsoft365User', e.target.value)} /></Field>
                   <Field label="Estado antivirus"><input className={inputCls} value={form.spec.antivirusStatus ?? ''} onChange={e => setSpec('antivirusStatus', e.target.value)} /></Field>
                 </div>

@@ -1,7 +1,7 @@
 import api from './client'
 import type {
   ApiResponse, PagedResult,
-  ItEmployeeDto, CreateItEmployeeRequest, UpdateItEmployeeRequest, IdentificationLookupResult,
+  ItEmployeeDto, ItEmployeeHistoryDto, CreateItEmployeeRequest, UpdateItEmployeeRequest, IdentificationLookupResult,
 } from '@/types'
 
 export const itEmployeesApi = {
@@ -13,6 +13,9 @@ export const itEmployeesApi = {
 
   getById: (id: string) =>
     api.get<ApiResponse<ItEmployeeDto>>(`/ti/employees/${id}`),
+
+  getHistory: (id: string) =>
+    api.get<ApiResponse<ItEmployeeHistoryDto>>(`/ti/employees/${id}/history`),
 
   create: (data: CreateItEmployeeRequest) =>
     api.post<ApiResponse<ItEmployeeDto>>('/ti/employees', data),

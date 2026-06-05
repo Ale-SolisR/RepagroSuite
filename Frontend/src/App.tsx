@@ -37,6 +37,7 @@ const ItTicketDetailPage = lazy(() => import('@/pages/ti/ItTicketDetailPage'))
 const ItAssignmentWizardPage = lazy(() => import('@/pages/ti/ItAssignmentWizardPage'))
 const ItReturnWizardPage = lazy(() => import('@/pages/ti/ItReturnWizardPage'))
 const ItEmployeesPage = lazy(() => import('@/pages/ti/ItEmployeesPage'))
+const ItEmployeeDetailPage = lazy(() => import('@/pages/ti/ItEmployeeDetailPage'))
 
 // Fallback para Suspense — pantalla mínima mientras carga el chunk.
 function PageLoader() {
@@ -111,6 +112,7 @@ export default function App() {
                   <Route path="/ti/tickets" element={<ItTicketsPage />} />
                   <Route path="/ti/tickets/:id" element={<ItTicketDetailPage />} />
                   <Route path="/ti/employees" element={<ItEmployeesPage />} />
+                  <Route path="/ti/employees/:id" element={<ItEmployeeDetailPage />} />
                 </Route>
                 <Route element={<ProtectedRoute permission="Ti.Assign" />}>
                   <Route path="/ti/assignments/new" element={<ItAssignmentWizardPage />} />

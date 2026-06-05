@@ -10,4 +10,5 @@ public interface IItEmployeeService
     Task<ItEmployeeDto> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<ItEmployeeDto> CreateAsync(CreateItEmployeeDto dto, Guid createdBy, CancellationToken cancellationToken = default);
     Task<ItEmployeeDto> UpdateAsync(Guid id, UpdateItEmployeeDto dto, Guid updatedBy, CancellationToken cancellationToken = default);
+    Task<ItEmployeeHistoryDto> GetHistoryAsync(Guid id, CancellationToken cancellationToken = default);
 }

@@ -2,7 +2,7 @@ import api from './client'
 import type {
   ApiResponse, PagedResult,
   ItAssetListDto, ItAssetDto, ItAssetHistoryDto, ItDashboardDto,
-  CreateItAssetRequest, UpdateItAssetRequest, ChangeItAssetStatusRequest,
+  CreateItAssetRequest, UpdateItAssetRequest, ReactivateAssetRequest,
   ItCatalogsDto, ItCatalogItemDto, CreateCatalogItemRequest, ItDepartmentDto, ItBrandDto, ItSupplierDto,
 } from '@/types'
 
@@ -43,8 +43,9 @@ export const itAssetsApi = {
   update: (id: string, data: UpdateItAssetRequest) =>
     api.put<ApiResponse<ItAssetDto>>(`/ti/assets/${id}`, data),
 
-  changeStatus: (id: string, data: ChangeItAssetStatusRequest) =>
-    api.patch<ApiResponse<ItAssetDto>>(`/ti/assets/${id}/status`, data),
+  // Reactivar activo inactivo (Dañado/Perdido/Robado/Inactivo) → Disponible. Solo admin.
+  reactivate: (id: string, data: ReactivateAssetRequest) =>
+    api.post<ApiResponse<ItAssetDto>>(`/ti/assets/${id}/reactivate`, data),
 
   delete: (id: string) =>
     api.delete<ApiResponse<null>>(`/ti/assets/${id}`),

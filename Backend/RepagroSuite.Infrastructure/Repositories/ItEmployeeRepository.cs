@@ -13,7 +13,7 @@ public class ItEmployeeRepository : GenericRepository<ItEmployee>, IItEmployeeRe
         int page, int pageSize, string? search, bool? activeOnly, CancellationToken cancellationToken = default)
     {
         var query = _dbSet.AsNoTracking().AsQueryable();
-        if (activeOnly == true) query = query.Where(e => e.IsActive);
+        if (activeOnly.HasValue) query = query.Where(e => e.IsActive == activeOnly.Value);
         if (!string.IsNullOrWhiteSpace(search))
         {
             var s = search.Trim();
@@ -31,4 +31,23 @@ public class ItEmployeeRepository : GenericRepository<ItEmployee>, IItEmployeeRe
 
     public async Task<ItEmployee?> GetByNormalizedIdAsync(string normalizedId, CancellationToken cancellationToken = default)
         => await _dbSet.FirstOrDefaultAsync(e => e.NormalizedIdentificationNumber == normalizedId, cancellationToken);
+
+    public async Task<IReadOnlyList<ItAssignment>> GetAssignmentsWithDetailsAsync(Guid employeeId, CancellationToken cancellationToken = default)
+        => await _context.ItAssignments
+            .AsNoTracking()
+            .Include(a => a.Asset).ThenInclude(x => x!.AssetType)
+            .Include(a => a.Asset).ThenInclude(x => x!.Photos)
+            .Include(a => a.AssignedTicket)
+            .Include(a => a.ReturnTicket)
+            .Where(a => a.EmployeeId == employeeId)
+            .OrderByDescending(a => a.AssignedAt)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<ItTicket>> GetTicketsAsync(Guid employeeId, CancellationToken cancellationToken = default)
+        => await _context.ItTickets
+            .AsNoTracking()
+            .Include(t => t.Details)
+            .Where(t => t.EmployeeId == employeeId)
+            .OrderByDescending(t => t.IssuedAt)
+            .ToListAsync(cancellationToken);
 }

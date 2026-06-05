@@ -1,0 +1,93 @@
+Usando la configuración de inicio de C:\Users\alejandro.solis\REPAGRO_WEB\Backend\RepagroSuite.API\Properties\launchSettings.json...
+Compilando...
+[16:46:41 WRN] Entity 'Permission' has a global query filter defined and is the required end of a relationship with the entity 'RolePermission'. This may lead to unexpected results when the required entity is filtered out. Either configure the navigation as optional, or define matching query filters for both entities in the navigation. See https://go.microsoft.com/fwlink/?linkid=2131316 for more information.
+[16:46:41 WRN] Entity 'Feature' has a global query filter defined and is the required end of a relationship with the entity 'RoomFeature'. This may lead to unexpected results when the required entity is filtered out. Either configure the navigation as optional, or define matching query filters for both entities in the navigation. See https://go.microsoft.com/fwlink/?linkid=2131316 for more information.
+[16:46:41 WRN] Entity 'Role' has a global query filter defined and is the required end of a relationship with the entity 'UserRole'. This may lead to unexpected results when the required entity is filtered out. Either configure the navigation as optional, or define matching query filters for both entities in the navigation. See https://go.microsoft.com/fwlink/?linkid=2131316 for more information.
+[16:46:47 WRN] The ASP.NET Core developer certificate is not trusted. For information about trusting the ASP.NET Core developer certificate, see https://aka.ms/aspnet/https-trust-dev-cert
+[16:47:00 INF] HTTP GET /swagger/v1/swagger.json responded 200 in 220.1427 ms
+[16:47:14 ERR] Unhandled exception: A task was canceled.
+System.Threading.Tasks.TaskCanceledException: A task was canceled.
+   at Microsoft.EntityFrameworkCore.Query.Internal.BufferedDataReader.BufferedDataRecord.InitializeAsync(DbDataReader reader, IReadOnlyList`1 columns, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Query.Internal.BufferedDataReader.InitializeAsync(IReadOnlyList`1 columns, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Query.Internal.BufferedDataReader.InitializeAsync(IReadOnlyList`1 columns, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.ExecutionStrategy.<>c__DisplayClass30_0`2.<<ExecuteAsync>b__0>d.MoveNext()
+--- End of stack trace from previous location ---
+   at Microsoft.EntityFrameworkCore.Storage.ExecutionStrategy.ExecuteImplementationAsync[TState,TResult](Func`4 operation, Func`4 verifySucceeded, TState state, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.ExecutionStrategy.ExecuteImplementationAsync[TState,TResult](Func`4 operation, Func`4 verifySucceeded, TState state, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Storage.ExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+   at Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync[TSource](IQueryable`1 source, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync[TSource](IQueryable`1 source, CancellationToken cancellationToken)
+   at RepagroSuite.Infrastructure.Repositories.ItTicketRepository.GetPagedAsync(Int32 page, Int32 pageSize, Nullable`1 type, Nullable`1 status, String search, CancellationToken cancellationToken) in C:\Users\alejandro.solis\REPAGRO_WEB\Backend\RepagroSuite.Infrastructure\Repositories\ItTicketRepository.cs:line 33
+   at RepagroSuite.Application.Features.ITAssets.Services.ItTicketService.GetPagedAsync(Int32 page, Int32 pageSize, Nullable`1 type, Nullable`1 status, String search, CancellationToken cancellationToken) in C:\Users\alejandro.solis\REPAGRO_WEB\Backend\RepagroSuite.Application\Features\ITAssets\Services\ItTicketService.cs:line 34
+   at RepagroSuite.API.Controllers.v1.ItTicketsController.GetAll(Int32 page, Int32 pageSize, Nullable`1 type, Nullable`1 status, String search, CancellationToken ct) in C:\Users\alejandro.solis\REPAGRO_WEB\Backend\RepagroSuite.API\Controllers\v1\ItTicketsController.cs:line 34
+   at lambda_method324(Closure, Object)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ActionMethodExecutor.AwaitableObjectResultExecutor.Execute(ActionContext actionContext, IActionResultTypeMapper mapper, ObjectMethodExecutor executor, Object controller, Object[] arguments)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeActionMethodAsync>g__Awaited|12_0(ControllerActionInvoker invoker, ValueTask`1 actionResultValueTask)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeNextActionFilterAsync>g__Awaited|10_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Rethrow(ActionExecutedContextSealed context)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeInnerFilterAsync>g__Awaited|13_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at RepagroSuite.API.Middleware.GlobalExceptionMiddleware.InvokeAsync(HttpContext context) in C:\Users\alejandro.solis\REPAGRO_WEB\Backend\RepagroSuite.API\Middleware\GlobalExceptionMiddleware.cs:line 23
+[16:47:14 ERR] HTTP GET /api/v1/ti/tickets responded 500 in 1917.6842 ms
+[16:47:15 INF] HTTP GET /api/v1/ti/tickets responded 200 in 684.6509 ms
+[16:47:20 INF] HTTP GET /api/v1/ti/assets responded 200 in 565.9978 ms
+[16:47:20 INF] HTTP GET /api/v1/ti/catalogs responded 200 in 676.1954 ms
+[16:48:52 INF] HTTP GET /api/v1/ti/assets responded 401 in 7.8200 ms
+[16:48:52 WRN] Compiling a query which loads related collections for more than one collection navigation, either via 'Include' or through projection, but no 'QuerySplittingBehavior' has been configured. By default, Entity Framework will use 'QuerySplittingBehavior.SingleQuery', which can potentially result in slow query performance. See https://go.microsoft.com/fwlink/?linkid=2134277 for more information. To identify the query that's triggering this warning call 'ConfigureWarnings(w => w.Throw(RelationalEventId.MultipleCollectionIncludeWarning))'.
+[16:48:54 INF] HTTP POST /api/v1/auth/refresh responded 200 in 2213.5650 ms
+[16:48:55 INF] HTTP GET /api/v1/ti/assets responded 200 in 315.1937 ms
+[16:49:11 INF] HTTP GET /api/v1/ti/assets responded 200 in 427.8392 ms
+[16:49:14 INF] HTTP GET /api/v1/ti/assets responded 200 in 315.7807 ms
+[16:49:16 INF] HTTP GET /api/v1/ti/assets responded 200 in 320.8747 ms
+[16:49:23 INF] HTTP GET /api/v1/ti/assets responded 200 in 320.7010 ms
+[16:49:44 INF] HTTP GET /api/v1/ti/assets/76ed6b1f-c2b9-48d6-8d4c-321388a2a71e/history responded 200 in 139.7594 ms
+[16:49:44 INF] HTTP GET /api/v1/ti/assets/76ed6b1f-c2b9-48d6-8d4c-321388a2a71e responded 200 in 850.0759 ms
+[16:51:04 INF] HTTP GET /api/v1/ti/assets responded 200 in 314.9834 ms
+[16:51:18 INF] HTTP GET /api/v1/ti/assets/76ed6b1f-c2b9-48d6-8d4c-321388a2a71e/history responded 200 in 105.8221 ms
+[16:51:18 INF] HTTP GET /api/v1/ti/assets/76ed6b1f-c2b9-48d6-8d4c-321388a2a71e responded 200 in 359.1669 ms
+[16:51:50 INF] HTTP GET /api/v1/ti/assets responded 200 in 313.8663 ms
+[16:53:55 INF] HTTP GET /api/v1/ti/assets/76ed6b1f-c2b9-48d6-8d4c-321388a2a71e/history responded 200 in 107.7628 ms
+[16:53:55 INF] HTTP GET /api/v1/ti/assets/76ed6b1f-c2b9-48d6-8d4c-321388a2a71e responded 200 in 249.2648 ms
+[16:53:56 INF] HTTP GET /api/v1/ti/assets responded 200 in 313.9513 ms
+[16:53:57 INF] HTTP GET /api/v1/ti/catalogs responded 200 in 526.1772 ms
+[16:55:00 INF] HTTP GET /api/v1/ti/assets responded 200 in 316.7242 ms
+[16:55:03 INF] HTTP GET /api/v1/ti/assets/76ed6b1f-c2b9-48d6-8d4c-321388a2a71e/history responded 200 in 106.7781 ms
+[16:55:03 INF] HTTP GET /api/v1/ti/assets/76ed6b1f-c2b9-48d6-8d4c-321388a2a71e responded 200 in 339.2403 ms
+[16:55:25 INF] HTTP GET /api/v1/ti/employees/active responded 200 in 121.8711 ms
+[16:55:25 INF] HTTP GET /api/v1/ti/assets/76ed6b1f-c2b9-48d6-8d4c-321388a2a71e responded 200 in 441.9484 ms
+[16:55:32 INF] HTTP PUT /api/v1/ti/assets/76ed6b1f-c2b9-48d6-8d4c-321388a2a71e responded 200 in 2372.0865 ms
+[16:55:33 INF] HTTP GET /api/v1/ti/employees/active responded 200 in 106.4187 ms
+[16:55:33 INF] HTTP GET /api/v1/ti/catalogs responded 200 in 533.6950 ms
+[16:55:33 INF] HTTP GET /api/v1/ti/assets/76ed6b1f-c2b9-48d6-8d4c-321388a2a71e/history responded 200 in 802.6826 ms
+[16:55:35 INF] HTTP GET /api/v1/ti/assets/76ed6b1f-c2b9-48d6-8d4c-321388a2a71e responded 200 in 2781.3721 ms
+[16:55:50 INF] HTTP GET /api/v1/ti/employees/active responded 200 in 104.5119 ms
+[16:55:50 INF] HTTP GET /api/v1/ti/catalogs responded 200 in 510.6893 ms
+[16:55:51 INF] HTTP GET /api/v1/ti/assets/76ed6b1f-c2b9-48d6-8d4c-321388a2a71e responded 200 in 727.1374 ms
+[16:55:58 INF] HTTP GET /api/v1/ti/assets responded 200 in 316.8916 ms
+[16:56:01 INF] HTTP GET /api/v1/ti/assets/76ed6b1f-c2b9-48d6-8d4c-321388a2a71e/history responded 200 in 109.1242 ms
+[16:56:35 INF] HTTP GET /api/v1/ti/assets/76ed6b1f-c2b9-48d6-8d4c-321388a2a71e/history responded 200 in 110.4437 ms
+[16:56:35 INF] HTTP GET /api/v1/ti/assets/76ed6b1f-c2b9-48d6-8d4c-321388a2a71e responded 200 in 282.4956 ms
+[16:57:19 INF] HTTP GET /api/v1/ti/assets responded 200 in 314.8139 ms
+[16:57:29 INF] HTTP GET /api/v1/ti/tickets responded 200 in 310.9971 ms
+[16:57:33 INF] HTTP GET /api/v1/ti/employees responded 200 in 225.2392 ms
+[16:57:35 INF] HTTP GET /api/v1/ti/employees/1d06bc30-e51f-4acc-8c17-dbf340d45a0c/history responded 200 in 691.6836 ms
+[16:57:55 INF] HTTP GET /api/v1/ti/assets responded 200 in 310.4905 ms
+[16:57:57 INF] HTTP GET /api/v1/ti/assets/76ed6b1f-c2b9-48d6-8d4c-321388a2a71e/history responded 200 in 103.1899 ms
+[16:57:57 INF] HTTP GET /api/v1/ti/assets/76ed6b1f-c2b9-48d6-8d4c-321388a2a71e responded 200 in 250.0011 ms
+[16:58:35 INF] HTTP GET /api/v1/ti/assets responded 200 in 313.7488 ms
+[16:58:37 INF] HTTP GET /api/v1/ti/assets/76ed6b1f-c2b9-48d6-8d4c-321388a2a71e/history responded 200 in 103.6656 ms
+[16:58:37 INF] HTTP GET /api/v1/ti/assets/76ed6b1f-c2b9-48d6-8d4c-321388a2a71e responded 200 in 510.2661 ms
+[16:58:54 INF] HTTP GET /api/v1/ti/employees responded 200 in 210.2551 ms
+[16:58:59 INF] HTTP GET /api/v1/ti/employees/1d06bc30-e51f-4acc-8c17-dbf340d45a0c/history responded 200 in 509.2877 ms
+[16:59:02 WRN] Compiling a query which loads related collections for more than one collection navigation, either via 'Include' or through projection, but no 'QuerySplittingBehavior' has been configured. By default, Entity Framework will use 'QuerySplittingBehavior.SingleQuery', which can potentially result in slow query performance. See https://go.microsoft.com/fwlink/?linkid=2134277 for more information. To identify the query that's triggering this warning call 'ConfigureWarnings(w => w.Throw(RelationalEventId.MultipleCollectionIncludeWarning))'.
+[16:59:02 INF] HTTP GET /api/v1/ti/tickets/b7c4ead7-e175-4fed-b367-d3112f4ac515 responded 200 in 502.5126 ms
+[16:59:32 INF] HTTP GET /api/v1/ti/tickets responded 200 in 371.2696 ms

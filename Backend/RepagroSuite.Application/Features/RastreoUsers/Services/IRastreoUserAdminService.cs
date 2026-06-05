@@ -11,8 +11,8 @@ public interface IRastreoUserAdminService
 {
     Task<PagedResult<RastreoUserDto>> GetPagedAsync(int page, int pageSize, string? search, bool? activeOnly, CancellationToken cancellationToken = default);
     Task<RastreoUserDto> GetByIdAsync(int id, CancellationToken cancellationToken = default);
-    Task<RastreoUserDto> CreateAsync(CreateRastreoUserDto dto, Guid adminId, CancellationToken cancellationToken = default);
-    Task ResetPasswordAsync(int id, ResetRastreoUserPasswordDto dto, Guid adminId, CancellationToken cancellationToken = default);
+    Task<RastreoUserPasswordResultDto> CreateAsync(CreateRastreoUserDto dto, Guid adminId, CancellationToken cancellationToken = default);
+    Task<string> ResetPasswordAsync(int id, ResetRastreoUserPasswordDto dto, Guid adminId, CancellationToken cancellationToken = default);
     Task<RastreoUserDto> ChangeRoleAsync(int id, UpdateRastreoUserRoleDto dto, Guid adminId, CancellationToken cancellationToken = default);
     Task<RastreoUserDto> SetStatusAsync(int id, UpdateRastreoUserStatusDto dto, Guid adminId, CancellationToken cancellationToken = default);
 }

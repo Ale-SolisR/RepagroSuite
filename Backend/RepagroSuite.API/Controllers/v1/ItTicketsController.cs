@@ -67,6 +67,22 @@ public class ItTicketsController : ControllerBase
         return Created(string.Empty, ApiResponse<ItTicketDto>.Ok(result, "Boleta de devolución emitida."));
     }
 
+    [HttpPost("deassignments")]
+    [Authorize(Policy = "Ti.Return")]
+    public async Task<ActionResult<ApiResponse<ItTicketDto>>> CreateDeassignment([FromBody] CreateDeassignmentDto dto, CancellationToken ct)
+    {
+        var result = await _tickets.CreateDeassignmentAsync(dto, _currentUser.UserId!.Value, ct);
+        return Created(string.Empty, ApiResponse<ItTicketDto>.Ok(result, "Boleta de desasignación emitida."));
+    }
+
+    [HttpPost("incidents")]
+    [Authorize(Policy = "Ti.Ticket.Create")]
+    public async Task<ActionResult<ApiResponse<ItTicketDto>>> CreateIncident([FromBody] CreateIncidentDto dto, CancellationToken ct)
+    {
+        var result = await _tickets.CreateIncidentAsync(dto, _currentUser.UserId!.Value, ct);
+        return Created(string.Empty, ApiResponse<ItTicketDto>.Ok(result, "Boleta de incidente emitida."));
+    }
+
     [HttpPost]
     [Authorize(Policy = "Ti.Ticket.Create")]
     public async Task<ActionResult<ApiResponse<ItTicketDto>>> CreateGeneric([FromBody] CreateGenericTicketDto dto, CancellationToken ct)

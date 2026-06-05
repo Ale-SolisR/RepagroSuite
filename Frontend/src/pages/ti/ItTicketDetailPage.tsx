@@ -58,7 +58,7 @@ export default function ItTicketDetailPage() {
 
   return (
     <div className="flex min-h-full flex-col">
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-line bg-paper px-6 py-3" style={{ minHeight: 64 }}>
+      <header className="sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b border-line bg-paper px-4 sm:px-6 py-3" style={{ minHeight: 64 }}>
         <button onClick={() => navigate(-1)} className="rounded p-1.5 text-ink2 hover:bg-bg hover:text-ink" aria-label="Volver"><ArrowLeft className="h-5 w-5" /></button>
         <div className="min-w-0 flex-1">
           <p className="font-mono text-[12px] text-ink2 mb-0.5 leading-none">TI / Boletas / {t.ticketTypeName}</p>
@@ -83,7 +83,7 @@ export default function ItTicketDetailPage() {
         </div>
       </header>
 
-      <div className="flex-1 p-6 bg-bg">
+      <div className="flex-1 p-4 sm:p-6 bg-bg">
         <div className="mx-auto max-w-3xl space-y-3.5">
           {t.status === 'Anulada' && (
             <div className="rounded-[10px] border p-4" style={{ background: '#FEF2F2', borderColor: '#FECACA' }}>

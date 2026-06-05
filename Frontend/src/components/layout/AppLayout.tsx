@@ -8,6 +8,7 @@ import {
 import { useAuthStore } from '@/store/authStore'
 import { authApi } from '@/api/auth'
 import { classNames } from '@/utils'
+import repagroLogoFull from '@/assets/repagro-logo-full.png'
 
 type NavItem = {
   to: string
@@ -126,17 +127,20 @@ function SidebarContent({
       <div className="flex h-16 items-center gap-3 px-4 shrink-0 relative"
         style={{ borderBottom: '1px solid rgba(255,255,255,.08)' }}
       >
-        <div
-          className="flex h-8 w-8 items-center justify-center rounded-lg shrink-0 shadow-sm ring-1 ring-white/20"
-          style={{ background: '#fff' }}
-        >
-          <span className="text-[15px] font-bold" style={{ color: '#0A5037' }}>R</span>
-        </div>
-        {!collapsed && (
-          <div className="flex-1 min-w-0">
-            <p className="text-[15px] font-semibold tracking-tight leading-none">Repagro</p>
-            <p className="text-[10px] text-white/45 tracking-wider mt-0.5">SUITE · v6.1</p>
+        {collapsed ? (
+          <div
+            className="flex h-8 w-8 items-center justify-center rounded-lg shrink-0 shadow-sm ring-1 ring-white/20"
+            style={{ background: '#fff' }}
+          >
+            <span className="text-[15px] font-bold" style={{ color: '#0A5037' }}>R</span>
           </div>
+        ) : (
+          /* Logo arriba a la izquierda, tal cual (a color), sin recuadro ni filtro. */
+          <img
+            src={repagroLogoFull}
+            alt="Repagro"
+            className="h-9 w-auto shrink-0"
+          />
         )}
         {onClose && (
           <button

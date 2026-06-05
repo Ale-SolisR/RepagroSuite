@@ -63,7 +63,7 @@ public class RastreoUserAdminService : IRastreoUserAdminService
     public async Task<RastreoUserDto> GetByIdAsync(int id, CancellationToken cancellationToken = default)
         => Map(await FindOrThrow(id, cancellationToken));
 
-    public async Task<RastreoUserDto> CreateAsync(CreateRastreoUserDto dto, Guid adminId, CancellationToken cancellationToken = default)
+    public async Task<RastreoUserPasswordResultDto> CreateAsync(CreateRastreoUserDto dto, Guid adminId, CancellationToken cancellationToken = default)
     {
         var correo = NormalizeEmail(dto.Correo);
         if (string.IsNullOrWhiteSpace(correo) || !correo.Contains('@'))
@@ -71,8 +71,8 @@ public class RastreoUserAdminService : IRastreoUserAdminService
 
         var rol = NormalizeRole(dto.Rol);
 
-        if (!_passwords.IsPasswordPolicyCompliant(dto.Password, out var violations))
-            throw new InvalidOperationException(string.Join(" ", violations));
+        // Contraseña: la provista por el admin o, si pidió generar / no la dio, una segura aleatoria.
+        var password = ResolvePassword(dto.Password, dto.Generate);
 
         if (await _db.Usuarios.AnyAsync(u => u.Correo == correo, cancellationToken))
             throw new InvalidOperationException("Ya existe un usuario de rastreo con ese correo.");
@@ -84,26 +84,27 @@ public class RastreoUserAdminService : IRastreoUserAdminService
             Rol = rol,
             Activo = true,
             FechaCreacion = DateTime.UtcNow,
-            PasswordHash = _passwords.HashPassword(dto.Password)
+            PasswordHash = _passwords.HashPassword(password)
         };
 
         _db.Usuarios.Add(usuario);
         await _db.SaveChangesAsync(cancellationToken);
 
         await _audit.LogAsync(adminId, "RASTREO_USER_CREATED", entityName: "RastreoUsuario", entityId: usuario.Id.ToString(),
-            newValues: new { usuario.Correo, usuario.Rol }, module: "RastreoUsers", cancellationToken: cancellationToken);
+            newValues: new { usuario.Correo, usuario.Rol, Generada = dto.Generate || string.IsNullOrWhiteSpace(dto.Password) },
+            module: "RastreoUsers", cancellationToken: cancellationToken);
 
-        return Map(usuario);
+        // Devuelve la contraseña EFECTIVA para mostrarla una sola vez (no se guarda legible).
+        return new RastreoUserPasswordResultDto { User = Map(usuario), Password = password };
     }
 
-    public async Task ResetPasswordAsync(int id, ResetRastreoUserPasswordDto dto, Guid adminId, CancellationToken cancellationToken = default)
+    public async Task<string> ResetPasswordAsync(int id, ResetRastreoUserPasswordDto dto, Guid adminId, CancellationToken cancellationToken = default)
     {
         var usuario = await FindOrThrow(id, cancellationToken);
 
-        if (!_passwords.IsPasswordPolicyCompliant(dto.NewPassword, out var violations))
-            throw new InvalidOperationException(string.Join(" ", violations));
+        var password = ResolvePassword(dto.NewPassword, dto.Generate);
 
-        usuario.PasswordHash = _passwords.HashPassword(dto.NewPassword);
+        usuario.PasswordHash = _passwords.HashPassword(password);
         if (dto.CloseActiveSession)
         {
             usuario.SesionToken = null;
@@ -112,7 +113,25 @@ public class RastreoUserAdminService : IRastreoUserAdminService
         await _db.SaveChangesAsync(cancellationToken);
 
         await _audit.LogAsync(adminId, "RASTREO_USER_PASSWORD_RESET", entityName: "RastreoUsuario", entityId: usuario.Id.ToString(),
-            newValues: new { usuario.Correo, dto.CloseActiveSession }, module: "RastreoUsers", cancellationToken: cancellationToken);
+            newValues: new { usuario.Correo, dto.CloseActiveSession, Generada = dto.Generate || string.IsNullOrWhiteSpace(dto.NewPassword) },
+            module: "RastreoUsers", cancellationToken: cancellationToken);
+
+        // Devuelve la contraseña EFECTIVA para mostrarla una sola vez (no se guarda legible).
+        return password;
+    }
+
+    /// <summary>
+    /// Devuelve la contraseña a usar: si <paramref name="generate"/> es true o no se proporcionó una,
+    /// genera una segura aleatoria; en caso contrario valida la provista contra la política.
+    /// </summary>
+    private string ResolvePassword(string? provided, bool generate)
+    {
+        if (generate || string.IsNullOrWhiteSpace(provided))
+            return _passwords.GenerateTemporaryPassword();
+
+        if (!_passwords.IsPasswordPolicyCompliant(provided, out var violations))
+            throw new InvalidOperationException(string.Join(" ", violations));
+        return provided;
     }
 
     public async Task<RastreoUserDto> ChangeRoleAsync(int id, UpdateRastreoUserRoleDto dto, Guid adminId, CancellationToken cancellationToken = default)

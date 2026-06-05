@@ -103,12 +103,12 @@ public class ItAssetsController : ControllerBase
         return Ok(ApiResponse<ItAssetDto>.Ok(result, "Activo actualizado correctamente."));
     }
 
-    [HttpPatch("{id:guid}/status")]
-    [Authorize(Policy = "Ti.Inventory.Update")]
-    public async Task<ActionResult<ApiResponse<ItAssetDto>>> ChangeStatus(Guid id, [FromBody] ChangeItAssetStatusDto dto, CancellationToken ct)
+    [HttpPost("{id:guid}/reactivate")]
+    [Authorize(Policy = "Ti.Asset.Reactivate")]
+    public async Task<ActionResult<ApiResponse<ItAssetDto>>> Reactivate(Guid id, [FromBody] ReactivateAssetDto dto, CancellationToken ct)
     {
-        var result = await _assets.ChangeStatusAsync(id, dto, _currentUser.UserId!.Value, ct);
-        return Ok(ApiResponse<ItAssetDto>.Ok(result, "Estado del activo actualizado."));
+        var result = await _assets.ReactivateAsync(id, dto, _currentUser.UserId!.Value, ct);
+        return Ok(ApiResponse<ItAssetDto>.Ok(result, "Activo reactivado y disponible."));
     }
 
     [HttpDelete("{id:guid}")]

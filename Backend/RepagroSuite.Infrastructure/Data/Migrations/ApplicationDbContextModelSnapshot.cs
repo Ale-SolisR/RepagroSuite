@@ -546,6 +546,11 @@ namespace RepagroSuite.Infrastructure.Data.Migrations
                         .HasColumnType("nvarchar(50)")
                         .HasColumnName("CodigoInterno");
 
+                    b.Property<string>("InvoiceNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("NumeroFactura");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit")
                         .HasColumnName("EliminadoLogico");
@@ -638,6 +643,93 @@ namespace RepagroSuite.Infrastructure.Data.Migrations
                     b.ToTable("Activos", "SOPORTE");
                 });
 
+            modelBuilder.Entity("RepagroSuite.Domain.Entities.ItAssetCredential", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("Id");
+
+                    b.Property<Guid>("AssetId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("ActivoId");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("CreadoEn");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("CreadoPor");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("EliminadoEn");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("EliminadoPor");
+
+                    b.Property<string>("Host")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)")
+                        .HasColumnName("Host");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit")
+                        .HasColumnName("EliminadoLogico");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)")
+                        .HasColumnName("Cuenta");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)")
+                        .HasColumnName("Notas");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion")
+                        .HasColumnName("VersionFila");
+
+                    b.Property<string>("SecretEncrypted")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)")
+                        .HasColumnName("SecretoCifrado");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int")
+                        .HasColumnName("Orden");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int")
+                        .HasColumnName("Tipo");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("ActualizadoEn");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("ActualizadoPor");
+
+                    b.Property<string>("Username")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("Usuario");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssetId", "SortOrder");
+
+                    b.ToTable("CredencialesActivo", "SOPORTE");
+                });
+
             modelBuilder.Entity("RepagroSuite.Domain.Entities.ItAssetHistory", b =>
                 {
                     b.Property<Guid>("Id")
@@ -698,6 +790,10 @@ namespace RepagroSuite.Infrastructure.Data.Migrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion")
                         .HasColumnName("VersionFila");
+
+                    b.Property<Guid?>("TicketId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("BoletaId");
 
                     b.Property<int?>("ToStatus")
                         .HasColumnType("int")
@@ -1226,6 +1322,11 @@ namespace RepagroSuite.Infrastructure.Data.Migrations
                     b.Property<Guid>("AssignedTicketId")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("BoletaEntregaId");
+
+                    b.Property<string>("ClosedReason")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("MotivoCierre");
 
                     b.Property<int?>("ConditionIn")
                         .HasColumnType("int")
@@ -4586,6 +4687,17 @@ namespace RepagroSuite.Infrastructure.Data.Migrations
                     b.Navigation("Supplier");
                 });
 
+            modelBuilder.Entity("RepagroSuite.Domain.Entities.ItAssetCredential", b =>
+                {
+                    b.HasOne("RepagroSuite.Domain.Entities.ItAsset", "Asset")
+                        .WithMany("Credentials")
+                        .HasForeignKey("AssetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Asset");
+                });
+
             modelBuilder.Entity("RepagroSuite.Domain.Entities.ItAssetHistory", b =>
                 {
                     b.HasOne("RepagroSuite.Domain.Entities.ItAsset", "Asset")
@@ -4842,6 +4954,8 @@ namespace RepagroSuite.Infrastructure.Data.Migrations
 
             modelBuilder.Entity("RepagroSuite.Domain.Entities.ItAsset", b =>
                 {
+                    b.Navigation("Credentials");
+
                     b.Navigation("History");
 
                     b.Navigation("Photos");

@@ -11,5 +11,9 @@ public enum ItTicketType
     Traslado = 5,
     CambioResponsable = 6,
     AsignacionAccesorios = 7,
-    Baja = 8
+    Baja = 8,
+    // Movimientos canónicos del flujo robusto (propuesta aprobada §4):
+    Desasignacion = 9,   // Cierre administrativo del vínculo, activo vuelve a Disponible
+    Deterioro = 10,      // Activo dañado → inactivo (no asignable)
+    PerdidaRobo = 11     // Activo perdido/robado → inactivo (no asignable)
 }

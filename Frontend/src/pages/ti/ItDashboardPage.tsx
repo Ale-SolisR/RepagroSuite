@@ -237,7 +237,7 @@ export default function ItDashboardPage() {
 
   return (
     <div className="flex min-h-full flex-col">
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-line bg-paper px-6 py-3" style={{ minHeight: 64 }}>
+      <header className="sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b border-line bg-paper px-4 sm:px-6 py-3" style={{ minHeight: 64 }}>
         <div className="min-w-0 flex-1">
           <p className="font-mono text-[12px] text-ink2 mb-0.5 leading-none">TI / Dashboard</p>
           <h1 className="text-[18px] font-semibold text-ink leading-tight tracking-tight flex items-center gap-2">

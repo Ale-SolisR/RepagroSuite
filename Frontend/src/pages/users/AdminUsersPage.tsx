@@ -371,7 +371,7 @@ export default function AdminUsersPage() {
   const isAdmin = (u: UserDto) => u.roles?.some(r => r.toUpperCase().includes('ADMIN'))
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="mb-6">
         <p className="text-xs text-gray-400 tracking-wide mb-1">Administración / Usuarios</p>

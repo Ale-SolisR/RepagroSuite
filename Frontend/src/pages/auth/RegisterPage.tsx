@@ -85,7 +85,7 @@ export default function RegisterPage() {
             <DoorOpen className="h-7 w-7 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Solicitar Acceso</h1>
-          <p className="text-gray-500 text-sm mt-1">RepagroSuite — Sistema de Gestión de Salas</p>
+          <p className="text-gray-500 text-sm mt-1">Repagro App — Sistema de Gestión de Salas</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-8">

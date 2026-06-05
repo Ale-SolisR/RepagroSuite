@@ -3,6 +3,7 @@ import type {
   ApiResponse, PagedResult,
   ItTicketListDto, ItTicketDto,
   CreateAssignmentRequest, CreateReturnRequest, CreateGenericTicketRequest, VoidTicketRequest,
+  CreateDeassignmentRequest, CreateIncidentRequest,
 } from '@/types'
 
 export interface ItTicketListParams {
@@ -29,6 +30,12 @@ export const itTicketsApi = {
 
   createReturn: (data: CreateReturnRequest) =>
     api.post<ApiResponse<ItTicketDto>>('/ti/tickets/returns', data),
+
+  createDeassignment: (data: CreateDeassignmentRequest) =>
+    api.post<ApiResponse<ItTicketDto>>('/ti/tickets/deassignments', data),
+
+  createIncident: (data: CreateIncidentRequest) =>
+    api.post<ApiResponse<ItTicketDto>>('/ti/tickets/incidents', data),
 
   createGeneric: (data: CreateGenericTicketRequest) =>
     api.post<ApiResponse<ItTicketDto>>('/ti/tickets', data),

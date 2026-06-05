@@ -46,6 +46,9 @@ public class ItTicket : BaseEntity
         ItTicketType.CambioResponsable => "CRE",
         ItTicketType.AsignacionAccesorios => "ACC",
         ItTicketType.Baja => "BAJ",
+        ItTicketType.Desasignacion => "DES",
+        ItTicketType.Deterioro => "DET",
+        ItTicketType.PerdidaRobo => "PRB",
         _ => "TIX"
     };
 }

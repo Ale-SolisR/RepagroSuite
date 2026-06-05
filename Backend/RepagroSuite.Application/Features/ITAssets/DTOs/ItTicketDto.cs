@@ -103,3 +103,37 @@ public class VoidTicketDto
 {
     public string Reason { get; set; } = string.Empty;
 }
+
+// ─── Movimientos canónicos (propuesta aprobada §4) ───────────────────────────────
+
+/// <summary>Desasignación: cierre administrativo del vínculo. El activo vuelve a Disponible.</summary>
+public class CreateDeassignmentDto
+{
+    public Guid AssetId { get; set; }
+    public string? Notes { get; set; }
+    public List<string> Photos { get; set; } = [];
+    public List<SignatureInputDto> Signatures { get; set; } = [];
+}
+
+/// <summary>
+/// Incidente: Deterioro (→Damaged) o Pérdida/Robo (→Lost/Stolen). El activo queda inactivo
+/// (no asignable). Si estaba asignado, se cierra la asignación. Motivo obligatorio.
+/// Firma del responsable TI obligatoria; la del colaborador es opcional (puede no estar presente).
+/// </summary>
+public class CreateIncidentDto
+{
+    public Guid AssetId { get; set; }
+    /// <summary>Damaged (deterioro) | Lost | Stolen (pérdida/robo).</summary>
+    public ItAssetStatus TargetStatus { get; set; }
+    public string Reason { get; set; } = string.Empty;
+    /// <summary>Estado físico resultante (opcional, típico en deterioro).</summary>
+    public PhysicalCondition? Condition { get; set; }
+    public List<string> Photos { get; set; } = [];
+    public List<SignatureInputDto> Signatures { get; set; } = [];
+}
+
+/// <summary>Reactivación de un activo inactivo (Dañado/Perdido/Robado/Inactivo) → Disponible. Solo admin.</summary>
+public class ReactivateAssetDto
+{
+    public string Reason { get; set; } = string.Empty;
+}

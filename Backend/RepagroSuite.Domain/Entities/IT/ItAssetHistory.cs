@@ -18,4 +18,7 @@ public class ItAssetHistory : BaseEntity
     public string? Description { get; set; }
     public DateTime OccurredAt { get; set; } = BusinessClock.Now;
     public Guid? PerformedBy { get; set; }
+
+    /// <summary>Boleta que originó el evento (entrega, devolución, desasignación, deterioro, pérdida/robo). Null para altas/reactivaciones.</summary>
+    public Guid? TicketId { get; set; }
 }

@@ -453,6 +453,7 @@ export interface ItAssetDto extends ItAssetListDto {
   currency?: string
   hasWarranty: boolean
   warrantyEndDate?: string
+  invoiceNumber?: string
   notes?: string
   spec?: ItAssetSpecDto
   photos: ItAssetPhotoDto[]
@@ -467,6 +468,7 @@ export interface ItAssetHistoryDto {
   toStatus?: ItAssetStatus
   description?: string
   occurredAt: string
+  ticketId?: string
 }
 
 export interface CreateItAssetRequest {
@@ -487,14 +489,51 @@ export interface CreateItAssetRequest {
   currency?: string
   hasWarranty: boolean
   warrantyEndDate?: string
+  invoiceNumber?: string
   notes?: string
   /** Hasta 5 fotos como data URLs base64; el servidor las guarda como binario. */
   photos?: string[]
   spec?: ItAssetSpecDto
+  /** Contraseña de AnyDesk (write-only). Si trae valor, se guarda cifrada como credencial AnyDesk. */
+  anyDeskPassword?: string
 }
 
 export interface UpdateItAssetRequest extends CreateItAssetRequest {
   rowVersion?: string
+}
+
+// ─── Credenciales por activo (bóveda cifrada) ──────────────────────────────────
+export type ItCredentialType =
+  | 'AnyDesk' | 'Windows' | 'Microsoft365' | 'Email' | 'Bios' | 'Network' | 'Application' | 'Other'
+
+export interface ItAssetCredentialDto {
+  id: string
+  type: ItCredentialType
+  typeName: string
+  label: string
+  username?: string
+  hasSecret: boolean
+  host?: string
+  notes?: string
+  sortOrder: number
+}
+
+export interface ItAssetCredentialSecret {
+  id: string
+  secret?: string
+}
+
+export interface CreateItAssetCredentialRequest {
+  type: ItCredentialType
+  label: string
+  username?: string
+  secret?: string
+  host?: string
+  notes?: string
+}
+
+export interface UpdateItAssetCredentialRequest extends CreateItAssetCredentialRequest {
+  clearSecret?: boolean
 }
 
 export interface ChangeItAssetStatusRequest {
@@ -632,6 +671,7 @@ export interface ItDashboardDto {
 export type ItTicketType =
   | 'Entrega' | 'Devolucion' | 'Prestamo' | 'Mantenimiento' | 'Reparacion'
   | 'Traslado' | 'CambioResponsable' | 'AsignacionAccesorios' | 'Baja'
+  | 'Desasignacion' | 'Deterioro' | 'PerdidaRobo'
 
 export type ItTicketStatus = 'Borrador' | 'PendienteFirma' | 'Firmada' | 'Emitida' | 'Anulada'
 
@@ -721,6 +761,28 @@ export interface VoidTicketRequest {
   reason: string
 }
 
+// Movimientos canónicos (single-asset, desde la ficha del activo)
+export interface CreateDeassignmentRequest {
+  assetId: string
+  notes?: string
+  photos: string[]
+  signatures: SignatureInput[]
+}
+
+export interface CreateIncidentRequest {
+  assetId: string
+  /** Damaged (deterioro) | Lost | Stolen (pérdida/robo) */
+  targetStatus: ItAssetStatus
+  reason: string
+  condition?: PhysicalCondition
+  photos: string[]
+  signatures: SignatureInput[]
+}
+
+export interface ReactivateAssetRequest {
+  reason: string
+}
+
 // ─── TI / Colaboradores ──────────────────────────────────────────────────────────
 export interface ItEmployeeDto {
   id: string
@@ -743,6 +805,7 @@ export interface CreateItEmployeeRequest {
 }
 
 export interface UpdateItEmployeeRequest {
+  identificationNumber: string
   fullName: string
   position?: string
   department?: string
@@ -756,6 +819,50 @@ export interface IdentificationLookupResult {
   identificationNumber: string
   fullName?: string
   found: boolean
+}
+
+// ─── Historial / auditoría por colaborador ───────────────────────────────────────
+export interface ItEmployeeAssignmentDto {
+  id: string
+  assetId: string
+  assetCode: string
+  assetTypeName?: string
+  assetModel?: string
+  assetStatus: ItAssetStatus
+  assetStatusName: string
+  isActive: boolean
+  assignedAt: string
+  returnedAt?: string
+  conditionOutName?: string
+  conditionInName?: string
+  closedReason?: string
+  assignedTicketNumber?: string
+  assignedTicketId?: string
+  closingTicketNumber?: string
+  closingTicketId?: string
+  notes?: string
+  assetPhotos: string[]
+}
+
+export interface ItEmployeeTicketDto {
+  id: string
+  ticketNumber: string
+  ticketType: ItTicketType
+  ticketTypeName: string
+  status: ItTicketStatus
+  statusName: string
+  issuedAt: string
+  assetCount: number
+  hasPdf: boolean
+}
+
+export interface ItEmployeeHistoryDto {
+  employee: ItEmployeeDto
+  currentAssetsCount: number
+  pastAssetsCount: number
+  currentAssignments: ItEmployeeAssignmentDto[]
+  pastAssignments: ItEmployeeAssignmentDto[]
+  tickets: ItEmployeeTicketDto[]
 }
 
 // ─── Usuarios del Sistema de Rastreo ────────────────────────────────────────────
@@ -777,10 +884,20 @@ export interface CreateRastreoUserRequest {
   nombre?: string
   correo: string
   rol: RastreoRol
-  password: string
+  /** Opcional: si se omite o `generate` es true, el servidor genera una contraseña segura. */
+  password?: string
+  generate?: boolean
 }
 
 export interface ResetRastreoUserPasswordRequest {
-  newPassword: string
+  /** Opcional: si se omite o `generate` es true, el servidor genera una contraseña segura. */
+  newPassword?: string
+  generate?: boolean
   closeActiveSession: boolean
+}
+
+/** Resultado de crear/restablecer: trae la contraseña EFECTIVA para mostrarla una sola vez. */
+export interface RastreoUserPasswordResult {
+  user?: RastreoUserDto
+  password: string
 }

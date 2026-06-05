@@ -17,6 +17,7 @@ public class ItTicketRepository : GenericRepository<ItTicket>, IItTicketReposito
         var query = _dbSet
             .Include(t => t.Employee)
             .Include(t => t.ItResponsible)
+            .Include(t => t.Details)
             .AsNoTracking()
             .AsQueryable();
 

@@ -321,7 +321,7 @@ export default function RoomsPage() {
   const totalPages = data?.totalPages ?? 1
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto">
       {/* ─── Header ─── */}
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-3">

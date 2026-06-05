@@ -13,6 +13,12 @@ public interface IItAssetRepository : IGenericRepository<ItAsset>
     /// <summary>Activo con todas sus relaciones (incluye Spec) para la ficha de detalle/edición.</summary>
     Task<ItAsset?> GetWithDetailsAsync(Guid id, CancellationToken cancellationToken = default);
 
+    Task<ItAsset?> GetForUpdateAsync(Guid id, CancellationToken cancellationToken = default);
+
+    Task ReplacePhotosAsync(Guid assetId, IEnumerable<ItAssetPhoto> photos, CancellationToken cancellationToken = default);
+
+    Task<int> ReleaseAssetsFromVoidedAssignmentsAsync(CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<ItAssetHistory>> GetHistoryAsync(Guid assetId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<string>> GetAllInternalCodesAsync(CancellationToken cancellationToken = default);

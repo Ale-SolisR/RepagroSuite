@@ -14,18 +14,60 @@ public class ItAssetService : IItAssetService
     private readonly IAuditService _audit;
     private readonly IItExcelExporter _excel;
     private readonly IPdfGenerator _pdf;
+    private readonly ISecretProtector _protector;
 
-    public ItAssetService(IUnitOfWork uow, IAuditService audit, IItExcelExporter excel, IPdfGenerator pdf)
+    public ItAssetService(IUnitOfWork uow, IAuditService audit, IItExcelExporter excel, IPdfGenerator pdf, ISecretProtector protector)
     {
         _uow = uow;
         _audit = audit;
         _excel = excel;
         _pdf = pdf;
+        _protector = protector;
+    }
+
+    // La contraseña de AnyDesk del formulario se guarda como una credencial CIFRADA en la bóveda
+    // del activo (tipo AnyDesk). Es write-only desde el form: vacío = no cambiar; con valor = crear/reemplazar.
+    private async Task ApplyAnyDeskPasswordAsync(Guid assetId, string? password, string? anyDeskId, Guid userId, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(password)) return;
+        var repo = _uow.Repository<ItAssetCredential>();
+        var existing = await repo.FirstOrDefaultAsync(c => c.AssetId == assetId && c.Type == ItCredentialType.AnyDesk, ct);
+        if (existing is null)
+        {
+            var all = await repo.FindAsync(c => c.AssetId == assetId, ct);
+            await repo.AddAsync(new ItAssetCredential
+            {
+                AssetId = assetId,
+                Type = ItCredentialType.AnyDesk,
+                Label = "AnyDesk",
+                Username = string.IsNullOrWhiteSpace(anyDeskId) ? null : anyDeskId.Trim(),
+                SecretEncrypted = _protector.Protect(password),
+                SortOrder = all.Any() ? all.Max(c => c.SortOrder) + 1 : 0,
+                CreatedBy = userId,
+            }, ct);
+        }
+        else
+        {
+            existing.SecretEncrypted = _protector.Protect(password);
+            if (!string.IsNullOrWhiteSpace(anyDeskId)) existing.Username = anyDeskId.Trim();
+            existing.UpdatedBy = userId;
+            repo.Update(existing);
+        }
+        await _uow.SaveChangesAsync(ct);
+    }
+
+    private async Task ReleaseVoidedAssignmentSideEffectsAsync(CancellationToken ct)
+    {
+        var changed = await _uow.ItAssets.ReleaseAssetsFromVoidedAssignmentsAsync(ct);
+        if (changed > 0)
+            await _uow.SaveChangesAsync(ct);
     }
 
     public async Task<PagedResult<ItAssetListDto>> GetPagedAsync(int page, int pageSize, string? search,
         ItAssetStatus? status, Guid? assetTypeId, Guid? departmentId, CancellationToken cancellationToken = default)
     {
+        await ReleaseVoidedAssignmentSideEffectsAsync(cancellationToken);
+
         var (items, total) = await _uow.ItAssets.GetPagedAsync(page, pageSize, search, status, assetTypeId, departmentId, cancellationToken);
         return new PagedResult<ItAssetListDto>
         {
@@ -38,6 +80,8 @@ public class ItAssetService : IItAssetService
 
     public async Task<ItAssetDto> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
+        await ReleaseVoidedAssignmentSideEffectsAsync(cancellationToken);
+
         var asset = await _uow.ItAssets.GetWithDetailsAsync(id, cancellationToken)
             ?? throw new KeyNotFoundException("Activo no encontrado.");
         return MapToDto(asset);
@@ -65,7 +109,8 @@ public class ItAssetService : IItAssetService
             FromStatus = h.FromStatus,
             ToStatus = h.ToStatus,
             Description = h.Description,
-            OccurredAt = h.OccurredAt
+            OccurredAt = h.OccurredAt,
+            TicketId = h.TicketId
         });
     }
 
@@ -106,6 +151,7 @@ public class ItAssetService : IItAssetService
             Currency = NormalizeCurrency(dto.Currency),
             HasWarranty = dto.HasWarranty,
             WarrantyEndDate = dto.WarrantyEndDate,
+            InvoiceNumber = dto.InvoiceNumber?.Trim(),
             Notes = dto.Notes?.Trim(),
             CreatedBy = createdBy
         };
@@ -134,12 +180,14 @@ public class ItAssetService : IItAssetService
             newValues: new { asset.InternalCode, asset.SerialNumber, asset.Status }, module: "TI",
             cancellationToken: cancellationToken);
 
+        await ApplyAnyDeskPasswordAsync(asset.Id, dto.AnyDeskPassword, dto.Spec?.AnyDeskId, createdBy, cancellationToken);
+
         return await GetByIdAsync(asset.Id, cancellationToken);
     }
 
     public async Task<ItAssetDto> UpdateAsync(Guid id, UpdateItAssetDto dto, Guid updatedBy, CancellationToken cancellationToken = default)
     {
-        var asset = await _uow.ItAssets.GetWithDetailsAsync(id, cancellationToken)
+        var asset = await _uow.ItAssets.GetForUpdateAsync(id, cancellationToken)
             ?? throw new KeyNotFoundException("Activo no encontrado.");
 
         if (!string.IsNullOrEmpty(dto.RowVersion))
@@ -168,19 +216,9 @@ public class ItAssetService : IItAssetService
         asset.Currency = NormalizeCurrency(dto.Currency);
         asset.HasWarranty = dto.HasWarranty;
         asset.WarrantyEndDate = dto.WarrantyEndDate;
+        asset.InvoiceNumber = dto.InvoiceNumber?.Trim();
         asset.Notes = dto.Notes?.Trim();
         asset.UpdatedBy = updatedBy;
-
-        // Reemplazo total de la galería sólo si el cliente envía la colección (evita borrarla en updates parciales).
-        if (dto.Photos is not null)
-        {
-            asset.Photos.Clear();   // cascade delete elimina las huérfanas al guardar
-            foreach (var p in BuildPhotos(dto.Photos, asset.InternalCode, updatedBy))
-            {
-                p.AssetId = asset.Id;
-                asset.Photos.Add(p);
-            }
-        }
 
         // Spec 1:1 — crea o actualiza
         if (dto.Spec is not null && HasAnySpec(dto.Spec))
@@ -190,49 +228,77 @@ public class ItAssetService : IItAssetService
             asset.Spec.UpdatedBy = updatedBy;
         }
 
-        _uow.ItAssets.Update(asset);
+        asset.UpdatedAt = BusinessClock.Now;
         await _uow.SaveChangesAsync(cancellationToken);
+
+        if (dto.Photos is not null)
+        {
+            var photos = BuildPhotos(dto.Photos, asset.InternalCode, updatedBy);
+            foreach (var p in photos)
+                p.AssetId = id;
+
+            await _uow.ItAssets.ReplacePhotosAsync(id, photos, cancellationToken);
+            await _uow.SaveChangesAsync(cancellationToken);
+        }
 
         await _audit.LogAsync(updatedBy, "TI_ASSET_UPDATED", entityName: "ItAsset", entityId: id.ToString(), module: "TI",
             cancellationToken: cancellationToken);
 
+        await ApplyAnyDeskPasswordAsync(id, dto.AnyDeskPassword, dto.Spec?.AnyDeskId, updatedBy, cancellationToken);
+
         return await GetByIdAsync(id, cancellationToken);
     }
 
-    public async Task<ItAssetDto> ChangeStatusAsync(Guid id, ChangeItAssetStatusDto dto, Guid updatedBy, CancellationToken cancellationToken = default)
+    public async Task<ItAssetDto> ReactivateAsync(Guid id, ReactivateAssetDto dto, Guid updatedBy, CancellationToken cancellationToken = default)
     {
+        if (string.IsNullOrWhiteSpace(dto.Reason))
+            throw new InvalidOperationException("La reactivación requiere un motivo.");
+
         var asset = await _uow.ItAssets.GetByIdAsync(id, cancellationToken)
             ?? throw new KeyNotFoundException("Activo no encontrado.");
 
         var from = asset.Status;
-        if (!ItAsset.CanTransition(from, dto.Status))
-            throw new InvalidOperationException($"Transición no permitida: {StatusName(from)} → {StatusName(dto.Status)}.");
+        // Reactivable cualquier estado "detenido": incidentes (dañado/perdido/robado/inactivo) y
+        // estados heredados sin salida en el flujo de 5 movimientos (devuelto/en revisión/mantenimiento/reparación).
+        var reactivatable = from is ItAssetStatus.Damaged or ItAssetStatus.Lost or ItAssetStatus.Stolen
+            or ItAssetStatus.Inactive or ItAssetStatus.Returned or ItAssetStatus.UnderReview
+            or ItAssetStatus.UnderMaintenance or ItAssetStatus.UnderRepair;
+        if (!reactivatable)
+            throw new InvalidOperationException($"Este activo no requiere reactivación. Estado actual: {StatusName(from)}.");
 
-        // Robo/pérdida exigen motivo (propuesta §3 / §18).
-        if ((dto.Status is ItAssetStatus.Stolen or ItAssetStatus.Lost or ItAssetStatus.Disposed)
-            && string.IsNullOrWhiteSpace(dto.Reason))
-            throw new InvalidOperationException("Este cambio de estado requiere un motivo.");
-
-        asset.Status = dto.Status;
+        asset.Status = ItAssetStatus.Available;
+        asset.CurrentHolderEmployeeId = null;
         asset.UpdatedBy = updatedBy;
         _uow.ItAssets.Update(asset);
+
+        // Cierra cualquier asignación colgante (datos heredados: estado cambiado sin cerrar la asignación).
+        var asgRepo = _uow.Repository<ItAssignment>();
+        var dangling = await asgRepo.FindAsync(x => x.AssetId == id && x.Status == AssignmentStatus.Activa, cancellationToken);
+        foreach (var asg in dangling)
+        {
+            asg.Status = AssignmentStatus.Cerrada;
+            asg.ReturnedAt = BusinessClock.Now;
+            asg.ClosedReason = "Reactivacion";
+            asg.UpdatedBy = updatedBy;
+            asgRepo.Update(asg);
+        }
 
         await _uow.Repository<ItAssetHistory>().AddAsync(new ItAssetHistory
         {
             AssetId = id,
-            EventType = "STATUS_CHANGED",
+            EventType = "REACTIVATED",
             FromStatus = from,
-            ToStatus = dto.Status,
-            Description = dto.Reason?.Trim(),
+            ToStatus = ItAssetStatus.Available,
+            Description = $"Reactivado por administrador. {dto.Reason.Trim()}",
             PerformedBy = updatedBy,
             CreatedBy = updatedBy
         }, cancellationToken);
 
         await _uow.SaveChangesAsync(cancellationToken);
 
-        await _audit.LogAsync(updatedBy, $"TI_ASSET_STATUS_{dto.Status.ToString().ToUpperInvariant()}",
+        await _audit.LogAsync(updatedBy, "TI_ASSET_REACTIVATE",
             entityName: "ItAsset", entityId: id.ToString(),
-            oldValues: new { Status = from.ToString() }, newValues: new { Status = dto.Status.ToString(), dto.Reason },
+            oldValues: new { Status = from.ToString() }, newValues: new { Status = ItAssetStatus.Available.ToString(), dto.Reason },
             module: "TI", cancellationToken: cancellationToken);
 
         return await GetByIdAsync(id, cancellationToken);
@@ -251,6 +317,8 @@ public class ItAssetService : IItAssetService
 
     public async Task<ItDashboardDto> GetDashboardAsync(CancellationToken cancellationToken = default)
     {
+        await ReleaseVoidedAssignmentSideEffectsAsync(cancellationToken);
+
         var assets = await _uow.ItAssets.GetAllForDashboardAsync(cancellationToken);
         var now = BusinessClock.Now;
         var soon = now.AddDays(60);
@@ -382,6 +450,8 @@ public class ItAssetService : IItAssetService
 
     public async Task<byte[]> ExportInventoryExcelAsync(CancellationToken cancellationToken = default)
     {
+        await ReleaseVoidedAssignmentSideEffectsAsync(cancellationToken);
+
         var assets = await _uow.ItAssets.GetAllForExportAsync(cancellationToken);
         var dashboard = await GetDashboardAsync(cancellationToken);
         var rows = assets.Select(a => new ItAssetExportRow
@@ -609,6 +679,7 @@ public class ItAssetService : IItAssetService
         Currency = a.Currency,
         HasWarranty = a.HasWarranty,
         WarrantyEndDate = a.WarrantyEndDate,
+        InvoiceNumber = a.InvoiceNumber,
         Notes = a.Notes,
         Photos = a.Photos.OrderBy(p => p.SortOrder).Select(p => new ItAssetPhotoDto
         {

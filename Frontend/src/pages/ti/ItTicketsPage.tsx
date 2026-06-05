@@ -42,7 +42,7 @@ export default function ItTicketsPage() {
 
   return (
     <div className="flex min-h-full flex-col">
-      <header className="sticky top-0 z-10 flex items-center gap-4 border-b border-line bg-paper px-6 py-3" style={{ minHeight: 64 }}>
+      <header className="sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b border-line bg-paper px-4 sm:px-6 py-3" style={{ minHeight: 64 }}>
         <div className="min-w-0 flex-1">
           <p className="font-mono text-[12px] text-ink2 mb-0.5 leading-none">TI / Boletas</p>
           <h1 className="text-[18px] font-semibold text-ink leading-tight tracking-tight flex items-center gap-2">
@@ -56,7 +56,7 @@ export default function ItTicketsPage() {
         )}
       </header>
 
-      <div className="flex-1 p-6 bg-bg space-y-3.5">
+      <div className="flex-1 p-4 sm:p-6 bg-bg space-y-3.5">
         <div className="flex flex-wrap items-center gap-2.5">
           <label className="relative flex flex-1 min-w-[200px] items-center">
             <Search className="pointer-events-none absolute left-3 h-4 w-4 text-ink2" />

@@ -36,6 +36,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Department> Departments => Set<Department>();
     public DbSet<ItAssetHistory> ItAssetHistory => Set<ItAssetHistory>();
     public DbSet<ItAssetPhoto> ItAssetPhotos => Set<ItAssetPhoto>();
+    public DbSet<ItAssetCredential> ItAssetCredentials => Set<ItAssetCredential>();
     public DbSet<ItTicket> ItTickets => Set<ItTicket>();
     public DbSet<ItTicketDetail> ItTicketDetails => Set<ItTicketDetail>();
     public DbSet<ItAssignment> ItAssignments => Set<ItAssignment>();

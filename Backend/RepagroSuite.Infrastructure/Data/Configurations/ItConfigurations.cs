@@ -130,6 +130,7 @@ public class ItAssetConfiguration : IEntityTypeConfiguration<ItAsset>
         builder.Property(x => x.HasWarranty).HasColumnName("TieneGarantia");
         builder.Property(x => x.WarrantyEndDate).HasColumnName("FechaVencimientoGarantia");
         builder.HasIndex(x => x.WarrantyEndDate);
+        builder.Property(x => x.InvoiceNumber).HasColumnName("NumeroFactura").HasMaxLength(100);
 
         builder.Property(x => x.Notes).HasColumnName("Observaciones").HasMaxLength(2000);
 
@@ -143,6 +144,31 @@ public class ItAssetConfiguration : IEntityTypeConfiguration<ItAsset>
         builder.HasOne(x => x.Spec).WithOne(s => s.Asset).HasForeignKey<ItAssetSpec>(s => s.AssetId).OnDelete(DeleteBehavior.Cascade);
         builder.HasMany(x => x.History).WithOne(h => h.Asset).HasForeignKey(h => h.AssetId).OnDelete(DeleteBehavior.Cascade);
         builder.HasMany(x => x.Photos).WithOne(p => p.Asset).HasForeignKey(p => p.AssetId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasMany(x => x.Credentials).WithOne(c => c.Asset).HasForeignKey(c => c.AssetId).OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasQueryFilter(x => !x.IsDeleted);
+    }
+}
+
+public class ItAssetCredentialConfiguration : IEntityTypeConfiguration<ItAssetCredential>
+{
+    public void Configure(EntityTypeBuilder<ItAssetCredential> builder)
+    {
+        builder.ToTable("CredencialesActivo", "SOPORTE");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.RowVersion).IsRowVersion();
+        builder.MapBaseEntityColumns();
+
+        builder.Property(x => x.AssetId).HasColumnName("ActivoId");
+        builder.Property(x => x.Type).HasColumnName("Tipo").HasConversion<int>();
+        builder.Property(x => x.Label).HasColumnName("Cuenta").HasMaxLength(150).IsRequired();
+        builder.Property(x => x.Username).HasColumnName("Usuario").HasMaxLength(200);
+        // Secreto cifrado (Data Protection, prefijo enc:). Tamaño holgado por el overhead del cifrado.
+        builder.Property(x => x.SecretEncrypted).HasColumnName("SecretoCifrado").HasMaxLength(2000);
+        builder.Property(x => x.Host).HasColumnName("Host").HasMaxLength(300);
+        builder.Property(x => x.Notes).HasColumnName("Notas").HasMaxLength(1000);
+        builder.Property(x => x.SortOrder).HasColumnName("Orden");
+        builder.HasIndex(x => new { x.AssetId, x.SortOrder });
 
         builder.HasQueryFilter(x => !x.IsDeleted);
     }
@@ -237,6 +263,7 @@ public class ItAssetHistoryConfiguration : IEntityTypeConfiguration<ItAssetHisto
         builder.Property(x => x.Description).HasColumnName("Descripcion").HasMaxLength(500);
         builder.Property(x => x.OccurredAt).HasColumnName("OcurrioEn");
         builder.Property(x => x.PerformedBy).HasColumnName("RealizadoPor");
+        builder.Property(x => x.TicketId).HasColumnName("BoletaId");
         builder.HasIndex(x => new { x.AssetId, x.OccurredAt });
 
         builder.HasQueryFilter(x => !x.IsDeleted);

@@ -420,7 +420,7 @@ export default function RoomForm({ room, onClose }: { room?: RoomDto; onClose: (
       </div>
 
       {/* ─── Capacidad + Ubicación + Piso ─── */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="flex flex-col gap-1">
           <label className={labelCls}>Capacidad <span className="text-red-500">*</span></label>
           <input type="number" min={1} className={inputCls} {...register('capacity', { valueAsNumber: true })} />

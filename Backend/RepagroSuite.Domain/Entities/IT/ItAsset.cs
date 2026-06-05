@@ -41,6 +41,7 @@ public class ItAsset : BaseEntity
     public string? Currency { get; set; }   // CRC | USD
     public bool HasWarranty { get; set; }
     public DateTime? WarrantyEndDate { get; set; }
+    public string? InvoiceNumber { get; set; }   // N.º de factura de compra (opcional)
 
     // Otros
     public string? Notes { get; set; }
@@ -49,6 +50,7 @@ public class ItAsset : BaseEntity
     public ItAssetSpec? Spec { get; set; }
     public ICollection<ItAssetHistory> History { get; set; } = [];
     public ICollection<ItAssetPhoto> Photos { get; set; } = [];   // Galería (hasta 5). ImageUrl = primera foto (miniatura).
+    public ICollection<ItAssetCredential> Credentials { get; set; } = [];   // Bóveda de credenciales (cifradas).
 
     /// <summary>
     /// Máquina de estados del ciclo de vida. Se valida en el dominio (no sólo en la UI).
@@ -59,13 +61,13 @@ public class ItAsset : BaseEntity
         if (from == to) return true;
         return from switch
         {
-            ItAssetStatus.Available        => to is ItAssetStatus.Assigned or ItAssetStatus.Loaned or ItAssetStatus.UnderMaintenance or ItAssetStatus.UnderReview or ItAssetStatus.Inactive or ItAssetStatus.Disposed,
-            ItAssetStatus.Assigned         => to is ItAssetStatus.Returned or ItAssetStatus.UnderReview or ItAssetStatus.UnderRepair or ItAssetStatus.Damaged or ItAssetStatus.Lost or ItAssetStatus.Stolen,
+            ItAssetStatus.Available        => to is ItAssetStatus.Assigned or ItAssetStatus.Loaned or ItAssetStatus.UnderMaintenance or ItAssetStatus.UnderReview or ItAssetStatus.Inactive or ItAssetStatus.Disposed or ItAssetStatus.Damaged or ItAssetStatus.Lost or ItAssetStatus.Stolen,
+            ItAssetStatus.Assigned         => to is ItAssetStatus.Available or ItAssetStatus.Returned or ItAssetStatus.UnderReview or ItAssetStatus.UnderRepair or ItAssetStatus.Damaged or ItAssetStatus.Lost or ItAssetStatus.Stolen,
             ItAssetStatus.Loaned           => to is ItAssetStatus.Returned or ItAssetStatus.Available or ItAssetStatus.Damaged or ItAssetStatus.Lost,
             ItAssetStatus.UnderReview      => to is ItAssetStatus.Available or ItAssetStatus.UnderRepair or ItAssetStatus.Disposed,
             ItAssetStatus.UnderMaintenance => to is ItAssetStatus.Available or ItAssetStatus.UnderRepair,
             ItAssetStatus.UnderRepair      => to is ItAssetStatus.Available or ItAssetStatus.Damaged or ItAssetStatus.Disposed,
-            ItAssetStatus.Returned         => to is ItAssetStatus.Available or ItAssetStatus.UnderReview,
+            ItAssetStatus.Returned         => to is ItAssetStatus.Available or ItAssetStatus.UnderReview or ItAssetStatus.Assigned or ItAssetStatus.Loaned,
             ItAssetStatus.Damaged          => to is ItAssetStatus.UnderRepair or ItAssetStatus.Disposed,
             ItAssetStatus.Lost             => to is ItAssetStatus.Disposed or ItAssetStatus.Available,
             ItAssetStatus.Stolen           => to is ItAssetStatus.Disposed,

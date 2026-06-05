@@ -127,7 +127,7 @@ export default function DashboardPage() {
     <div className="flex min-h-full flex-col">
       {/* ── Topbar ── */}
       <header
-        className="sticky top-0 z-10 flex items-center gap-4 border-b border-line bg-paper px-6 py-3"
+        className="sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b border-line bg-paper px-4 sm:px-6 py-3"
         style={{ minHeight: 64 }}
       >
         <div className="min-w-0 flex-1">
@@ -167,7 +167,7 @@ export default function DashboardPage() {
       </header>
 
       {/* ── Content ── */}
-      <div className="flex-1 p-6 bg-bg space-y-3.5">
+      <div className="flex-1 p-4 sm:p-6 bg-bg space-y-3.5">
 
         {/* Error state */}
         {errorStats && (

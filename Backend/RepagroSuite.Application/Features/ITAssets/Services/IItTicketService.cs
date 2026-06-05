@@ -13,6 +13,8 @@ public interface IItTicketService
 
     Task<ItTicketDto> CreateAssignmentAsync(CreateAssignmentDto dto, Guid actorUserId, CancellationToken cancellationToken = default);
     Task<ItTicketDto> CreateReturnAsync(CreateReturnDto dto, Guid actorUserId, CancellationToken cancellationToken = default);
+    Task<ItTicketDto> CreateDeassignmentAsync(CreateDeassignmentDto dto, Guid actorUserId, CancellationToken cancellationToken = default);
+    Task<ItTicketDto> CreateIncidentAsync(CreateIncidentDto dto, Guid actorUserId, CancellationToken cancellationToken = default);
     Task<ItTicketDto> CreateGenericTicketAsync(CreateGenericTicketDto dto, Guid actorUserId, CancellationToken cancellationToken = default);
     Task<ItTicketDto> VoidAsync(Guid id, VoidTicketDto dto, Guid actorUserId, CancellationToken cancellationToken = default);
 }

@@ -26,8 +26,12 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       isAuthenticated: false,
 
-      setAuth: (accessToken, user) =>
-        set({ accessToken, user, isAuthenticated: true }),
+      setAuth: (accessToken, user) => {
+        // Reinicia el reloj de inactividad en cada login para no heredar una marca vieja
+        // de una sesión anterior (evita el falso "sesión expirada" justo al entrar).
+        localStorage.setItem('repagro-last-activity', String(Date.now()))
+        set({ accessToken, user, isAuthenticated: true })
+      },
 
       setAccessToken: (accessToken) =>
         set({ accessToken }),
