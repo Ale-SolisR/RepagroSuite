@@ -300,33 +300,27 @@ public class InformePdfService
                 col.Item().Element(e => Explicacion(e, r.Interpretaciones.AnalisisVacunacion, "LECTURA · VACUNACIÓN ANTES/DESPUÉS"));
             }
 
-            // ===== 8. Comparativo entre granjas =====
-            if (r.ComparativoGranjas.Count > 1)
-            {
-                col.Item().PageBreak();
-                col.Item().Element(e => SeccionTitulo(e, "8. Comparativo entre Granjas (mismo periodo)"));
-                col.Item().PaddingTop(8).Element(e => BarrasComparativoGranjas(e, r));
-                col.Item().Element(e => Explicacion(e, r.Interpretaciones.Granjas));
-            }
+            // El "Comparativo entre Granjas" se muestra solo en el sistema (dashboard web), NO en el PDF.
 
-            // ===== 9. Detalle por lote =====
+            // ===== 8. Detalle por lote =====
             if (r.PorLote.Count > 0)
             {
-                col.Item().PaddingTop(20).Element(e => SeccionTitulo(e, "9. Resultados por Lote"));
+                col.Item().PageBreak();
+                col.Item().Element(e => SeccionTitulo(e, "8. Resultados por Lote"));
                 col.Item().PaddingTop(8).Element(e => TablaPorLote(e, r));
             }
 
-            // ===== 10. Conclusiones =====
+            // ===== 9. Conclusiones =====
             col.Item().PageBreak();
-            col.Item().Element(e => SeccionTitulo(e, "10. Conclusiones Tecnicas"));
+            col.Item().Element(e => SeccionTitulo(e, "9. Conclusiones Tecnicas"));
             col.Item().PaddingTop(8).Element(e => ListaTexto(e, r.Conclusiones, TealPrimary));
 
-            // ===== 11. Recomendaciones =====
-            col.Item().PaddingTop(20).Element(e => SeccionTitulo(e, "11. Recomendaciones"));
+            // ===== 10. Recomendaciones =====
+            col.Item().PaddingTop(20).Element(e => SeccionTitulo(e, "10. Recomendaciones"));
             col.Item().PaddingTop(8).Element(e => ListaTexto(e, r.Recomendaciones, AccentBlue));
 
-            // ===== 12. Anexo de datos =====
-            col.Item().PaddingTop(20).Element(e => SeccionTitulo(e, "12. Anexo de Datos · Auditoria"));
+            // ===== 11. Anexo de datos =====
+            col.Item().PaddingTop(20).Element(e => SeccionTitulo(e, "11. Anexo de Datos · Auditoria"));
             col.Item().PaddingTop(8).Element(e => AnexoDatos(e, meta, r));
         });
     }

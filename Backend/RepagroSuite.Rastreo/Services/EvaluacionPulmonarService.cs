@@ -112,6 +112,13 @@ public class EvaluacionPulmonarService
                 var dt = g.SelectMany(r => r.Detalles).ToList();
                 var cons = dt.Select(ConsolidacionAnimal).ToList();
                 var prev = dt.Count == 0 ? 0 : 100.0 * dt.Count(x => SumaScores(x) > 0) / dt.Count;
+                // Vacunas aplicadas en el lote (nombres distintos) y dosis totales (animales x vacunas por registro).
+                var vacunasLote = g
+                    .SelectMany(r => r.Vacunas.Where(rv => rv.Vacuna != null).Select(rv => rv.Vacuna!.Nombre))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(x => x)
+                    .ToList();
+                var dosisLote = g.Sum(r => r.Detalles.Count * r.Vacunas.Count(rv => rv.Vacuna != null));
                 return new LoteInfo
                 {
                     Lote = g.Key,
@@ -126,6 +133,8 @@ public class EvaluacionPulmonarService
                         Etiqueta = e.Nombre,
                         Positivos = dt.Count(d => EnfermedadValorHelper.Positivo(d, e))
                     }).ToList(),
+                    Vacunas = vacunasLote,
+                    DosisAplicadas = dosisLote,
                 };
             })
             .OrderByDescending(x => x.ConsolidacionPct)
@@ -171,7 +180,7 @@ public class EvaluacionPulmonarService
         }).ToList();
         resultado.Vacunas = CalcularVacunas(registros, detalles);
         resultado.TendenciaVacunas = CalcularTendenciaVacunas(historicos, inicioTendencia);
-        resultado.AnalisisVacunacion = await CalcularAnalisisVacunacionAsync(granjaId, ct);
+        resultado.AnalisisVacunacion = await CalcularAnalisisVacunacionAsync(granjaId, enfermedades, ct);
 
         // ===== Tendencia por hallazgo: pendiente (regresion lineal) y direccion clinica exactas =====
         resultado.TendenciaHallazgos = CalcularTendenciaHallazgos(resultado.Tendencia, resultado.Hallazgos);
@@ -403,7 +412,7 @@ public class EvaluacionPulmonarService
         }).ToList();
         resultado.Vacunas = CalcularVacunas(registros, detalles);
         resultado.TendenciaVacunas = CalcularTendenciaVacunas(historicos, inicioTendencia);
-        resultado.AnalisisVacunacion = await CalcularAnalisisVacunacionAsync(null, ct);
+        resultado.AnalisisVacunacion = await CalcularAnalisisVacunacionAsync(null, enfermedades, ct);
         resultado.TendenciaHallazgos = CalcularTendenciaHallazgos(resultado.Tendencia, resultado.Hallazgos);
 
         resultado.Conclusiones = GenerarConclusiones(resultado);
@@ -477,6 +486,11 @@ public class EvaluacionPulmonarService
             var dtVac = vacunados.SelectMany(r => r.Detalles).ToList();
             var dtSin = sinVacuna.SelectMany(r => r.Detalles).ToList();
             var total = dtVac.Count + dtSin.Count;
+            // Dosis = por cada registro vacunado, cada animal recibe cada vacuna distinta del registro.
+            var dosis = vacunados.Sum(r => r.Detalles.Count * r.Vacunas.Count(rv => rv.Vacuna != null));
+            var vacunasDistintas = vacunados
+                .SelectMany(r => r.Vacunas.Where(rv => rv.Vacuna != null).Select(rv => rv.VacunaId))
+                .Distinct().Count();
             var consVac = dtVac.Count == 0 ? 0 : Math.Round(dtVac.Select(ConsolidacionAnimal).Average(), 2);
             var consSin = dtSin.Count == 0 ? 0 : Math.Round(dtSin.Select(ConsolidacionAnimal).Average(), 2);
             var prevVac = dtVac.Count == 0 ? 0 : Math.Round(100.0 * dtVac.Count(x => SumaScores(x) > 0) / dtVac.Count, 2);
@@ -487,6 +501,8 @@ public class EvaluacionPulmonarService
                 Animales = total,
                 AnimalesVacunados = dtVac.Count,
                 AnimalesSinVacuna = dtSin.Count,
+                DosisAplicadas = dosis,
+                VacunasDistintas = vacunasDistintas,
                 CoberturaVacunadosPct = Pct(dtVac.Count, total),
                 ConsolidacionVacunadosPct = consVac,
                 ConsolidacionSinVacunaPct = consSin,
@@ -504,7 +520,7 @@ public class EvaluacionPulmonarService
     /// consolidacion y prevalencia por offset (linea temporal con marcador en 0) y ANTES (offset&lt;0)
     /// vs DESPUES (offset&gt;=0). granjaId null = todas las granjas. No se limita por periodo: es longitudinal.
     /// </summary>
-    private async Task<AnalisisVacunacion> CalcularAnalisisVacunacionAsync(int? granjaId, CancellationToken ct)
+    private async Task<AnalisisVacunacion> CalcularAnalisisVacunacionAsync(int? granjaId, List<Enfermedad> enfermedades, CancellationToken ct)
     {
         var q = _db.Registros.AsNoTracking()
             .Include(r => r.Vacunas)
@@ -551,6 +567,9 @@ public class EvaluacionPulmonarService
                 Animales = dt.Count,
                 ConsolidacionPct = dt.Count == 0 ? 0 : Math.Round(dt.Select(ConsolidacionAnimal).Average(), 2),
                 PrevalenciaPct = dt.Count == 0 ? 0 : Math.Round(100.0 * dt.Count(x => SumaScores(x) > 0) / dt.Count, 2),
+                HallazgosPct = enfermedades.ToDictionary(
+                    e => e.Codigo,
+                    e => Pct(dt.Count(d => EnfermedadValorHelper.Positivo(d, e)), dt.Count)),
             };
         }).ToList();
 
@@ -1035,6 +1054,10 @@ public class LoteInfo
     public int SpesPositivos { get; set; }
     public int PericarditisPositivos { get; set; }
     public List<HallazgoConteo> Hallazgos { get; set; } = new();
+    /// <summary>Nombres de las vacunas aplicadas en este lote (vacio si no se vacuno).</summary>
+    public List<string> Vacunas { get; set; } = new();
+    /// <summary>Total de dosis aplicadas en el lote (animales x vacunas distintas por registro).</summary>
+    public int DosisAplicadas { get; set; }
 }
 
 public class HallazgoConteo
@@ -1082,6 +1105,8 @@ public class PuntoVacunacionRelativo
     public int Animales { get; set; }
     public double ConsolidacionPct { get; set; }
     public double PrevalenciaPct { get; set; }
+    /// <summary>Prevalencia (% animales afectados) de cada enfermedad en este offset, para ver mejoria por enfermedad tras vacunar.</summary>
+    public Dictionary<string, double> HallazgosPct { get; set; } = new();
 }
 
 public class VacunaTendenciaPunto
@@ -1090,6 +1115,10 @@ public class VacunaTendenciaPunto
     public int Animales { get; set; }
     public int AnimalesVacunados { get; set; }
     public int AnimalesSinVacuna { get; set; }
+    /// <summary>Total de dosis aplicadas en el mes (animales vacunados x vacunas distintas por registro).</summary>
+    public int DosisAplicadas { get; set; }
+    /// <summary>Cantidad de vacunas distintas utilizadas en el mes.</summary>
+    public int VacunasDistintas { get; set; }
     public double CoberturaVacunadosPct { get; set; }
     public double ConsolidacionVacunadosPct { get; set; }
     public double ConsolidacionSinVacunaPct { get; set; }
