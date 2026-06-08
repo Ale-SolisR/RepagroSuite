@@ -39,3 +39,6 @@ publish/
 db-export/
 remote-logs/
 *.zip
+
+# Publish output y secretos de produccion (no commitear)
+Backend/artifacts/
