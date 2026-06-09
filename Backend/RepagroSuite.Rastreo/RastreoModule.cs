@@ -7,6 +7,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
+using Rastreo.Api.Controllers;
 using Rastreo.Api.Data;
 using Rastreo.Api.Models;
 using Rastreo.Api.Services;
@@ -93,12 +94,30 @@ public static class RastreoModule
                     var db = ctx.HttpContext.RequestServices.GetRequiredService<RastreoDbContext>();
                     var u = await db.Usuarios.AsNoTracking()
                         .Where(x => x.Id == id)
-                        .Select(x => new { x.Activo, x.SesionToken })
+                        .Select(x => new { x.Activo, x.SesionToken, x.SesionExpira })
                         .FirstOrDefaultAsync();
                     if (u is null || !u.Activo || u.SesionToken?.ToString() != sid)
                     {
                         ctx.Response.Headers["X-Session-Superseded"] = "1";
                         ctx.Fail("SESION_SUPERSEDED");
+                        return;
+                    }
+
+                    var now = DateTime.UtcNow;
+                    // Sesión DESLIZANTE: expira tras 3h SIN actividad. Cualquier request válida la extiende.
+                    if (u.SesionExpira.HasValue && u.SesionExpira.Value <= now)
+                    {
+                        ctx.Response.Headers["X-Session-Expired"] = "1";
+                        ctx.Fail("SESION_EXPIRADA_INACTIVIDAD");
+                        return;
+                    }
+                    // Extiende la ventana a now+3h. Throttle: solo escribe si quedan < 2.5h
+                    // (≈ máx. 1 escritura cada 30 min) para no pegar a la BD en cada request.
+                    var ventana = TimeSpan.FromHours(AuthController.SesionInactividadHoras);
+                    if (!u.SesionExpira.HasValue || u.SesionExpira.Value < now.Add(ventana) - TimeSpan.FromMinutes(30))
+                    {
+                        await db.Usuarios.Where(x => x.Id == id)
+                            .ExecuteUpdateAsync(s => s.SetProperty(p => p.SesionExpira, now.Add(ventana)));
                     }
                 }
             };

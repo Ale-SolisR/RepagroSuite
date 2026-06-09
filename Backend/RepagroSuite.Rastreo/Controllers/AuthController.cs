@@ -14,6 +14,9 @@ public class AuthController : ControllerBase
     private readonly RastreoDbContext _db;
     private readonly JwtService _jwt;
 
+    /// <summary>Ventana de inactividad de la sesión (horas). Tras este lapso SIN actividad, la sesión expira.</summary>
+    public const double SesionInactividadHoras = 3;
+
     public AuthController(RastreoDbContext db, JwtService jwt)
     {
         _db = db;
@@ -50,7 +53,9 @@ public class AuthController : ControllerBase
         var sesionToken = Guid.NewGuid();
         var (token, expira) = _jwt.GenerarToken(usuario, sesionToken);
         usuario.SesionToken = sesionToken;
-        usuario.SesionExpira = expira;
+        // SesionExpira = ventana DESLIZANTE de inactividad (3h). El JWT dura mucho más (credencial),
+        // pero la BD es la fuente de verdad: cada request la extiende y, tras 3h sin actividad, expira.
+        usuario.SesionExpira = DateTime.UtcNow.AddHours(SesionInactividadHoras);
         await _db.SaveChangesAsync(ct);
 
         return Ok(new LoginResponse(token, usuario.Correo, usuario.Nombre, usuario.Rol, usuario.Id, expira));
