@@ -1,6 +1,5 @@
 import { Navigate, Outlet } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
-import { useIdleLogout } from '@/hooks/useIdleLogout'
 
 interface ProtectedRouteProps {
   permission?: string
@@ -11,8 +10,6 @@ interface ProtectedRouteProps {
 
 export default function ProtectedRoute({ permission, role, master, redirectTo = '/login' }: ProtectedRouteProps) {
   const { isAuthenticated, user, hasPermission, hasRole } = useAuthStore()
-
-  useIdleLogout()
 
   if (!isAuthenticated) return <Navigate to={redirectTo} replace />
 

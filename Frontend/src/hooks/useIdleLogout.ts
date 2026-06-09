@@ -5,7 +5,10 @@ import { useAuthStore } from '@/store/authStore'
 
 const IDLE_TIMEOUT_MS = 3 * 60 * 60 * 1000   // 3 horas de inactividad
 const STORAGE_KEY = 'repagro-last-activity'
-const ACTIVITY_EVENTS = ['mousedown', 'keydown', 'touchstart', 'scroll', 'visibilitychange'] as const
+// Incluye movimiento de mouse y clic. La escritura a localStorage se throttlea (abajo) para que
+// mousemove/scroll no saturen, pero el temporizador se reprograma en cada evento.
+const ACTIVITY_EVENTS = ['mousedown', 'mousemove', 'click', 'keydown', 'touchstart', 'scroll', 'visibilitychange'] as const
+const WRITE_THROTTLE_MS = 15_000
 
 export function useIdleLogout() {
   const navigate = useNavigate()
@@ -35,8 +38,13 @@ export function useIdleLogout() {
       timerRef.current = window.setTimeout(expire, remaining)
     }
 
+    let lastWrite = 0
     const touch = () => {
-      localStorage.setItem(STORAGE_KEY, String(Date.now()))
+      const now = Date.now()
+      if (now - lastWrite >= WRITE_THROTTLE_MS) {
+        lastWrite = now
+        localStorage.setItem(STORAGE_KEY, String(now))
+      }
       scheduleFromLastActivity()
     }
 

@@ -8,6 +8,7 @@ import { useAuthStore } from '@/store/authStore'
 import { authApi } from '@/api/auth'
 import { classNames } from '@/utils'
 import { navGroups } from '@/components/layout/navConfig'
+import { useIdleLogout } from '@/hooks/useIdleLogout'
 import repagroLogoFull from '@/assets/repagro-logo-full.png'
 
 function getInitials(name: string) {
@@ -312,6 +313,9 @@ function SidebarContent({
 export default function AppLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
+  // Control de inactividad (3h) montado UNA sola vez aquí (no en ProtectedRoute, que se
+  // anida y duplicaría temporizadores/listeners y mostraría avisos repetidos).
+  useIdleLogout()
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
