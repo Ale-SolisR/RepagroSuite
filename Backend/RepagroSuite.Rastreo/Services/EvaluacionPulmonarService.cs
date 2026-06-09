@@ -514,11 +514,14 @@ public class EvaluacionPulmonarService
     }
 
     /// <summary>
-    /// Analisis antes/despues de vacunacion alineado por lote (event-study).
-    /// Para cada lote (granja+lote), el primer registro FINALIZADO con vacuna marca el "mes 0" (inicio).
-    /// Cada registro del lote se ubica en un offset de meses relativo a ese inicio; se agregan
-    /// consolidacion y prevalencia por offset (linea temporal con marcador en 0) y ANTES (offset&lt;0)
-    /// vs DESPUES (offset&gt;=0). granjaId null = todas las granjas. No se limita por periodo: es longitudinal.
+    /// Analisis antes/despues de vacunacion alineado POR GRANJA (event-study).
+    /// Modelo real: cada granja envia ~1 lote de matanza por mes (cada registro es un lote distinto),
+    /// asi que la mejoria se mide por granja a lo largo del tiempo, no comparando un lote consigo mismo.
+    /// Para cada granja, el primer registro FINALIZADO con vacuna marca el "mes 0" (inicio); cada registro
+    /// de la granja se ubica en un offset de meses relativo a ese inicio. Se agregan consolidacion,
+    /// prevalencia y hallazgos por offset (linea temporal con marcador en 0) y ANTES (offset&lt;0) vs
+    /// DESPUES (offset&gt;=0). granjaId null = todas las granjas (cada una alineada a su propio inicio).
+    /// No se limita por periodo: es longitudinal. LotesAnalizados = numero de granjas con inicio de vacunacion.
     /// </summary>
     private async Task<AnalisisVacunacion> CalcularAnalisisVacunacionAsync(int? granjaId, List<Enfermedad> enfermedades, CancellationToken ct)
     {
@@ -535,18 +538,16 @@ public class EvaluacionPulmonarService
 
         static int MesIndex(DateTime d) => d.Year * 12 + (d.Month - 1);
 
-        // Agrupar por lote real (granja + lote); sin lote no participa.
-        var grupos = regs
-            .Where(r => !string.IsNullOrWhiteSpace(r.Lote))
-            .GroupBy(r => new { r.GranjaId, Lote = r.Lote!.Trim().ToUpperInvariant() });
+        // Agrupar POR GRANJA: cada granja se ancla a su primer mes con vacuna.
+        var grupos = regs.GroupBy(r => r.GranjaId);
 
         var porOffset = new Dictionary<int, List<RegistroDetalle>>();
         foreach (var g in grupos)
         {
             var vacunados = g.Where(r => r.UsaVacunas && r.Vacunas.Count > 0).ToList();
-            if (vacunados.Count == 0) continue; // lote sin vacuna: no hay inicio que anclar
+            if (vacunados.Count == 0) continue; // granja sin vacuna: no hay inicio que anclar
             var inicioIdx = MesIndex(vacunados.Min(r => r.FechaCreacion));
-            res.LotesAnalizados++;
+            res.LotesAnalizados++; // = granjas analizadas
             foreach (var r in g)
             {
                 var off = MesIndex(r.FechaCreacion) - inicioIdx;
@@ -819,15 +820,15 @@ public class EvaluacionPulmonarService
                 lecturaDelta;
         }
 
-        // --- Analisis antes/despues de vacunacion (alineado por lote) ---
+        // --- Analisis antes/despues de vacunacion (alineado por granja) ---
         var av = r.AnalisisVacunacion;
         if (av.LotesAnalizados == 0)
         {
-            ip.AnalisisVacunacion = "Aun no hay lotes con inicio de vacunacion registrado. Cuando un lote registre uso de vacuna, este analisis alinea cada lote a su mes de inicio (mes 0) y compara la consolidacion y prevalencia ANTES vs DESPUES de vacunar, para aislar la mejoria atribuible a la vacuna.";
+            ip.AnalisisVacunacion = "Aun no hay granjas con inicio de vacunacion registrado. Cuando una granja registre uso de vacuna, este analisis la alinea a su mes de inicio (mes 0) y compara la consolidacion y prevalencia ANTES vs DESPUES de vacunar (cada mes es un lote de matanza distinto), para aislar la mejoria atribuible a la vacuna.";
         }
         else if (!av.TieneComparacion)
         {
-            ip.AnalisisVacunacion = $"Se identificaron {av.LotesAnalizados} lote(s) con inicio de vacunacion, pero todavia no hay evaluaciones suficientes antes y despues del inicio para comparar. Se requieren evaluaciones del mismo lote en meses previos y posteriores a su primera vacuna.";
+            ip.AnalisisVacunacion = $"Se identificaron {av.LotesAnalizados} granja(s) con inicio de vacunacion, pero todavia no hay evaluaciones suficientes antes y despues del inicio para comparar. Se requieren evaluaciones de la granja en meses previos y posteriores a su primera vacuna.";
         }
         else
         {
@@ -843,8 +844,8 @@ public class EvaluacionPulmonarService
                     : "la prevalencia se mantuvo";
             string cierre = (av.MejoraConsolidacionPct > 0 || av.MejoraPrevalenciaPct > 0)
                 ? "La reduccion de lesiones tras el inicio de la vacunacion es compatible con un efecto protector; conviene sostener el plan y acumular mas ciclos para confirmar la tendencia."
-                : "No se observa mejoria tras el inicio: revisar momento de aplicacion, cobertura, conservacion de la vacuna (cadena de frio) y el desafio de campo del lote.";
-            ip.AnalisisVacunacion = $"Alineando {av.LotesAnalizados} lote(s) a su mes de inicio de vacunacion (mes 0 = marcador 'Inicio'), y comparando {av.AnimalesAntes} pulmones evaluados ANTES con {av.AnimalesDespues} DESPUES, se observa {lecturaCons} y {lecturaPrev}. {cierre} Este metodo compara cada lote consigo mismo (antes vs despues), lo que reduce el sesgo entre lotes de distinto riesgo.";
+                : "No se observa mejoria tras el inicio: revisar momento de aplicacion, cobertura, conservacion de la vacuna (cadena de frio) y el desafio de campo de la granja.";
+            ip.AnalisisVacunacion = $"Alineando {av.LotesAnalizados} granja(s) a su mes de inicio de vacunacion (mes 0 = marcador 'Inicio'), y comparando {av.AnimalesAntes} pulmones evaluados ANTES con {av.AnimalesDespues} DESPUES, se observa {lecturaCons} y {lecturaPrev}. {cierre} Este metodo compara cada granja consigo misma (antes vs despues de empezar a vacunar), donde cada mes aporta un lote de matanza distinto.";
         }
 
         // --- Comparativo periodo anterior ---
