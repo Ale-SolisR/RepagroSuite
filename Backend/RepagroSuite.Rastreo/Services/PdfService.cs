@@ -181,7 +181,7 @@ public class PdfService
                 .Select(g => g.First())
                 .ToList();
         return enfermedades
-            .Where(e => e.TipoCampo != "AGUDA_CRONICA")
+            .Where(e => e.Activo)
             .OrderBy(e => e.Orden).ThenBy(e => e.Nombre)
             .ToList();
     }

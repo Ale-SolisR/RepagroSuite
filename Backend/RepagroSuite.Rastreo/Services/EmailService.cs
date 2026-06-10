@@ -15,6 +15,10 @@ public class EmailService
         _log = log;
     }
 
+    /// <summary>True solo si hay credenciales SMTP (app-password) configuradas; si no, el envío no es posible.</summary>
+    public bool Configurado => !string.IsNullOrWhiteSpace(_cfg["Rastreo:Email:Password"])
+                           && !string.IsNullOrWhiteSpace(_cfg["Rastreo:Email:Username"]);
+
     public async Task EnviarAsync(
         IEnumerable<string> destinatarios,
         string asunto,

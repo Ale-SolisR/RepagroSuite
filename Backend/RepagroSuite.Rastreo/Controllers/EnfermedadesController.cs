@@ -15,6 +15,11 @@ public class EnfermedadesController : ControllerBase
     private readonly RastreoDbContext _db;
     public EnfermedadesController(RastreoDbContext db) { _db = db; }
 
+    // Tipos de campo soportados por la captura y por las tabulaciones (KPIs, Excel, PDF).
+    // Si se permitiera otro valor, el hallazgo se capturaría pero NUNCA tabularía (helper => false).
+    private static readonly HashSet<string> TiposValidos = new(StringComparer.OrdinalIgnoreCase)
+    { "SCORE_0_4", "BOOL", "AGUDA_CRONICA" };
+
     [HttpGet]
     public async Task<IActionResult> List()
     {
@@ -28,6 +33,9 @@ public class EnfermedadesController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] EnfermedadUpsertDto dto, CancellationToken ct)
     {
+        var tipo = dto.TipoCampo.Trim().ToUpperInvariant();
+        if (!TiposValidos.Contains(tipo))
+            return BadRequest(new { mensaje = $"Tipo de campo inválido. Use uno de: {string.Join(", ", TiposValidos)}" });
         var codigo = dto.Codigo.Trim().ToUpperInvariant();
         if (await _db.Enfermedades.AnyAsync(e => e.Codigo == codigo, ct))
             return Conflict(new { mensaje = "Ya existe una enfermedad con ese código" });
@@ -35,7 +43,7 @@ public class EnfermedadesController : ControllerBase
         {
             Codigo = codigo,
             Nombre = dto.Nombre.Trim(),
-            TipoCampo = dto.TipoCampo.Trim().ToUpperInvariant(),
+            TipoCampo = tipo,
             Orden = dto.Orden,
             Activo = true
         };
@@ -47,10 +55,13 @@ public class EnfermedadesController : ControllerBase
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, [FromBody] EnfermedadUpsertDto dto, CancellationToken ct)
     {
+        var tipo = dto.TipoCampo.Trim().ToUpperInvariant();
+        if (!TiposValidos.Contains(tipo))
+            return BadRequest(new { mensaje = $"Tipo de campo inválido. Use uno de: {string.Join(", ", TiposValidos)}" });
         var e = await _db.Enfermedades.FindAsync(new object?[] { id }, ct);
         if (e is null) return NotFound();
         e.Nombre = dto.Nombre.Trim();
-        e.TipoCampo = dto.TipoCampo.Trim().ToUpperInvariant();
+        e.TipoCampo = tipo;
         e.Orden = dto.Orden;
         await _db.SaveChangesAsync(ct);
         return NoContent();

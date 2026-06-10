@@ -83,6 +83,7 @@ public class EvaluacionPulmonarService
         var detalles = registros.SelectMany(r => r.Detalles).ToList();
         var granja = await _db.Granjas.AsNoTracking().FirstOrDefaultAsync(g => g.Id == granjaId, ct);
         var enfermedades = await EnfermedadesReporte(ct);
+        var agudaCronicas = await EnfermedadesAcAsync(ct);
 
         var resultado = new EvaluacionResultado
         {
@@ -102,7 +103,7 @@ public class EvaluacionPulmonarService
         }
 
         // ===== Metricas por animal (compartidas con el consolidado) =====
-        PoblarMetricasBase(resultado, detalles, enfermedades);
+        PoblarMetricasBase(resultado, detalles, enfermedades, agudaCronicas);
 
         // ===== Detalle por lote =====
         resultado.PorLote = registros
@@ -238,7 +239,7 @@ public class EvaluacionPulmonarService
     private static double Pct(int parte, int total) => total == 0 ? 0 : Math.Round(100.0 * parte / total, 2);
 
     /// <summary>Pobla las metricas que dependen solo del conjunto de detalles (sirve por granja y consolidado).</summary>
-    private static void PoblarMetricasBase(EvaluacionResultado resultado, List<RegistroDetalle> detalles, List<Enfermedad> enfermedades)
+    private static void PoblarMetricasBase(EvaluacionResultado resultado, List<RegistroDetalle> detalles, List<Enfermedad> enfermedades, List<Enfermedad> agudaCronicas)
     {
         if (detalles.Count == 0) return;
 
@@ -289,12 +290,14 @@ public class EvaluacionPulmonarService
             })
             .ToList();
 
-        resultado.AgudaCronicaPct = new AgudaCronicaDist
+        // Aguda/Cronica DINÁMICO: una distribución por cada enfermedad AGUDA_CRONICA activa.
+        resultado.AgudaCronicaItems = agudaCronicas.Select(e => BuildAcItem(detalles, e)).ToList();
+        // AgudaCronicaPct (legado) = primera AC activa, para la lectura clínica y compatibilidad.
+        var ac0 = resultado.AgudaCronicaItems.FirstOrDefault();
+        resultado.AgudaCronicaPct = ac0 == null ? new AgudaCronicaDist() : new AgudaCronicaDist
         {
-            AgudaPct     = Pct(detalles.Count(d => d.AgudaCronica == "A"),  detalles.Count),
-            CronicaPct   = Pct(detalles.Count(d => d.AgudaCronica == "C"),  detalles.Count),
-            AmbasPct     = Pct(detalles.Count(d => d.AgudaCronica == "AC"), detalles.Count),
-            SinClasifPct = Pct(detalles.Count(d => string.IsNullOrEmpty(d.AgudaCronica)), detalles.Count),
+            AgudaPct = ac0.AgudaPct, CronicaPct = ac0.CronicaPct,
+            AmbasPct = ac0.AmbasPct, SinClasifPct = ac0.SinClasifPct,
         };
 
         resultado.GradosPorLobulo = Lobulos.Select(l =>
@@ -321,6 +324,22 @@ public class EvaluacionPulmonarService
                 OportunidadPct = Pct(valores.Count(v => v > 0), valores.Length),
             };
         }).ToList();
+    }
+
+    /// <summary>Distribución A/C/AC/sin-clasificar de UNA enfermedad AGUDA_CRONICA (vía helper, dinámico).</summary>
+    private static AgudaCronicaItem BuildAcItem(List<RegistroDetalle> detalles, Enfermedad e)
+    {
+        string Val(RegistroDetalle d) => EnfermedadValorHelper.Texto(d, e); // "A" | "C" | "AC" | ""
+        return new AgudaCronicaItem
+        {
+            Clave = e.Codigo,
+            Etiqueta = e.Nombre,
+            Animales = detalles.Count,
+            AgudaPct     = Pct(detalles.Count(d => Val(d) == "A"),  detalles.Count),
+            CronicaPct   = Pct(detalles.Count(d => Val(d) == "C"),  detalles.Count),
+            AmbasPct     = Pct(detalles.Count(d => Val(d) == "AC"), detalles.Count),
+            SinClasifPct = Pct(detalles.Count(d => string.IsNullOrEmpty(Val(d))), detalles.Count),
+        };
     }
 
     /// <summary>Resumen por granja (KPIs + nivel de riesgo) para ranking/consolidado.</summary>
@@ -356,6 +375,7 @@ public class EvaluacionPulmonarService
             .ToListAsync(ct);
         var detalles = registros.SelectMany(r => r.Detalles).ToList();
         var enfermedades = await EnfermedadesReporte(ct);
+        var agudaCronicas = await EnfermedadesAcAsync(ct);
 
         var resultado = new EvaluacionResultado
         {
@@ -369,7 +389,7 @@ public class EvaluacionPulmonarService
         };
         if (detalles.Count == 0) { resultado.SinDatos = true; return resultado; }
 
-        PoblarMetricasBase(resultado, detalles, enfermedades);
+        PoblarMetricasBase(resultado, detalles, enfermedades, agudaCronicas);
 
         // Ranking por granja (con nivel de riesgo) — alimenta el ranking y la distribucion de riesgo.
         resultado.ComparativoGranjas = registros
@@ -428,6 +448,14 @@ public class EvaluacionPulmonarService
         if (consolidacionPct >= 5  || prevalenciaPct >= 30) return "MEDIO";
         return "BAJO";
     }
+
+    /// <summary>Enfermedades activas tipo AGUDA_CRONICA (eje de temporalidad). Dinámico: cualquier
+    /// enfermedad nueva de este tipo tabula su propia distribución; al inactivarla deja de aparecer.</summary>
+    private async Task<List<Enfermedad>> EnfermedadesAcAsync(CancellationToken ct) =>
+        await _db.Enfermedades.AsNoTracking()
+            .Where(e => e.Activo && e.TipoCampo == "AGUDA_CRONICA")
+            .OrderBy(e => e.Orden).ThenBy(e => e.Nombre)
+            .ToListAsync(ct);
 
     private async Task<List<Enfermedad>> EnfermedadesReporte(CancellationToken ct) =>
         await _db.Enfermedades.AsNoTracking()
@@ -527,6 +555,7 @@ public class EvaluacionPulmonarService
     {
         var q = _db.Registros.AsNoTracking()
             .Include(r => r.Vacunas)
+                .ThenInclude(rv => rv.Vacuna)
             .Include(r => r.Detalles)
                 .ThenInclude(d => d.EnfermedadesValores)
             .Where(r => r.Estado == "FINALIZADO" && r.GranjaId != null);
@@ -542,6 +571,8 @@ public class EvaluacionPulmonarService
         var grupos = regs.GroupBy(r => r.GranjaId);
 
         var porOffset = new Dictionary<int, List<RegistroDetalle>>();
+        // Resumen ejecutivo: qué vacunas se aplicaron, cuántas dosis y en cuántas granjas.
+        var vacunasAgg = new Dictionary<string, (int dosis, HashSet<int> granjas)>(StringComparer.OrdinalIgnoreCase);
         foreach (var g in grupos)
         {
             var vacunados = g.Where(r => r.UsaVacunas && r.Vacunas.Count > 0).ToList();
@@ -554,8 +585,23 @@ public class EvaluacionPulmonarService
                 if (!porOffset.TryGetValue(off, out var lst)) { lst = new(); porOffset[off] = lst; }
                 lst.AddRange(r.Detalles);
             }
+            foreach (var r in vacunados)
+                foreach (var nombre in r.Vacunas.Where(rv => rv.Vacuna != null)
+                                                .Select(rv => rv.Vacuna!.Nombre)
+                                                .Distinct(StringComparer.OrdinalIgnoreCase))
+                {
+                    if (!vacunasAgg.TryGetValue(nombre, out var cur)) cur = (0, new HashSet<int>());
+                    cur.dosis += r.Detalles.Count;
+                    if (r.GranjaId.HasValue) cur.granjas.Add(r.GranjaId.Value);
+                    vacunasAgg[nombre] = cur;
+                }
         }
         if (porOffset.Count == 0) return res;
+
+        res.VacunasUsadas = vacunasAgg
+            .Select(kv => new VacunaAplicadaResumen { Nombre = kv.Key, Dosis = kv.Value.dosis, Granjas = kv.Value.granjas.Count })
+            .OrderByDescending(v => v.Dosis)
+            .ToList();
 
         // Linea temporal: offsets presentes (clamp -6..+6 para legibilidad).
         res.Puntos = porOffset.Keys.Where(o => o >= -6 && o <= 6).OrderBy(o => o).Select(o =>
@@ -963,6 +1009,7 @@ public class EvaluacionResultado
     public HallazgosSecundarios HallazgosPct { get; set; } = new();
     public List<HallazgoClinico> Hallazgos { get; set; } = new();
     public AgudaCronicaDist AgudaCronicaPct { get; set; } = new();
+    public List<AgudaCronicaItem> AgudaCronicaItems { get; set; } = new();
     public List<GradoLobulo> GradosPorLobulo { get; set; } = new();
     public List<LoteInfo> PorLote { get; set; } = new();
     public List<TendenciaPunto> Tendencia { get; set; } = new();
@@ -1033,6 +1080,18 @@ public class AgudaCronicaDist
     public double SinClasifPct { get; set; }
 }
 
+/// <summary>Distribución temporal de UNA enfermedad tipo AGUDA_CRONICA (dinámico por enfermedad activa).</summary>
+public class AgudaCronicaItem
+{
+    public string Clave { get; set; } = "";
+    public string Etiqueta { get; set; } = "";
+    public int Animales { get; set; }
+    public double AgudaPct { get; set; }
+    public double CronicaPct { get; set; }
+    public double AmbasPct { get; set; }
+    public double SinClasifPct { get; set; }
+}
+
 public class GradoLobulo
 {
     public string Codigo { get; set; } = "";
@@ -1096,6 +1155,17 @@ public class AnalisisVacunacion
     public double MejoraPrevalenciaPct { get; set; }
     public bool TieneComparacion { get; set; }
     public List<PuntoVacunacionRelativo> Puntos { get; set; } = new();
+    /// <summary>Vacunas efectivamente aplicadas en el periodo analizado (resumen ejecutivo).</summary>
+    public List<VacunaAplicadaResumen> VacunasUsadas { get; set; } = new();
+}
+
+public class VacunaAplicadaResumen
+{
+    public string Nombre { get; set; } = "";
+    /// <summary>Total de dosis aplicadas (animales de los registros que incluyen esta vacuna).</summary>
+    public int Dosis { get; set; }
+    /// <summary>En cuántas granjas se aplicó.</summary>
+    public int Granjas { get; set; }
 }
 
 public class PuntoVacunacionRelativo

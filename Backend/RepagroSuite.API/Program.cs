@@ -77,8 +77,9 @@ builder.Services.AddCors(options =>
               })
               .AllowAnyHeader()
               .AllowAnyMethod()
-              // Permite que el frontend lea el nombre de archivo en descargas (PDF de boletas, Excel).
-              .WithExposedHeaders("Content-Disposition")
+              // Permite que el frontend lea el nombre de archivo en descargas (PDF de boletas, Excel)
+              // y los avisos de sesión de Rastreo (cross-origin no se leen si no se exponen).
+              .WithExposedHeaders("Content-Disposition", "X-Session-Expired", "X-Session-Superseded")
               .AllowCredentials());
 });
 

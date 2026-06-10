@@ -226,9 +226,15 @@ public class InformePdfService
             col.Item().PaddingTop(8).Row(row =>
             {
                 row.RelativeItem().Element(e => DonutSeveridad(e, r));
-                row.ConstantItem(16);
-                row.RelativeItem().Element(e => DonutAgudaCronica(e, r));
+                if (r.AgudaCronicaItems.Count > 0)
+                {
+                    row.ConstantItem(16);
+                    row.RelativeItem().Element(e => DonutAgudaCronica(e, r.AgudaCronicaItems[0]));
+                }
             });
+            // Enfermedades AGUDA_CRONICA adicionales (catálogo dinámico): un donut por cada una.
+            foreach (var ac in r.AgudaCronicaItems.Skip(1))
+                col.Item().PaddingTop(8).Element(e => DonutAgudaCronica(e, ac));
             col.Item().Element(e => Explicacion(e, r.Interpretaciones.Severidad, "LECTURA · SEVERIDAD"));
             col.Item().Element(e => Explicacion(e, r.Interpretaciones.AgudaCronica, "LECTURA · LESIONES AGUDAS / CRONICAS"));
 
@@ -456,9 +462,8 @@ public class InformePdfService
         ChartDonut(container, "Distribucion por severidad clinica", data, r.TotalEvaluados);
     }
 
-    private void DonutAgudaCronica(IContainer container, EvaluacionResultado r)
+    private void DonutAgudaCronica(IContainer container, AgudaCronicaItem a)
     {
-        var a = r.AgudaCronicaPct;
         var data = new[]
         {
             (label: "Aguda",       pct: a.AgudaPct,      color: "#ef4444", cnt: 0),
@@ -466,7 +471,7 @@ public class InformePdfService
             (label: "Ambas (AC)",  pct: a.AmbasPct,      color: "#f97316", cnt: 0),
             (label: "Sin clasif.", pct: a.SinClasifPct,  color: Slate300,  cnt: 0),
         };
-        ChartDonut(container, "Lesiones agudas vs cronicas", data, 100);
+        ChartDonut(container, a.Etiqueta, data, 100);
     }
 
     private void ChartDonut(IContainer container, string titulo, (string label, double pct, string color, int cnt)[] data, int totalShown)

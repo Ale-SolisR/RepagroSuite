@@ -17,13 +17,15 @@ public class RegistrosController : ControllerBase
     private readonly ExcelService _excel;
     private readonly PdfService _pdf;
     private readonly EmailService _email;
+    private readonly ILogger<RegistrosController> _log;
 
-    public RegistrosController(RastreoDbContext db, ExcelService excel, PdfService pdf, EmailService email)
+    public RegistrosController(RastreoDbContext db, ExcelService excel, PdfService pdf, EmailService email, ILogger<RegistrosController> log)
     {
         _db = db;
         _excel = excel;
         _pdf = pdf;
         _email = email;
+        _log = log;
     }
 
     // ===================== AISLAMIENTO POR USUARIO =====================
@@ -293,6 +295,8 @@ public class RegistrosController : ControllerBase
             return BadRequest(new { mensaje = "Debe indicar al menos un destinatario" });
         if (!dto.IncluirExcel && !dto.IncluirPdf)
             return BadRequest(new { mensaje = "Debe incluir al menos Excel o PDF" });
+        if (!_email.Configurado)
+            return StatusCode(503, new { mensaje = "El envío de correo no está habilitado en el servidor (falta la contraseña de aplicación de Gmail). Descarga el Excel/PDF y compártelo manualmente." });
 
         var r = await CargarCompleto(id, ct);
         if (r is null || !PuedeAcceder(r)) return NotFound();
@@ -320,7 +324,16 @@ public class RegistrosController : ControllerBase
 <b>Total cerdos:</b> {r.Detalles.Count}<br/>
 <b>Estado:</b> {r.Estado}</p>";
 
-        await _email.EnviarAsync(dto.Destinatarios, asunto, cuerpo, adjuntos, ct);
+        try
+        {
+            await _email.EnviarAsync(dto.Destinatarios, asunto, cuerpo, adjuntos, ct);
+        }
+        catch (Exception ex)
+        {
+            // No filtrar el detalle SMTP al cliente; registrar y devolver un mensaje accionable.
+            _log.LogError(ex, "Fallo al enviar correo del registro {Id}", id);
+            return StatusCode(502, new { mensaje = "No se pudo enviar el correo (el servidor de correo rechazó el envío). Verifica los destinatarios o descarga el Excel/PDF y compártelo manualmente." });
+        }
         return Ok(new { mensaje = "Correo enviado", destinatarios = dto.Destinatarios });
     }
 
